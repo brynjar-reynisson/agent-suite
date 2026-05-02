@@ -70,7 +70,11 @@ public class AnthropicChatService implements ChatService {
         if (aiMessage.hasToolExecutionRequests()) {
             messages.add(aiMessage);
             for (ToolExecutionRequest req : aiMessage.toolExecutionRequests()) {
-                String result = executors.get(req.name()).execute(req, "default");
+                ToolExecutor executor = executors.get(req.name());
+                if (executor == null) {
+                    throw new IllegalStateException("No executor found for tool: " + req.name());
+                }
+                String result = executor.execute(req, "default");
                 messages.add(ToolExecutionResultMessage.from(req, result));
             }
             return loop(messages, toolSpecs, executors, iterations + 1);
