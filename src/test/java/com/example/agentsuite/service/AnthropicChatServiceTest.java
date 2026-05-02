@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -30,6 +31,9 @@ class AnthropicChatServiceTest {
 
     private AnthropicChatService service;
 
+    @Captor
+    private ArgumentCaptor<List<ChatMessage>> captor;
+
     @BeforeEach
     void setUp() {
         service = new AnthropicChatService(mockModel);
@@ -46,7 +50,6 @@ class AnthropicChatServiceTest {
 
     @Test
     void chat_withSystemPrompt_includesSystemMessageFirst() {
-        ArgumentCaptor<List<ChatMessage>> captor = ArgumentCaptor.forClass(List.class);
         when(mockModel.generate(captor.capture())).thenReturn(Response.from(AiMessage.from("OK")));
 
         service.chat("You are helpful", "Hi");
@@ -59,7 +62,6 @@ class AnthropicChatServiceTest {
 
     @Test
     void chat_emptySystemPrompt_excludesSystemMessage() {
-        ArgumentCaptor<List<ChatMessage>> captor = ArgumentCaptor.forClass(List.class);
         when(mockModel.generate(captor.capture())).thenReturn(Response.from(AiMessage.from("OK")));
 
         service.chat("", "Hi");

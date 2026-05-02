@@ -20,6 +20,7 @@ import java.util.Map;
 public class AnthropicChatService implements ChatService {
 
     private final ChatLanguageModel model;
+    private static final int MAX_TOOL_ITERATIONS = 20;
 
     public AnthropicChatService(String apiKey, String modelName) {
         this(AnthropicChatModel.builder()
@@ -51,6 +52,16 @@ public class AnthropicChatService implements ChatService {
     private String loop(List<ChatMessage> messages,
                         List<ToolSpecification> toolSpecs,
                         Map<String, ToolExecutor> executors) {
+        return loop(messages, toolSpecs, executors, 0);
+    }
+
+    private String loop(List<ChatMessage> messages,
+                        List<ToolSpecification> toolSpecs,
+                        Map<String, ToolExecutor> executors,
+                        int iterations) {
+        if (iterations >= MAX_TOOL_ITERATIONS) {
+            throw new IllegalStateException("Exceeded maximum tool iterations: " + MAX_TOOL_ITERATIONS);
+        }
         Response<AiMessage> response = toolSpecs.isEmpty()
                 ? model.generate(messages)
                 : model.generate(messages, toolSpecs);
@@ -62,7 +73,7 @@ public class AnthropicChatService implements ChatService {
                 String result = executors.get(req.name()).execute(req, "default");
                 messages.add(ToolExecutionResultMessage.from(req, result));
             }
-            return loop(messages, toolSpecs, executors);
+            return loop(messages, toolSpecs, executors, iterations + 1);
         }
         return aiMessage.text() != null ? aiMessage.text() : "";
     }
@@ -78,9 +89,11 @@ public class AnthropicChatService implements ChatService {
     private Map<String, ToolExecutor> buildExecutors(Object[] tools) {
         Map<String, ToolExecutor> executors = new HashMap<>();
         for (Object tool : tools) {
-            for (Method method : tool.getClass().getDeclaredMethods()) {
+            for (Method method : tool.getClass().getMethods()) {
                 if (method.isAnnotationPresent(Tool.class)) {
-                    executors.put(method.getName(), new DefaultToolExecutor(tool, method));
+                    Tool annotation = method.getAnnotation(Tool.class);
+                    String toolName = annotation.name().isEmpty() ? method.getName() : annotation.name();
+                    executors.put(toolName, new DefaultToolExecutor(tool, method));
                 }
             }
         }
