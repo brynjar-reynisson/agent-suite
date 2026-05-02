@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-public class DeepSeekService {
+public class DeepSeekService implements ChatService {
 
     private static final Logger log = LoggerFactory.getLogger(DeepSeekService.class);
 
