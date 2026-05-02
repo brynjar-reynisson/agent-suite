@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AiController.class)
@@ -73,6 +74,17 @@ class AiControllerTest {
         mockMvc.perform(get("/ai/chat")
                         .param("message", "Hello")
                         .param("prompt", "Be concise"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("OK"));
+    }
+
+    @Test
+    void chat_postRequest_isSupported() throws Exception {
+        ChatService mockService = mock(ChatService.class);
+        when(modelRegistry.get("deepseek-v4-pro")).thenReturn(mockService);
+        when(mockService.chat("", "Hello")).thenReturn("OK");
+
+        mockMvc.perform(post("/ai/chat").param("message", "Hello"))
                 .andExpect(status().isOk())
                 .andExpect(content().string("OK"));
     }
