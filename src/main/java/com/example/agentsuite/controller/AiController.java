@@ -1,6 +1,7 @@
 package com.example.agentsuite.controller;
 
-import com.example.agentsuite.service.DeepSeekService;
+import com.example.agentsuite.service.ChatService;
+import com.example.agentsuite.service.ModelRegistry;
 import com.example.agentsuite.tools.UnixTools;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -19,25 +20,27 @@ public class AiController {
             "C:/Users/Lenovo/IdeaProjects/agent-suite"
     );
 
-    private final DeepSeekService deepSeekService;
+    private final ModelRegistry modelRegistry;
 
-    public AiController(DeepSeekService deepSeekService) {
-        this.deepSeekService = deepSeekService;
+    public AiController(ModelRegistry modelRegistry) {
+        this.modelRegistry = modelRegistry;
     }
 
     @RequestMapping(path = "/ai/chat", method = {RequestMethod.GET, RequestMethod.POST})
     public String chat(@RequestParam(defaultValue = "Hello, how are you?") String message,
                        @RequestParam(defaultValue = "") String prompt,
-                       @RequestParam(defaultValue = "") String rootDirectory) {
-        if (!ALLOWED_ROOT_DIRECTORIES.contains(rootDirectory)) {
+                       @RequestParam(defaultValue = "") String rootDirectory,
+                       @RequestParam(defaultValue = "deepseek-v4-pro") String model) {
+
+        ChatService service = modelRegistry.get(model);
+        if (service == null) return "Error: Unknown model: " + model;
+
+        if (!ALLOWED_ROOT_DIRECTORIES.contains(rootDirectory))
             return "Error: Access to the specified root directory is not allowed.";
-        }
 
-        if (!rootDirectory.isEmpty()) {
-            UnixTools tools = new UnixTools(rootDirectory);
-            return deepSeekService.chat(prompt, message, tools);
-        }
+        if (!rootDirectory.isEmpty())
+            return service.chat(prompt, message, new UnixTools(rootDirectory));
 
-        return deepSeekService.chat(prompt, message);
+        return service.chat(prompt, message);
     }
 }
