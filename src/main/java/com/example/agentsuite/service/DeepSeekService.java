@@ -75,7 +75,7 @@ public class DeepSeekService implements ChatService {
             // Cache reasoning content
             String fingerprint = buildFingerprint(msg);
             if (reasoning != null && !reasoning.isEmpty()) {
-                log.debug("Caching reasoning: {}", reasoning);
+                log.info("Caching reasoning: {}", reasoning);
                 reasoningCache.put(fingerprint, reasoning);
             }
 

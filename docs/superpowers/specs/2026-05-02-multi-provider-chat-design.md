@@ -53,7 +53,7 @@ Both services follow the same pattern:
 
 3. **No reasoning cache** — DeepSeek-specific; not needed here.
 
-Tool execution uses LangChain4j's `DefaultToolExecutor`, avoiding the hand-rolled reflection logic from `DeepSeekService`.
+Tool execution uses LangChain4j's `DefaultToolExecutor`. In LangChain4j 0.36.2, `DefaultToolExecutor` is constructed per tool method (`new DefaultToolExecutor(toolInstance, method)`), so the service builds a `Map<String, ToolExecutor>` (tool name → executor) by iterating `@Tool`-annotated methods on each tool object. This map is built fresh per `chat()` call since tools are passed as arguments.
 
 ## Controller Changes
 
