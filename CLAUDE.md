@@ -41,6 +41,18 @@ GET/POST /ai/chat
   ?message=<user message>          (default: "Hello, how are you?")
   ?prompt=<system prompt>          (default: empty)
   ?rootDirectory=<path>            (default: empty; must be in allowlist)
+  ?model=<model alias>             (default: "deepseek-v4-pro")
 ```
+
+Supported model aliases:
+
+| Alias | Provider | Requires env var |
+|---|---|---|
+| `deepseek-v4-pro` | DeepSeek (hand-rolled) | `DEEPSEEK_API_KEY` |
+| `sonnet-4.6` | Anthropic Claude Sonnet 4.6 | `ANTHROPIC_API_KEY` |
+| `opus-4.7` | Anthropic Claude Opus 4.7 | `ANTHROPIC_API_KEY` |
+| `haiku-4.5` | Anthropic Claude Haiku 4.5 | `ANTHROPIC_API_KEY` |
+| `gemini-2.5-pro` | Google Gemini 2.5 Pro | `GOOGLE_API_KEY` |
+| `gemini-2.5-flash` | Google Gemini 2.5 Flash | `GOOGLE_API_KEY` |
 
 Returns plain text AI response.
