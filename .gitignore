@@ -1,3 +1,9 @@
+# IntelliJ Idea
+.idea/
+target/
+.mvn/
+mvnw.cmd
+
 # Compiled class file
 *.class
 
