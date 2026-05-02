@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-public class DeepSeekService {
+public class DeepSeekService implements ChatService {
 
     private static final Logger log = LoggerFactory.getLogger(DeepSeekService.class);
 
@@ -75,7 +75,7 @@ public class DeepSeekService {
             // Cache reasoning content
             String fingerprint = buildFingerprint(msg);
             if (reasoning != null && !reasoning.isEmpty()) {
-                log.debug("Caching reasoning: {}", reasoning);
+                log.info("Caching reasoning: {}", reasoning);
                 reasoningCache.put(fingerprint, reasoning);
             }
 
