@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
@@ -86,6 +87,33 @@ class AnthropicChatServiceTest {
 
         assertThat(result).isEqualTo("I said: Hello, World!");
         verify(mockModel, times(2)).generate(anyList(), anyList());
+    }
+
+    @Test
+    void chat_nullTextResponse_returnsEmptyString() {
+        AiMessage mockMessage = mock(AiMessage.class);
+        when(mockMessage.text()).thenReturn(null);
+        when(mockMessage.hasToolExecutionRequests()).thenReturn(false);
+        when(mockModel.generate(anyList())).thenReturn(Response.from(mockMessage));
+
+        String result = service.chat("", "Hi");
+
+        assertThat(result).isEqualTo("");
+    }
+
+    @Test
+    void chat_exceedsMaxIterations_throwsIllegalStateException() {
+        ToolExecutionRequest req = ToolExecutionRequest.builder()
+                .id("call_loop")
+                .name("greet")
+                .arguments("{\"name\":\"loop\"}")
+                .build();
+        when(mockModel.generate(anyList(), anyList()))
+                .thenReturn(Response.from(AiMessage.from(List.of(req))));
+
+        assertThatThrownBy(() -> service.chat("", "Go", new EchoTool()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Exceeded maximum tool iterations");
     }
 
     static class EchoTool {
