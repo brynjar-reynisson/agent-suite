@@ -4,7 +4,7 @@
 
 **Goal:** Replace the current Claude lightning bolt favicon with a circuit-brain SVG that represents AgentSuite as a multi-provider AI agent platform.
 
-**Architecture:** A single SVG file replaces two copies of the favicon — `frontend/public/favicon.svg` (Vite source) and `frontend/dist/favicon.svg` (built output). No build step required; both files are edited directly. The SVG is hand-authored with a brain-silhouette path, four circuit trace lines, and five node circles.
+**Architecture:** Edit `frontend/public/favicon.svg` (the Vite source). Vite copies `public/` to `dist/` at build time; `frontend/dist/` is gitignored and should not be edited or committed directly. The SVG is hand-authored with a brain-silhouette path, four circuit trace lines, and five node circles.
 
 **Tech Stack:** SVG (hand-authored), Vite (serves `public/` files as-is)
 
@@ -14,7 +14,6 @@
 
 **Files:**
 - Modify: `frontend/public/favicon.svg`
-- Modify: `frontend/dist/favicon.svg`
 
 - [ ] **Step 1: Replace `frontend/public/favicon.svg` with the new design**
 
@@ -47,11 +46,7 @@ Node layout:
 
 Trace pattern (H with a tail): TL→TR (horizontal), TL→CL (left vertical), TR→CR (right vertical), CL→BC (bottom diagonal).
 
-- [ ] **Step 2: Copy the same content to `frontend/dist/favicon.svg`**
-
-The `dist/` folder is the Vite build output. Copy the same SVG verbatim so the served app picks it up without a rebuild.
-
-- [ ] **Step 3: Open the favicon in a browser to verify it looks right**
+- [ ] **Step 2: Open the favicon in a browser to verify it looks right**
 
 Open `frontend/public/favicon.svg` directly in a browser (drag-and-drop or `file://` URL). Check:
 - Brain silhouette fills the canvas with visible top cleft
@@ -59,9 +54,9 @@ Open `frontend/public/favicon.svg` directly in a browser (drag-and-drop or `file
 - Cyan accent node at top-right is visible
 - Everything reads cleanly when the browser tab shrinks the icon to ~16px
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add frontend/public/favicon.svg frontend/dist/favicon.svg
+git add frontend/public/favicon.svg
 git commit -m "feat: replace favicon with circuit-brain icon"
 ```
