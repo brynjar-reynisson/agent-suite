@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 @Service
 public class DeepSeekService implements ChatService {
@@ -50,7 +51,7 @@ public class DeepSeekService implements ChatService {
                 .build();
     }
 
-    public String chat(String systemPrompt, String userMessage, Object... tools) {
+    public ChatResponse chat(String systemPrompt, String userMessage, Object... tools) {
         List<ObjectNode> messages = new ArrayList<>();
         if (systemPrompt != null && !systemPrompt.isEmpty()) {
             messages.add(createMessage("system", systemPrompt));
@@ -63,8 +64,23 @@ public class DeepSeekService implements ChatService {
         return processResponse(messages, toolDefs, tools, response);
     }
 
-    private String processResponse(List<ObjectNode> messages, ArrayNode toolDefs,
-                                    Object[] tools, JsonNode response) {
+    @Override
+    public void chatStream(String systemPrompt, String userMessage, Consumer<ChatEvent> emitter, Object... tools) {
+        List<ObjectNode> messages = new ArrayList<>();
+        if (systemPrompt != null && !systemPrompt.isEmpty()) {
+            messages.add(createMessage("system", systemPrompt));
+        }
+        messages.add(createMessage("user", userMessage));
+
+        ArrayNode toolDefs = tools.length > 0 ? buildToolDefinitions(tools) : null;
+        JsonNode response = sendRequest(messages, toolDefs);
+
+        processResponseStream(messages, toolDefs, tools, response, emitter);
+        emitter.accept(new ChatEvent.Done());
+    }
+
+    private void processResponseStream(List<ObjectNode> messages, ArrayNode toolDefs,
+                                        Object[] tools, JsonNode response, Consumer<ChatEvent> emitter) {
         JsonNode choice = response.get("choices").get(0);
         JsonNode msg = choice.get("message");
 
@@ -72,22 +88,21 @@ public class DeepSeekService implements ChatService {
         String finishReason = choice.has("finish_reason") ? choice.get("finish_reason").asText() : "stop";
 
         if ("tool_calls".equals(finishReason) && msg.has("tool_calls")) {
-            // Cache reasoning content
             String fingerprint = buildFingerprint(msg);
             if (reasoning != null && !reasoning.isEmpty()) {
                 log.info("Caching reasoning: {}", reasoning);
                 reasoningCache.put(fingerprint, reasoning);
             }
 
-            // Add assistant message to history
             messages.add((ObjectNode) msg);
 
-            // Execute tools and add results
             ArrayNode toolCalls = (ArrayNode) msg.get("tool_calls");
             for (JsonNode toolCall : toolCalls) {
                 String funcName = toolCall.get("function").get("name").asText();
                 String funcArgs = toolCall.get("function").get("arguments").asText();
                 String callId = toolCall.get("id").asText();
+
+                emitter.accept(new ChatEvent.ToolCall(funcName, funcArgs));
 
                 String result = executeTool(tools, funcName, funcArgs);
                 ObjectNode toolMsg = mapper.createObjectNode();
@@ -97,14 +112,62 @@ public class DeepSeekService implements ChatService {
                 messages.add(toolMsg);
             }
 
-            // Send follow-up request
             JsonNode followUp = sendRequest(messages, toolDefs);
-            return processResponse(messages, toolDefs, tools, followUp);
+            processResponseStream(messages, toolDefs, tools, followUp, emitter);
+            return;
         }
 
-        return msg.has("content") && !msg.get("content").isNull()
+        String content = msg.has("content") && !msg.get("content").isNull()
                 ? msg.get("content").asText()
                 : "";
+        emitter.accept(new ChatEvent.Content(content));
+    }
+
+    private ChatResponse processResponse(List<ObjectNode> messages, ArrayNode toolDefs,
+                                          Object[] tools, JsonNode response) {
+        JsonNode choice = response.get("choices").get(0);
+        JsonNode msg = choice.get("message");
+
+        String reasoning = msg.has("reasoning_content") ? msg.get("reasoning_content").asText() : null;
+        String finishReason = choice.has("finish_reason") ? choice.get("finish_reason").asText() : "stop";
+
+        if ("tool_calls".equals(finishReason) && msg.has("tool_calls")) {
+            String fingerprint = buildFingerprint(msg);
+            if (reasoning != null && !reasoning.isEmpty()) {
+                log.info("Caching reasoning: {}", reasoning);
+                reasoningCache.put(fingerprint, reasoning);
+            }
+
+            messages.add((ObjectNode) msg);
+
+            ArrayNode toolCalls = (ArrayNode) msg.get("tool_calls");
+            List<ChatResponse.ToolCall> myToolCalls = new ArrayList<>();
+            for (JsonNode toolCall : toolCalls) {
+                String funcName = toolCall.get("function").get("name").asText();
+                String funcArgs = toolCall.get("function").get("arguments").asText();
+                String callId = toolCall.get("id").asText();
+
+                myToolCalls.add(new ChatResponse.ToolCall(funcName, funcArgs));
+
+                String result = executeTool(tools, funcName, funcArgs);
+                ObjectNode toolMsg = mapper.createObjectNode();
+                toolMsg.put("role", "tool");
+                toolMsg.put("tool_call_id", callId);
+                toolMsg.put("content", result);
+                messages.add(toolMsg);
+            }
+
+            JsonNode followUp = sendRequest(messages, toolDefs);
+            ChatResponse nested = processResponse(messages, toolDefs, tools, followUp);
+            List<ChatResponse.ToolCall> allToolCalls = new ArrayList<>(myToolCalls);
+            allToolCalls.addAll(nested.toolCalls());
+            return new ChatResponse(allToolCalls, nested.content());
+        }
+
+        String content = msg.has("content") && !msg.get("content").isNull()
+                ? msg.get("content").asText()
+                : "";
+        return new ChatResponse(List.of(), content);
     }
 
     private JsonNode sendRequest(List<ObjectNode> messages, ArrayNode tools) {

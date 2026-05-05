@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 abstract class AbstractLangChain4jChatService implements ChatService {
 
@@ -27,7 +28,46 @@ abstract class AbstractLangChain4jChatService implements ChatService {
     }
 
     @Override
-    public String chat(String systemPrompt, String userMessage, Object... tools) {
+    public ChatResponse chat(String systemPrompt, String userMessage, Object... tools) {
+        List<ChatMessage> messages = new ArrayList<>();
+        if (systemPrompt != null && !systemPrompt.isEmpty()) {
+            messages.add(SystemMessage.from(systemPrompt));
+        }
+        messages.add(UserMessage.from(userMessage));
+
+        List<ToolSpecification> toolSpecs = buildToolSpecs(tools);
+        Map<String, ToolExecutor> executors = buildExecutors(tools);
+
+        List<ChatResponse.ToolCall> allToolCalls = new ArrayList<>();
+        int iterations = 0;
+        while (true) {
+            if (iterations >= MAX_TOOL_ITERATIONS) {
+                throw new IllegalStateException("Exceeded maximum tool iterations: " + MAX_TOOL_ITERATIONS);
+            }
+            Response<AiMessage> response = toolSpecs.isEmpty()
+                    ? model.generate(messages)
+                    : model.generate(messages, toolSpecs);
+
+            AiMessage aiMessage = response.content();
+            if (!aiMessage.hasToolExecutionRequests()) {
+                String text = aiMessage.text() != null ? aiMessage.text() : "";
+                return new ChatResponse(allToolCalls, text);
+            }
+            messages.add(aiMessage);
+            for (ToolExecutionRequest req : aiMessage.toolExecutionRequests()) {
+                allToolCalls.add(new ChatResponse.ToolCall(req.name(), req.arguments()));
+                ToolExecutor executor = executors.get(req.name());
+                if (executor == null) {
+                    throw new IllegalStateException("No executor found for tool: " + req.name());
+                }
+                messages.add(ToolExecutionResultMessage.from(req, executor.execute(req, "default")));
+            }
+            iterations++;
+        }
+    }
+
+    @Override
+    public void chatStream(String systemPrompt, String userMessage, Consumer<ChatEvent> emitter, Object... tools) {
         List<ChatMessage> messages = new ArrayList<>();
         if (systemPrompt != null && !systemPrompt.isEmpty()) {
             messages.add(SystemMessage.from(systemPrompt));
@@ -48,10 +88,14 @@ abstract class AbstractLangChain4jChatService implements ChatService {
 
             AiMessage aiMessage = response.content();
             if (!aiMessage.hasToolExecutionRequests()) {
-                return aiMessage.text() != null ? aiMessage.text() : "";
+                String text = aiMessage.text() != null ? aiMessage.text() : "";
+                emitter.accept(new ChatEvent.Content(text));
+                emitter.accept(new ChatEvent.Done());
+                return;
             }
             messages.add(aiMessage);
             for (ToolExecutionRequest req : aiMessage.toolExecutionRequests()) {
+                emitter.accept(new ChatEvent.ToolCall(req.name(), req.arguments()));
                 ToolExecutor executor = executors.get(req.name());
                 if (executor == null) {
                     throw new IllegalStateException("No executor found for tool: " + req.name());

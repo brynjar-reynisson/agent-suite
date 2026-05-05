@@ -44,9 +44,9 @@ class GoogleChatServiceTest {
     void chat_returnsTextResponse() {
         when(mockModel.generate(anyList())).thenReturn(Response.from(AiMessage.from("Gemini here!")));
 
-        String result = service.chat("", "Hi");
+        ChatResponse result = service.chat("", "Hi");
 
-        assertThat(result).isEqualTo("Gemini here!");
+        assertThat(result.content()).isEqualTo("Gemini here!");
     }
 
     @Test
@@ -83,9 +83,12 @@ class GoogleChatServiceTest {
                 .thenReturn(Response.from(AiMessage.from(List.of(req))))
                 .thenReturn(Response.from(AiMessage.from("I said: Hello, World!")));
 
-        String result = service.chat("", "Greet the world", new EchoTool());
+        ChatResponse result = service.chat("", "Greet the world", new EchoTool());
 
-        assertThat(result).isEqualTo("I said: Hello, World!");
+        assertThat(result.content()).isEqualTo("I said: Hello, World!");
+        assertThat(result.toolCalls()).hasSize(1);
+        assertThat(result.toolCalls().get(0).name()).isEqualTo("greet");
+        assertThat(result.toolCalls().get(0).arguments()).isEqualTo("{\"name\":\"World\"}");
         verify(mockModel, times(2)).generate(anyList(), anyList());
     }
 
@@ -96,9 +99,9 @@ class GoogleChatServiceTest {
         when(mockMessage.hasToolExecutionRequests()).thenReturn(false);
         when(mockModel.generate(anyList())).thenReturn(Response.from(mockMessage));
 
-        String result = service.chat("", "Hi");
+        ChatResponse result = service.chat("", "Hi");
 
-        assertThat(result).isEqualTo("");
+        assertThat(result.content()).isEqualTo("");
     }
 
     @Test

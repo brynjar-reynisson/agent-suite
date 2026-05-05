@@ -1,13 +1,19 @@
 package com.example.agentsuite.controller;
 
+import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatService;
 import com.example.agentsuite.service.ModelRegistry;
 import com.example.agentsuite.tools.UnixTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @RestController
 @CrossOrigin(origins = {"http://localhost:5176", "http://127.0.0.1:5176", "https://agent.breynisson.org"})
@@ -23,6 +29,7 @@ public class AiController {
     );
 
     private final ModelRegistry modelRegistry;
+    private final ExecutorService executor = Executors.newCachedThreadPool();
 
     public AiController(ModelRegistry modelRegistry) {
         this.modelRegistry = modelRegistry;
@@ -34,21 +41,60 @@ public class AiController {
     }
 
     @RequestMapping(path = "/ai/chat", method = {RequestMethod.GET, RequestMethod.POST})
-    public String chat(@RequestParam(defaultValue = "Hello, how are you?") String message,
-                       @RequestParam(defaultValue = "") String prompt,
-                       @RequestParam(defaultValue = "") String rootDirectory,
-                       @RequestParam(defaultValue = "deepseek-v4-pro") String model) {
+    public SseEmitter chat(@RequestParam(defaultValue = "Hello, how are you?") String message,
+                           @RequestParam(defaultValue = "") String prompt,
+                           @RequestParam(defaultValue = "") String rootDirectory,
+                           @RequestParam(defaultValue = "deepseek-v4-pro") String model) {
+
+        SseEmitter emitter = new SseEmitter(300000L);
 
         ChatService service = modelRegistry.get(model);
-        if (service == null) return "Error: Unknown model: " + model;
+        if (service == null) {
+            sendEvent(emitter, "error", "Error: Unknown model: " + model);
+            emitter.complete();
+            return emitter;
+        }
 
-        if (!ALLOWED_ROOT_DIRECTORIES.contains(rootDirectory))
-            return "Error: Access to the specified root directory is not allowed.";
+        if (!ALLOWED_ROOT_DIRECTORIES.contains(rootDirectory)) {
+            sendEvent(emitter, "error", "Error: Access to the specified root directory is not allowed.");
+            emitter.complete();
+            return emitter;
+        }
 
         log.info("Chat request - model: {}, prompt: {}, message: {}, rootDirectory: {}", model, prompt, message, rootDirectory);
-        if (!rootDirectory.isEmpty())
-            return service.chat(prompt, message, new UnixTools(rootDirectory));
 
-        return service.chat(prompt, message);
+        Object[] tools = rootDirectory.isEmpty() ? new Object[0] : new Object[]{new UnixTools(rootDirectory)};
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                service.chatStream(prompt, message, event -> {
+                    switch (event) {
+                        case ChatEvent.ToolCall tc ->
+                                sendEvent(emitter, "tool_call", tc);
+                        case ChatEvent.Content c ->
+                                sendEvent(emitter, "content", c.text());
+                        case ChatEvent.Error e ->
+                                sendEvent(emitter, "error", e.message());
+                        case ChatEvent.Done d -> {
+                            sendEvent(emitter, "done", "");
+                            emitter.complete();
+                        }
+                    }
+                }, tools);
+            } catch (Exception e) {
+                sendEvent(emitter, "error", e.getMessage());
+                emitter.complete();
+            }
+        }, executor);
+
+        return emitter;
+    }
+
+    private void sendEvent(SseEmitter emitter, String name, Object data) {
+        try {
+            emitter.send(SseEmitter.event().name(name).data(data));
+        } catch (IOException e) {
+            emitter.completeWithError(e);
+        }
     }
 }

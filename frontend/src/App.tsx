@@ -1,11 +1,21 @@
-import { useEffect, useState } from 'react';
-import { chat, getDirectories } from './api';
+import { useEffect, useRef, useState } from 'react';
+import { chatStream, getDirectories, type ToolCall } from './api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 interface Message {
   role: 'user' | 'ai';
   content: string;
+  toolCalls?: ToolCall[];
+}
+
+function formatToolArgs(args: string): string {
+  try {
+    const parsed = JSON.parse(args);
+    return Object.values(parsed).join(' ');
+  } catch {
+    return args;
+  }
 }
 
 const MODELS = [
@@ -25,19 +35,18 @@ function App() {
   const [allowedDirectories, setAllowedDirectories] = useState<string[]>([]);
   const [model, setModel] = useState('deepseek-v4-pro');
   const [loading, setLoading] = useState(false);
+  const streamMsgRef = useRef<Message | null>(null);
 
   useEffect(() => {
     const fetchConfig = async () => {
       try {
         const dirs = await getDirectories();
-        // Sort alphabetically, but keep empty string at the top
         const sortedDirs = [...dirs].sort((a, b) => {
           if (a === '') return -1;
           if (b === '') return 1;
           return a.localeCompare(b);
         });
         setAllowedDirectories(sortedDirs);
-        // Default to empty string (None)
         setRootDirectory('');
       } catch (error) {
         console.error('Failed to fetch allowed directories:', error);
@@ -54,22 +63,61 @@ function App() {
     setInput('');
     setLoading(true);
 
-    try {
-      const result = await chat({
-        message: input,
-        prompt: prompt,
-        rootDirectory: rootDirectory,
-        model: model,
-      });
+    const streamMsg: Message = { role: 'ai', content: '', toolCalls: [] };
+    streamMsgRef.current = streamMsg;
 
-      const aiMessage: Message = { role: 'ai', content: result };
-      setMessages((prev) => [...prev, aiMessage]);
+    try {
+      await chatStream(
+        {
+          message: input,
+          prompt: prompt,
+          rootDirectory: rootDirectory,
+          model: model,
+        },
+        {
+          onToolCall: (tc) => {
+            setMessages((prev) => {
+              const msgs = [...prev];
+              const last = msgs[msgs.length - 1];
+              if (last && last.role === 'ai') {
+                const updated = { ...last, toolCalls: [...(last.toolCalls || []), tc] };
+                msgs[msgs.length - 1] = updated;
+              } else {
+                msgs.push({ role: 'ai', content: '', toolCalls: [tc] });
+              }
+              return msgs;
+            });
+          },
+          onContent: (text) => {
+            setMessages((prev) => {
+              const msgs = [...prev];
+              const last = msgs[msgs.length - 1];
+              if (last && last.role === 'ai') {
+                msgs[msgs.length - 1] = { ...last, content: text };
+              } else {
+                msgs.push({ role: 'ai', content: text });
+              }
+              return msgs;
+            });
+          },
+        }
+      );
     } catch (error: any) {
-      const errorMessage: Message = { 
-        role: 'ai', 
-        content: `Error: ${error.response?.data || error.message}` 
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => {
+        const errorMessage: Message = {
+          role: 'ai',
+          content: `Error: ${error.message}`,
+        };
+        // Replace any in-progress streaming message
+        const msgs = [...prev];
+        const last = msgs[msgs.length - 1];
+        if (last && last.role === 'ai' && last.content === '') {
+          msgs[msgs.length - 1] = errorMessage;
+        } else {
+          msgs.push(errorMessage);
+        }
+        return msgs;
+      });
     } finally {
       setLoading(false);
     }
@@ -109,11 +157,23 @@ function App() {
                 : 'self-start bg-white text-gray-800'
             }`}
           >
-            <div className={`prose max-w-none ${msg.role === 'user' ? 'prose-invert' : ''}`}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {msg.content}
-              </ReactMarkdown>
-            </div>
+            {msg.toolCalls && msg.toolCalls.length > 0 && (
+              <div className="mb-3 pb-3 border-b border-gray-200">
+                {msg.toolCalls.map((tc, j) => (
+                  <div key={j} className="text-xs text-gray-400 font-mono mb-1">
+                    <span className="font-semibold text-gray-500">{tc.name}</span>
+                    <span className="ml-1 text-gray-400">{formatToolArgs(tc.arguments)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {msg.content && (
+              <div className={`prose max-w-none ${msg.role === 'user' ? 'prose-invert' : ''}`}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {msg.content}
+                </ReactMarkdown>
+              </div>
+            )}
           </div>
         ))}
         {loading && (

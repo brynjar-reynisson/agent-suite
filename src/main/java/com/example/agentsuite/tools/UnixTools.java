@@ -1,6 +1,5 @@
 package com.example.agentsuite.tools;
 
-import com.example.agentsuite.service.DeepSeekService;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import org.slf4j.Logger;
@@ -39,5 +38,14 @@ public class UnixTools {
             return "Error: Access to parent directories is not allowed.";
         }
         return Unix4j.cd(root.toString()).cat(relativePath).toStringResult();
+    }
+
+    @Tool("Recursively search for the specified text in files under the root directory")
+    public String grep(@P("Text to search for") String searchText, @P("File filter (e.g. *.txt), use \"*\" for all files") String fileFilter) {
+        log.info("grep {} {}", searchText, fileFilter);
+        if (fileFilter.isEmpty()) {
+            fileFilter = "*";
+        }
+        return Unix4j.cd(root.toString()).find(".", fileFilter).grep(searchText).toStringResult();
     }
 }
