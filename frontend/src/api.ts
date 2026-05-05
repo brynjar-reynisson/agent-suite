@@ -67,3 +67,9 @@ export const getDirectories = async (): Promise<string[]> => {
   const response = await fetch(`${API_BASE_URL}/ai/config/directories`);
   return response.json();
 };
+
+export const execTool = async (command: string, rootDirectory: string): Promise<string> => {
+  const urlParams = new URLSearchParams({ command, rootDirectory });
+  const response = await fetch(`${API_BASE_URL}/ai/tools?${urlParams.toString()}`);
+  return response.text();
+};

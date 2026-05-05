@@ -57,4 +57,40 @@ class AiControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("C:/Users/Lenovo/misc_projects/dragon")));
     }
+
+    @Test
+    void tools_emptyRootDirectory_returnsError() throws Exception {
+        mockMvc.perform(get("/ai/tools")
+                        .param("command", "ls src")
+                        .param("rootDirectory", ""))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("Select a root directory")));
+    }
+
+    @Test
+    void tools_disallowedDirectory_returnsError() throws Exception {
+        mockMvc.perform(get("/ai/tools")
+                        .param("command", "ls src")
+                        .param("rootDirectory", "/etc/passwd"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("Access to the specified root directory is not allowed")));
+    }
+
+    @Test
+    void tools_unknownCommand_returnsError() throws Exception {
+        mockMvc.perform(get("/ai/tools")
+                        .param("command", "rm -rf /")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("Unknown command")));
+    }
+
+    @Test
+    void tools_emptyCommand_returnsError() throws Exception {
+        mockMvc.perform(get("/ai/tools")
+                        .param("command", "")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("No command specified")));
+    }
 }

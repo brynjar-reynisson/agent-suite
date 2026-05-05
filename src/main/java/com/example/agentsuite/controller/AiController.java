@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -35,6 +37,33 @@ public class AiController {
         this.modelRegistry = modelRegistry;
     }
 
+    @GetMapping("/ai/tools")
+    public String executeTool(@RequestParam String command,
+                              @RequestParam(defaultValue = "") String rootDirectory) {
+        if (!ALLOWED_ROOT_DIRECTORIES.contains(rootDirectory)) {
+            return "Error: Access to the specified root directory is not allowed.";
+        }
+        if (rootDirectory.isEmpty()) {
+            return "Error: Select a root directory to use this command.";
+        }
+
+        List<String> tokens = parseCommand(command);
+        if (tokens.isEmpty()) {
+            return "Error: No command specified. Use: ls, cat, or grep";
+        }
+
+        String tool = tokens.getFirst();
+        UnixTools unixTools = new UnixTools(rootDirectory);
+
+        return switch (tool) {
+            case "ls" -> unixTools.ls(tokens.size() > 1 ? tokens.get(1) : ".");
+            case "cat" -> tokens.size() > 1 ? unixTools.cat(tokens.get(1)) : "Error: cat requires a file path";
+            case "grep" -> tokens.size() > 2
+                    ? unixTools.grep(tokens.get(1), tokens.get(2))
+                    : "Error: grep requires search text and file filter";
+            default -> "Error: Unknown command '" + tool + "'. Use: ls, cat, or grep";
+        };
+    }
     @GetMapping("/ai/config/directories")
     public Set<String> getAllowedDirectories() {
         return ALLOWED_ROOT_DIRECTORIES;
@@ -96,5 +125,28 @@ public class AiController {
         } catch (IOException e) {
             emitter.completeWithError(e);
         }
+    }
+
+    private List<String> parseCommand(String input) {
+        List<String> tokens = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean inQuotes = false;
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (c == ' ' && !inQuotes) {
+                if (!current.isEmpty()) {
+                    tokens.add(current.toString());
+                    current.setLength(0);
+                }
+            } else {
+                current.append(c);
+            }
+        }
+        if (!current.isEmpty()) {
+            tokens.add(current.toString());
+        }
+        return tokens;
     }
 }

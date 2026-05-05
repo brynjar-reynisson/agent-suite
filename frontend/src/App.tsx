@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { chatStream, getDirectories, type ToolCall } from './api';
+import { chatStream, execTool, getDirectories, type ToolCall } from './api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -35,7 +35,11 @@ function App() {
   const [allowedDirectories, setAllowedDirectories] = useState<string[]>([]);
   const [model, setModel] = useState('deepseek-v4-pro');
   const [loading, setLoading] = useState(false);
-  const streamMsgRef = useRef<Message | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -60,16 +64,28 @@ function App() {
 
     const userMessage: Message = { role: 'user', content: input };
     setMessages((prev) => [...prev, userMessage]);
+    const message = input;
     setInput('');
     setLoading(true);
 
-    const streamMsg: Message = { role: 'ai', content: '', toolCalls: [] };
-    streamMsgRef.current = streamMsg;
+    if (message.startsWith('!')) {
+      try {
+        const command = message.slice(1).trim();
+        const result = await execTool(command, rootDirectory);
+        const toolOutput = '```\n' + result + '\n```';
+        setMessages((prev) => [...prev, { role: 'ai', content: toolOutput }]);
+      } catch (error: any) {
+        setMessages((prev) => [...prev, { role: 'ai', content: `Error: ${error.message}` }]);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     try {
       await chatStream(
         {
-          message: input,
+          message: message,
           prompt: prompt,
           rootDirectory: rootDirectory,
           model: model,
@@ -181,6 +197,7 @@ function App() {
             Thinking...
           </div>
         )}
+        <div ref={bottomRef} />
       </main>
 
       {/* Settings Panel */}
