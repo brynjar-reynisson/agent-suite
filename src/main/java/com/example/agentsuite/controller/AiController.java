@@ -3,6 +3,7 @@ package com.example.agentsuite.controller;
 import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatService;
 import com.example.agentsuite.service.ModelRegistry;
+import com.example.agentsuite.tools.Git;
 import com.example.agentsuite.tools.UnixTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +50,7 @@ public class AiController {
 
         List<String> tokens = parseCommand(command);
         if (tokens.isEmpty()) {
-            return "Error: No command specified. Use: ls, cat, or grep";
+            return "Error: No command specified. Use: ls, cat, grep, or git";
         }
 
         String tool = tokens.getFirst();
@@ -61,7 +62,31 @@ public class AiController {
             case "grep" -> tokens.size() > 2
                     ? unixTools.grep(tokens.get(1), tokens.get(2))
                     : "Error: grep requires search text and file filter";
-            default -> "Error: Unknown command '" + tool + "'. Use: ls, cat, or grep";
+            case "git" -> {
+                if (tokens.size() < 2) {
+                    yield "Error: git requires a subcommand: status, add, commit, push, newBranch, checkoutBranch";
+                }
+                Git git = new Git(rootDirectory);
+                yield switch (tokens.get(1)) {
+                    case "status" -> git.status();
+                    case "add" -> tokens.size() > 2
+                            ? git.add(tokens.get(2))
+                            : "Error: add requires a file path";
+                    case "commit" -> tokens.size() > 2
+                            ? git.commit(String.join(" ", tokens.subList(2, tokens.size())))
+                            : "Error: commit requires a message";
+                    case "push" -> git.push();
+                    case "newBranch" -> tokens.size() > 2
+                            ? git.newBranch(tokens.get(2))
+                            : "Error: newBranch requires a branch name";
+                    case "checkoutBranch" -> tokens.size() > 2
+                            ? git.checkoutBranch(tokens.get(2))
+                            : "Error: checkoutBranch requires a branch name";
+                    default -> "Error: Unknown git subcommand '" + tokens.get(1)
+                            + "'. Use: status, add, commit, push, newBranch, checkoutBranch";
+                };
+            }
+            default -> "Error: Unknown command '" + tool + "'. Use: ls, cat, grep, or git";
         };
     }
     @GetMapping("/ai/config/directories")

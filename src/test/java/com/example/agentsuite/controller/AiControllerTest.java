@@ -93,4 +93,69 @@ class AiControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("No command specified")));
     }
+
+    @Test
+    void tools_gitStatus_returnsGitOutput() throws Exception {
+        mockMvc.perform(get("/ai/tools")
+                        .param("command", "git status")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.not(
+                        org.hamcrest.CoreMatchers.containsString("Unknown command"))))
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("branch")));
+    }
+
+    @Test
+    void tools_gitNoSubcommand_returnsError() throws Exception {
+        mockMvc.perform(get("/ai/tools")
+                        .param("command", "git")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("git requires a subcommand")));
+    }
+
+    @Test
+    void tools_gitUnknownSubcommand_returnsError() throws Exception {
+        mockMvc.perform(get("/ai/tools")
+                        .param("command", "git rebase")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("Unknown git subcommand")));
+    }
+
+    @Test
+    void tools_gitAddMissingArg_returnsError() throws Exception {
+        mockMvc.perform(get("/ai/tools")
+                        .param("command", "git add")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("add requires a file path")));
+    }
+
+    @Test
+    void tools_gitCommitMissingMessage_returnsError() throws Exception {
+        mockMvc.perform(get("/ai/tools")
+                        .param("command", "git commit")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("commit requires a message")));
+    }
+
+    @Test
+    void tools_gitNewBranchMissingArg_returnsError() throws Exception {
+        mockMvc.perform(get("/ai/tools")
+                        .param("command", "git newBranch")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("newBranch requires a branch name")));
+    }
+
+    @Test
+    void tools_gitCheckoutBranchMissingArg_returnsError() throws Exception {
+        mockMvc.perform(get("/ai/tools")
+                        .param("command", "git checkoutBranch")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("checkoutBranch requires a branch name")));
+    }
 }
