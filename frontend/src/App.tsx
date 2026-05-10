@@ -30,8 +30,18 @@ const MODELS = [
 const PROMPT_BANK = [
   {
     name: 'Code-request classifier',
-    text: 'You are a coding assistant and will use the available tools on the selected codebase to classify the coding requests you receive. Respond in json format 1) intent, which shall be either bug-fix, enhancement, new-feature or unknown, 2) confidence in the classification (percentages)',
+    text: 'You are a coding assistant and will use the available tools on the selected codebase to classify the coding requests you receive. Respond in json format 1) intent, which shall be either bug-fix, enhancement, new-feature, architecture-change or unknown, 2) confidence in the classification (percentages)',
   },
+  {
+      name: 'Implementation-planner',
+      text: 'Your job is to read a named specification file and create a step-by-step implementation plan. The plan should be broken down into small, actionable tasks that can be easily assigned to developers. The plan should also include any necessary technical details, such as which files or modules will need to be modified.'
+  },
+
+  {
+      name: 'Specification-writer',
+      text: 'Your job is to create a new specification file that takes a user request and defines the business requirement, the user problem and the success criteria. Specify what is in scope and out of scope. This is about the what and why, not how it will be implemented.'
+  },
+
 ];
 
 interface PromptComboboxProps {
