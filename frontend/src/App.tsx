@@ -27,6 +27,80 @@ const MODELS = [
   'gemini-2.5-flash',
 ];
 
+const PROMPT_BANK = [
+  {
+    name: 'Code-request classifier',
+    text: 'You are a coding assistant and will use the available tools on the selected codebase to classify the coding requests you receive. Respond in json format 1) intent, which shall be either bug-fix, enhancement, new-feature, architecture-change or unknown, 2) confidence in the classification (percentages)',
+  },
+  {
+      name: 'Implementation-planner',
+      text: 'Your job is to read a named specification file and create a step-by-step implementation plan. The plan should be broken down into small, actionable tasks that can be easily assigned to developers. The plan should also include any necessary technical details, such as which files or modules will need to be modified.'
+  },
+
+  {
+      name: 'Specification-writer',
+      text: 'Your job is to create a new specification file that takes a user request and defines the business requirement, the user problem and the success criteria. Specify what is in scope and out of scope. This is about the what and why, not how it will be implemented.'
+  },
+
+];
+
+interface PromptComboboxProps {
+  value: string;
+  onChange: (v: string) => void;
+  prompts?: { name: string; text: string }[];
+}
+
+function PromptCombobox({ value, onChange, prompts = PROMPT_BANK }: PromptComboboxProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleMouseDown = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, []);
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="System instructions..."
+        className="w-full border rounded px-3 py-2 pr-8 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+      />
+      <button
+        type="button"
+        aria-label="Open prompt presets"
+        onClick={() => setIsOpen((o) => !o)}
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+      >
+        ▾
+      </button>
+      {isOpen && (
+        <ul className="absolute z-10 w-full bg-white border rounded shadow-sm mt-1">
+          {prompts.map((entry) => (
+            <li
+              key={entry.name}
+              onMouseDown={() => {
+                onChange(entry.name);
+                setIsOpen(false);
+              }}
+              className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100"
+            >
+              {entry.name}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -82,11 +156,12 @@ function App() {
       return;
     }
 
+    const resolvedPrompt = PROMPT_BANK.find(p => p.name === prompt)?.text ?? prompt;
     try {
       await chatStream(
         {
           message: message,
-          prompt: prompt,
+          prompt: resolvedPrompt,
           rootDirectory: rootDirectory,
           model: model,
         },
@@ -204,13 +279,7 @@ function App() {
       <div className="bg-white border-t p-4 flex gap-4 flex-wrap">
         <div className="flex-1 min-w-[300px]">
           <label className="block text-xs font-semibold text-gray-500 mb-1">SYSTEM PROMPT</label>
-          <input 
-            type="text" 
-            value={prompt} 
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="System instructions..."
-            className="w-full border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-          />
+          <PromptCombobox value={prompt} onChange={setPrompt} />
         </div>
         <div className="flex-1 min-w-[300px]">
           <label className="block text-xs font-semibold text-gray-500 mb-1">ROOT DIRECTORY</label>

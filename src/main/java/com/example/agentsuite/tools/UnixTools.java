@@ -6,11 +6,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.unix4j.Unix4j;
 
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -112,6 +112,49 @@ public class UnixTools {
         return result.isEmpty() ? raw : result.toString().trim();
     }
 
+    @Tool("Create new markdown spec or plan file for a feature with the given content. Actual file name will be auto-generated and returned, based on the document type and current timestamp.")
+    public String newMarkDownFile(
+            @P("Document type, spec or plan") String documentType,
+            @P("Feature name") String featureName,
+            @P("The content to write") String content
+    ) {
+        // Guard against path traversal
+        Path docs = root.resolve("docs");
+        Path mdFolder;
+        if (documentType.equalsIgnoreCase("spec")) {
+            mdFolder = docs.resolve("specs");
+        } else if (documentType.equalsIgnoreCase("plan")) {
+            mdFolder = docs.resolve("plans");
+        } else {
+            return "Error: Unknown document type: " + documentType + ". Use 'spec' or 'plan'.";
+        }
+
+        try {
+            Files.createDirectories(mdFolder);
+        } catch (Exception e) {
+            return "Error: Could not create directory for markdown files: " + e.getMessage();
+        }
+
+        // New markdown file name: <yyyy-mm-dd>-<feature-name>.md
+        String safeFeatureName = featureName.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
+        String fileName = String.format("%s-%s.md", java.time.LocalDate.now(), safeFeatureName);
+        Path target = mdFolder.resolve(fileName);
+        if (!target.startsWith(root) || fileName.contains("..")) {
+            return "Error: Path escapes root directory.";
+        }
+        if (target.toFile().exists()) {
+            return "Error: File already exists: " + target;
+        }
+
+        try {
+            Files.createDirectories(target.getParent());
+            Files.writeString(target, content, StandardCharsets.UTF_8);
+            return "Successfully wrote " + target + " (" + content.length() + " bytes)";
+        } catch (Exception e) {
+            return "Error: Could not write file " + target + ", " + e.getMessage();
+        }
+    }
+
     private Set<String> gitTrackedFiles() {
         if (gitCacheLoaded) {
             return gitTrackedCache;
@@ -119,18 +162,14 @@ public class UnixTools {
         gitCacheLoaded = true;
         gitTrackedCache = new HashSet<>();
         try {
-            ProcessBuilder pb = new ProcessBuilder(
+            ProcessRunner.Output result = new ProcessRunner(new String[]{
                     "git", "-C", root.toString(),
-                    "ls-files", "--cached", "--others", "--exclude-standard");
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
-            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                log.warn("git ls-files exited with code {}", exitCode);
+                    "ls-files", "--cached", "--others", "--exclude-standard"}).run();
+            if (result.exitCode() != 0) {
+                log.warn("git ls-files exited with code {}", result.exitCode());
                 return gitTrackedCache;
             }
-            for (String line : output.split("\n")) {
+            for (String line : result.stdOut().split("\n")) {
                 String trimmed = line.trim();
                 if (!trimmed.isEmpty()) {
                     gitTrackedCache.add(normalize(trimmed));
@@ -161,30 +200,19 @@ public class UnixTools {
     private Set<String> checkIgnored(Set<String> paths) {
         Set<String> ignored = new HashSet<>();
         try {
-            ProcessBuilder pb = new ProcessBuilder(
-                    "git", "-C", root.toString(), "check-ignore", "--stdin");
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
+            List<String> cmd = new ArrayList<>(List.of("git", "-C", root.toString(), "check-ignore"));
+            cmd.addAll(paths);
+            ProcessRunner.Output result = new ProcessRunner(cmd.toArray(String[]::new)).run();
 
-            try (OutputStream stdin = process.getOutputStream()) {
-                for (String path : paths) {
-                    stdin.write((path + "\n").getBytes(StandardCharsets.UTF_8));
-                }
-                stdin.flush();
-            }
-
-            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            int exitCode = process.waitFor();
-
-            if (exitCode == 1) {
+            if (result.exitCode() == 1) {
                 return ignored;
             }
-            if (exitCode != 0) {
-                log.warn("git check-ignore exited with code {}", exitCode);
+            if (result.exitCode() != 0) {
+                log.warn("git check-ignore exited with code {}", result.exitCode());
                 return ignored;
             }
 
-            for (String line : output.split("\n")) {
+            for (String line : result.stdOut().split("\n")) {
                 String trimmed = line.trim();
                 if (!trimmed.isEmpty()) {
                     ignored.add(normalize(trimmed));
