@@ -64,7 +64,7 @@ public class AiController {
                     : "Error: grep requires search text and file filter";
             case "git" -> {
                 if (tokens.size() < 2) {
-                    yield "Error: git requires a subcommand: status, add, commit, push, newBranch, checkoutBranch";
+                    yield "Error: git requires a subcommand: status, add, commit, pull, push, newBranch, checkoutBranch";
                 }
                 Git git = new Git(rootDirectory);
                 yield switch (tokens.get(1)) {
@@ -76,6 +76,7 @@ public class AiController {
                             ? git.commit(String.join(" ", tokens.subList(2, tokens.size())))
                             : "Error: commit requires a message";
                     case "push" -> git.push();
+                    case "pull" -> git.pull();
                     case "newBranch" -> tokens.size() > 2
                             ? git.newBranch(tokens.get(2))
                             : "Error: newBranch requires a branch name";
@@ -83,7 +84,7 @@ public class AiController {
                             ? git.checkoutBranch(tokens.get(2))
                             : "Error: checkoutBranch requires a branch name";
                     default -> "Error: Unknown git subcommand '" + tokens.get(1)
-                            + "'. Use: status, add, commit, push, newBranch, checkoutBranch";
+                            + "'. Use: status, add, commit, pull, push, newBranch, checkoutBranch";
                 };
             }
             default -> "Error: Unknown command '" + tool + "'. Use: ls, cat, grep, or git";

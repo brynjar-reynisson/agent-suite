@@ -158,4 +158,14 @@ class AiControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("checkoutBranch requires a branch name")));
     }
+
+    @Test
+    void tools_gitPull_doesNotReturnUnknownSubcommand() throws Exception {
+        mockMvc.perform(get("/ai/tools")
+                        .param("command", "git pull")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.not(
+                        org.hamcrest.CoreMatchers.containsString("Unknown git subcommand"))));
+    }
 }

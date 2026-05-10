@@ -49,6 +49,14 @@ public class Git {
         return output.stdOut();
     }
 
+    public String pull() {
+        ProcessRunner.Output output = new ProcessRunner(new String[]{"git", "-C", root.toString(), "pull"}).run();
+        if (output.exitCode() != 0) {
+            return "Error: " + output.stdErr();
+        }
+        return output.stdOut();
+    }
+
     public String newBranch(String branchName) {
         ProcessRunner runner = new ProcessRunner(new String[]{"git", "-C", root.toString(), "checkout", "-b", branchName});
         ProcessRunner.Output output = runner.run();

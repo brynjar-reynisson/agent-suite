@@ -69,4 +69,10 @@ class GitTest {
         String result = git.push();
         assertThat(result).startsWith("Error:");
     }
+
+    @Test
+    void pull_noRemote_returnsError() {
+        String result = git.pull();
+        assertThat(result).startsWith("Error:");
+    }
 }
