@@ -12,6 +12,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -118,7 +119,7 @@ public class AiController {
         }
 
         log.info("Chat request - model: {}, prompt: {}, message: {}, rootDirectory: {}, tools: {}",
-                model, prompt, message, rootDirectory, tools);
+                model, prompt, message, rootDirectory, tools.replace("\n", "_").replace("\r", "_"));
 
         Object[] toolArray = buildToolInstances(tools, rootDirectory);
 
@@ -157,10 +158,16 @@ public class AiController {
 
     static Object[] buildToolInstances(String tools, String rootDirectory) {
         if (tools.isBlank()) return new Object[0];
-        if (tools.length() > 512) return new Object[0];
+        if (tools.length() > 512) {
+            log.warn("Rejected tools param: length {} exceeds 512 char limit", tools.length());
+            return new Object[0];
+        }
         List<Object> instances = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
         for (String group : tools.split(",")) {
-            switch (group.trim()) {
+            String g = group.trim();
+            if (!seen.add(g)) continue;
+            switch (g) {
                 case "unix" -> {
                     if (!rootDirectory.isEmpty()) instances.add(new UnixTools(rootDirectory));
                 }

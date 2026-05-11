@@ -11,8 +11,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import com.example.agentsuite.service.ChatEvent;
+import java.util.function.Consumer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -207,5 +211,28 @@ class AiControllerTest {
         Object[] result = AiController.buildToolInstances("unix,unknown", "C:/Users/Lenovo/IdeaProjects/agent-suite");
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
+    }
+
+    @Test
+    void chat_withUnixToolsAndValidRootDirectory_noErrorEvent() throws Exception {
+        ChatService mockService = mock(ChatService.class);
+        when(modelRegistry.get("deepseek-v4-pro")).thenReturn(mockService);
+        doAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            Consumer<ChatEvent> consumer = inv.getArgument(2);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(mockService).chatStream(any(), any(), any(Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
+                        .param("tools", "unix")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.not(
+                        org.hamcrest.CoreMatchers.containsString("error"))));
     }
 }
