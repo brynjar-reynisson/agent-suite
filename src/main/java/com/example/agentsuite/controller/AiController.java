@@ -4,6 +4,7 @@ import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatService;
 import com.example.agentsuite.service.ModelRegistry;
 import com.example.agentsuite.tools.Git;
+import com.example.agentsuite.tools.MarkDownWriter;
 import com.example.agentsuite.tools.UnixTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -170,6 +171,9 @@ public class AiController {
             switch (g) {
                 case "unix" -> {
                     if (!rootDirectory.isEmpty()) instances.add(new UnixTools(rootDirectory));
+                }
+                case "md-writer" -> {
+                    if (!rootDirectory.isEmpty()) instances.add(new MarkDownWriter(rootDirectory));
                 }
             }
         }

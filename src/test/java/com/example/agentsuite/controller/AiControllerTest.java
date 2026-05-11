@@ -2,6 +2,7 @@ package com.example.agentsuite.controller;
 
 import com.example.agentsuite.service.ChatService;
 import com.example.agentsuite.service.ModelRegistry;
+import com.example.agentsuite.tools.MarkDownWriter;
 import com.example.agentsuite.tools.UnixTools;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -211,6 +212,34 @@ class AiControllerTest {
         Object[] result = AiController.buildToolInstances("unix,unknown", "C:/Users/Lenovo/IdeaProjects/agent-suite");
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
+    }
+
+    @Test
+    void buildToolInstances_mdWriterGroup_withRootDirectory_returnsMarkDownWriter() {
+        Object[] result = AiController.buildToolInstances("md-writer", "C:/Users/Lenovo/IdeaProjects/agent-suite");
+        assertThat(result).hasSize(1);
+        assertThat(result[0]).isInstanceOf(MarkDownWriter.class);
+    }
+
+    @Test
+    void buildToolInstances_mdWriterGroup_noRootDirectory_returnsEmptyArray() {
+        Object[] result = AiController.buildToolInstances("md-writer", "");
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void buildToolInstances_unixAndMdWriter_withRootDirectory_returnsBothInstances() {
+        Object[] result = AiController.buildToolInstances("unix,md-writer", "C:/Users/Lenovo/IdeaProjects/agent-suite");
+        assertThat(result).hasSize(2);
+        assertThat(result[0]).isInstanceOf(UnixTools.class);
+        assertThat(result[1]).isInstanceOf(MarkDownWriter.class);
+    }
+
+    @Test
+    void buildToolInstances_mdWriterAndUnknown_onlyMarkDownWriterAdded() {
+        Object[] result = AiController.buildToolInstances("md-writer,unknown", "C:/Users/Lenovo/IdeaProjects/agent-suite");
+        assertThat(result).hasSize(1);
+        assertThat(result[0]).isInstanceOf(MarkDownWriter.class);
     }
 
     @Test
