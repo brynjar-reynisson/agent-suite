@@ -24,7 +24,7 @@ export const chatStream = (params: ChatRequest, callbacks: StreamCallbacks): Pro
     prompt: params.prompt || '',
     rootDirectory: params.rootDirectory || '',
     model: params.model || 'deepseek-v4-pro',
-    tools: params.tools || '',
+    ...(params.tools ? { tools: params.tools } : {}),
   });
   const url = `${API_BASE_URL}/ai/chat?${urlParams.toString()}`;
 
