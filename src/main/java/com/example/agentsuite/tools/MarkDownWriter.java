@@ -30,6 +30,7 @@ public class MarkDownWriter {
             @P("Feature name") String featureName,
             @P("The content to write") String content
     ) {
+        log.info("newMarkDownFile type={} feature={}", documentType, featureName);
         Path docs = root.resolve("docs");
         Path mdFolder;
         if (documentType.equalsIgnoreCase("spec")) {
@@ -57,7 +58,6 @@ public class MarkDownWriter {
         }
 
         try {
-            Files.createDirectories(target.getParent());
             Files.writeString(target, content, StandardCharsets.UTF_8);
             return "Successfully wrote " + target + " (" + content.length() + " bytes)";
         } catch (Exception e) {
