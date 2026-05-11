@@ -5,7 +5,9 @@ import com.example.agentsuite.service.ModelRegistry;
 import com.example.agentsuite.tools.MarkDownWriter;
 import com.example.agentsuite.tools.UnixTools;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
+import java.nio.file.Path;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -24,6 +26,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(AiController.class)
 class AiControllerTest {
+
+    @TempDir
+    static Path tempDir;
 
     @Autowired
     private MockMvc mockMvc;
@@ -178,7 +183,7 @@ class AiControllerTest {
 
     @Test
     void buildToolInstances_emptyTools_returnsEmptyArray() {
-        Object[] result = AiController.buildToolInstances("", "C:/Users/Lenovo/IdeaProjects/agent-suite");
+        Object[] result = AiController.buildToolInstances("", tempDir.toString());
         assertThat(result).isEmpty();
     }
 
@@ -190,33 +195,33 @@ class AiControllerTest {
 
     @Test
     void buildToolInstances_unixGroup_withRootDirectory_returnsUnixTools() {
-        Object[] result = AiController.buildToolInstances("unix", "C:/Users/Lenovo/IdeaProjects/agent-suite");
+        Object[] result = AiController.buildToolInstances("unix", tempDir.toString());
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
     }
 
     @Test
     void buildToolInstances_unknownGroup_silentlyIgnored() {
-        Object[] result = AiController.buildToolInstances("unknown", "C:/Users/Lenovo/IdeaProjects/agent-suite");
+        Object[] result = AiController.buildToolInstances("unknown", tempDir.toString());
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildToolInstances_blankTools_returnsEmptyArray() {
-        Object[] result = AiController.buildToolInstances("  ", "C:/Users/Lenovo/IdeaProjects/agent-suite");
+        Object[] result = AiController.buildToolInstances("  ", tempDir.toString());
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildToolInstances_multipleGroups_onlyKnownGroupsAdded() {
-        Object[] result = AiController.buildToolInstances("unix,unknown", "C:/Users/Lenovo/IdeaProjects/agent-suite");
+        Object[] result = AiController.buildToolInstances("unix,unknown", tempDir.toString());
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
     }
 
     @Test
     void buildToolInstances_mdWriterGroup_withRootDirectory_returnsMarkDownWriter() {
-        Object[] result = AiController.buildToolInstances("md-writer", "C:/Users/Lenovo/IdeaProjects/agent-suite");
+        Object[] result = AiController.buildToolInstances("md-writer", tempDir.toString());
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(MarkDownWriter.class);
     }
@@ -229,7 +234,7 @@ class AiControllerTest {
 
     @Test
     void buildToolInstances_unixAndMdWriter_withRootDirectory_returnsBothInstances() {
-        Object[] result = AiController.buildToolInstances("unix,md-writer", "C:/Users/Lenovo/IdeaProjects/agent-suite");
+        Object[] result = AiController.buildToolInstances("unix,md-writer", tempDir.toString());
         assertThat(result).hasSize(2);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
         assertThat(result[1]).isInstanceOf(MarkDownWriter.class);
@@ -237,7 +242,7 @@ class AiControllerTest {
 
     @Test
     void buildToolInstances_mdWriterAndUnknown_onlyMarkDownWriterAdded() {
-        Object[] result = AiController.buildToolInstances("md-writer,unknown", "C:/Users/Lenovo/IdeaProjects/agent-suite");
+        Object[] result = AiController.buildToolInstances("md-writer,unknown", tempDir.toString());
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(MarkDownWriter.class);
     }
