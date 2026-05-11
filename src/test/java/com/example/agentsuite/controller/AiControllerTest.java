@@ -197,6 +197,12 @@ class AiControllerTest {
     }
 
     @Test
+    void buildToolInstances_blankTools_returnsEmptyArray() {
+        Object[] result = AiController.buildToolInstances("  ", "C:/Users/Lenovo/IdeaProjects/agent-suite");
+        assertThat(result).isEmpty();
+    }
+
+    @Test
     void buildToolInstances_multipleGroups_onlyKnownGroupsAdded() {
         Object[] result = AiController.buildToolInstances("unix,unknown", "C:/Users/Lenovo/IdeaProjects/agent-suite");
         assertThat(result).hasSize(1);

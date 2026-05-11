@@ -157,6 +157,7 @@ public class AiController {
 
     static Object[] buildToolInstances(String tools, String rootDirectory) {
         if (tools.isBlank()) return new Object[0];
+        if (tools.length() > 512) return new Object[0];
         List<Object> instances = new ArrayList<>();
         for (String group : tools.split(",")) {
             switch (group.trim()) {
@@ -165,7 +166,7 @@ public class AiController {
                 }
             }
         }
-        return instances.toArray();
+        return instances.toArray(new Object[0]);
     }
 
     private List<String> parseCommand(String input) {
