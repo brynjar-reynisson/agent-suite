@@ -10,6 +10,7 @@ export interface ChatRequest {
   prompt?: string;
   rootDirectory?: string;
   model?: string;
+  tools?: string;
 }
 
 export interface StreamCallbacks {
@@ -23,6 +24,7 @@ export const chatStream = (params: ChatRequest, callbacks: StreamCallbacks): Pro
     prompt: params.prompt || '',
     rootDirectory: params.rootDirectory || '',
     model: params.model || 'deepseek-v4-pro',
+    tools: params.tools || '',
   });
   const url = `${API_BASE_URL}/ai/chat?${urlParams.toString()}`;
 
