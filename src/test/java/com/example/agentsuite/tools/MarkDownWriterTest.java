@@ -53,4 +53,10 @@ class MarkDownWriterTest {
         assertThat(result).startsWith("Successfully wrote");
         assertThat(result).contains("my-feature-with-spaces");
     }
+
+    @Test
+    void newMarkDownFile_allSpecialCharsFeatureName_returnsError() {
+        String result = writer.newMarkDownFile("spec", "!!!", "content");
+        assertThat(result).contains("Error: Feature name must contain at least one alphanumeric character");
+    }
 }

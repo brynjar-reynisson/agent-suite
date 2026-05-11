@@ -37,6 +37,7 @@ Spring Boot 3.5 + LangChain4j 0.36.2 agent application. Java 21.
 - `AnthropicChatService` — extends `AbstractLangChain4jChatService` for Claude models.
 - `GoogleChatService` — extends `AbstractLangChain4jChatService` for Gemini models.
 - `UnixTools` — exposes `ls`, `cat`, and `grep` as AI-callable tools. Blocks `..` path traversal; gitignore-aware (filters git-ignored paths).
+- `MarkDownWriter` — exposes `newMarkDownFile` as an AI-callable tool; writes spec/plan markdown files under `docs/specs/` or `docs/plans/`. Registered as the `"md-writer"` tool group.
 - `WebConfig` — CORS config allowing `localhost:5176`, `127.0.0.1:5176`, and `https://agent.breynisson.org`.
 - `LangChain4jConfig` — placeholder for advanced LangChain4j wiring (currently empty).
 

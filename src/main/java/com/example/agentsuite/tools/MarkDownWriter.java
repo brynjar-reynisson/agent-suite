@@ -48,9 +48,12 @@ public class MarkDownWriter {
         }
 
         String safeFeatureName = featureName.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
+        if (safeFeatureName.isEmpty()) {
+            return "Error: Feature name must contain at least one alphanumeric character.";
+        }
         String fileName = String.format("%s-%s.md", java.time.LocalDate.now(), safeFeatureName);
         Path target = mdFolder.resolve(fileName);
-        if (!target.startsWith(root) || fileName.contains("..")) {
+        if (!target.startsWith(root)) {
             return "Error: Path escapes root directory.";
         }
         if (target.toFile().exists()) {
