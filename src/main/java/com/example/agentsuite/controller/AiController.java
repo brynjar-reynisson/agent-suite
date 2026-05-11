@@ -99,7 +99,8 @@ public class AiController {
     public SseEmitter chat(@RequestParam(defaultValue = "Hello, how are you?") String message,
                            @RequestParam(defaultValue = "") String prompt,
                            @RequestParam(defaultValue = "") String rootDirectory,
-                           @RequestParam(defaultValue = "deepseek-v4-pro") String model) {
+                           @RequestParam(defaultValue = "deepseek-v4-pro") String model,
+                           @RequestParam(defaultValue = "") String tools) {
 
         SseEmitter emitter = new SseEmitter(300000L);
 
@@ -116,9 +117,10 @@ public class AiController {
             return emitter;
         }
 
-        log.info("Chat request - model: {}, prompt: {}, message: {}, rootDirectory: {}", model, prompt, message, rootDirectory);
+        log.info("Chat request - model: {}, prompt: {}, message: {}, rootDirectory: {}, tools: {}",
+                model, prompt, message, rootDirectory, tools);
 
-        Object[] tools = rootDirectory.isEmpty() ? new Object[0] : new Object[]{new UnixTools(rootDirectory)};
+        Object[] toolArray = buildToolInstances(tools, rootDirectory);
 
         CompletableFuture.runAsync(() -> {
             try {
@@ -135,7 +137,7 @@ public class AiController {
                             emitter.complete();
                         }
                     }
-                }, tools);
+                }, toolArray);
             } catch (Exception e) {
                 sendEvent(emitter, "error", e.getMessage());
                 emitter.complete();
@@ -151,6 +153,19 @@ public class AiController {
         } catch (IOException e) {
             emitter.completeWithError(e);
         }
+    }
+
+    static Object[] buildToolInstances(String tools, String rootDirectory) {
+        if (tools.isBlank()) return new Object[0];
+        List<Object> instances = new ArrayList<>();
+        for (String group : tools.split(",")) {
+            switch (group.trim()) {
+                case "unix" -> {
+                    if (!rootDirectory.isEmpty()) instances.add(new UnixTools(rootDirectory));
+                }
+            }
+        }
+        return instances.toArray();
     }
 
     private List<String> parseCommand(String input) {

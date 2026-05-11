@@ -2,6 +2,7 @@ package com.example.agentsuite.controller;
 
 import com.example.agentsuite.service.ChatService;
 import com.example.agentsuite.service.ModelRegistry;
+import com.example.agentsuite.tools.UnixTools;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -9,6 +10,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
@@ -167,5 +169,37 @@ class AiControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.CoreMatchers.not(
                         org.hamcrest.CoreMatchers.containsString("Unknown git subcommand"))));
+    }
+
+    @Test
+    void buildToolInstances_emptyTools_returnsEmptyArray() {
+        Object[] result = AiController.buildToolInstances("", "C:/Users/Lenovo/IdeaProjects/agent-suite");
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void buildToolInstances_unixGroup_noRootDirectory_returnsEmptyArray() {
+        Object[] result = AiController.buildToolInstances("unix", "");
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void buildToolInstances_unixGroup_withRootDirectory_returnsUnixTools() {
+        Object[] result = AiController.buildToolInstances("unix", "C:/Users/Lenovo/IdeaProjects/agent-suite");
+        assertThat(result).hasSize(1);
+        assertThat(result[0]).isInstanceOf(UnixTools.class);
+    }
+
+    @Test
+    void buildToolInstances_unknownGroup_silentlyIgnored() {
+        Object[] result = AiController.buildToolInstances("unknown", "C:/Users/Lenovo/IdeaProjects/agent-suite");
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void buildToolInstances_multipleGroups_onlyKnownGroupsAdded() {
+        Object[] result = AiController.buildToolInstances("unix,unknown", "C:/Users/Lenovo/IdeaProjects/agent-suite");
+        assertThat(result).hasSize(1);
+        assertThat(result[0]).isInstanceOf(UnixTools.class);
     }
 }
