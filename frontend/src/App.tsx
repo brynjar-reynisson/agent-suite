@@ -36,12 +36,12 @@ const PROMPT_BANK = [
   {
     name: 'Implementation-planner',
     text: 'Your job is to read a named specification file and create a step-by-step implementation plan. The plan should be broken down into small, actionable tasks that can be easily assigned to developers. The plan should also include any necessary technical details, such as which files or modules will need to be modified.',
-    tools: ['unix'],
+    tools: ['unix', 'md-writer'],
   },
   {
     name: 'Specification-writer',
     text: 'Your job is to create a new specification file that takes a user request and defines the business requirement, the user problem and the success criteria. Specify what is in scope and out of scope. This is about the what and why, not how it will be implemented.',
-    tools: ['unix'],
+    tools: ['unix', 'md-writer'],
   },
 ];
 
