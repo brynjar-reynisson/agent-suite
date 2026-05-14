@@ -4,6 +4,7 @@ import com.example.agentsuite.service.ChatService;
 import com.example.agentsuite.service.ModelRegistry;
 import com.example.agentsuite.tools.MarkDownWriter;
 import com.example.agentsuite.tools.UnixTools;
+import com.example.agentsuite.tools.WebTools;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -183,58 +184,58 @@ class AiControllerTest {
 
     @Test
     void buildToolInstances_emptyTools_returnsEmptyArray() {
-        Object[] result = AiController.buildToolInstances("", tempDir.toString());
+        Object[] result = AiController.buildToolInstances("", tempDir.toString(), "");
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildToolInstances_unixGroup_noRootDirectory_returnsEmptyArray() {
-        Object[] result = AiController.buildToolInstances("unix", "");
+        Object[] result = AiController.buildToolInstances("unix", "", "");
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildToolInstances_unixGroup_withRootDirectory_returnsUnixTools() {
-        Object[] result = AiController.buildToolInstances("unix", tempDir.toString());
+        Object[] result = AiController.buildToolInstances("unix", tempDir.toString(), "");
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
     }
 
     @Test
     void buildToolInstances_unknownGroup_silentlyIgnored() {
-        Object[] result = AiController.buildToolInstances("unknown", tempDir.toString());
+        Object[] result = AiController.buildToolInstances("unknown", tempDir.toString(), "");
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildToolInstances_blankTools_returnsEmptyArray() {
-        Object[] result = AiController.buildToolInstances("  ", tempDir.toString());
+        Object[] result = AiController.buildToolInstances("  ", tempDir.toString(), "");
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildToolInstances_multipleGroups_onlyKnownGroupsAdded() {
-        Object[] result = AiController.buildToolInstances("unix,unknown", tempDir.toString());
+        Object[] result = AiController.buildToolInstances("unix,unknown", tempDir.toString(), "");
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
     }
 
     @Test
     void buildToolInstances_mdWriterGroup_withRootDirectory_returnsMarkDownWriter() {
-        Object[] result = AiController.buildToolInstances("md-writer", tempDir.toString());
+        Object[] result = AiController.buildToolInstances("md-writer", tempDir.toString(), "");
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(MarkDownWriter.class);
     }
 
     @Test
     void buildToolInstances_mdWriterGroup_noRootDirectory_returnsEmptyArray() {
-        Object[] result = AiController.buildToolInstances("md-writer", "");
+        Object[] result = AiController.buildToolInstances("md-writer", "", "");
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildToolInstances_unixAndMdWriter_withRootDirectory_returnsBothInstances() {
-        Object[] result = AiController.buildToolInstances("unix,md-writer", tempDir.toString());
+        Object[] result = AiController.buildToolInstances("unix,md-writer", tempDir.toString(), "");
         assertThat(result).hasSize(2);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
         assertThat(result[1]).isInstanceOf(MarkDownWriter.class);
@@ -242,9 +243,16 @@ class AiControllerTest {
 
     @Test
     void buildToolInstances_mdWriterAndUnknown_onlyMarkDownWriterAdded() {
-        Object[] result = AiController.buildToolInstances("md-writer,unknown", tempDir.toString());
+        Object[] result = AiController.buildToolInstances("md-writer,unknown", tempDir.toString(), "");
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(MarkDownWriter.class);
+    }
+
+    @Test
+    void buildToolInstances_webSearchGroup_returnsWebTools() {
+        Object[] result = AiController.buildToolInstances("web-search", "", "");
+        assertThat(result).hasSize(1);
+        assertThat(result[0]).isInstanceOf(WebTools.class);
     }
 
     @Test

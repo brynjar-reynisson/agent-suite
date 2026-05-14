@@ -6,8 +6,10 @@ import com.example.agentsuite.service.ModelRegistry;
 import com.example.agentsuite.tools.Git;
 import com.example.agentsuite.tools.MarkDownWriter;
 import com.example.agentsuite.tools.UnixTools;
+import com.example.agentsuite.tools.WebTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -34,10 +36,13 @@ public class AiController {
     );
 
     private final ModelRegistry modelRegistry;
+    private final String braveApiKey;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
-    public AiController(ModelRegistry modelRegistry) {
+    public AiController(ModelRegistry modelRegistry,
+                        @Value("${brave.api-key}") String braveApiKey) {
         this.modelRegistry = modelRegistry;
+        this.braveApiKey = braveApiKey;
     }
 
     @GetMapping("/ai/tools")
@@ -122,7 +127,7 @@ public class AiController {
         log.info("Chat request - model: {}, prompt: {}, message: {}, rootDirectory: {}, tools: {}",
                 model, prompt, message, rootDirectory, tools.replace("\n", "_").replace("\r", "_"));
 
-        Object[] toolArray = buildToolInstances(tools, rootDirectory);
+        Object[] toolArray = buildToolInstances(tools, rootDirectory, braveApiKey);
 
         CompletableFuture.runAsync(() -> {
             try {
@@ -157,7 +162,7 @@ public class AiController {
         }
     }
 
-    static Object[] buildToolInstances(String tools, String rootDirectory) {
+    static Object[] buildToolInstances(String tools, String rootDirectory, String braveApiKey) {
         if (tools.isBlank()) return new Object[0];
         if (tools.length() > 512) {
             log.warn("Rejected tools param: length {} exceeds 512 char limit", tools.length());
@@ -175,6 +180,7 @@ public class AiController {
                 case "md-writer" -> {
                     if (!rootDirectory.isEmpty()) instances.add(new MarkDownWriter(rootDirectory));
                 }
+                case "web-search" -> instances.add(new WebTools(braveApiKey));
             }
         }
         return instances.toArray(new Object[0]);
