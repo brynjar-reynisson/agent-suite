@@ -95,7 +95,7 @@ public class WebTools {
                     .GET()
                     .build();
 
-            HttpResponse<java.io.InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
             log.info("webFetch status {}", response.statusCode());
 
             if (response.statusCode() != 200) {
