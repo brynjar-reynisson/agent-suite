@@ -43,4 +43,28 @@ class WebToolsTest {
     void processBody_nullHtml_returnsNoContentFound() {
         assertThat(WebTools.processBody(null)).isEqualTo("No content found.");
     }
+
+    @Test
+    void webFetch_fileScheme_returnsFetchFailed() {
+        WebTools tools = new WebTools("");
+        assertThat(tools.webFetch("file:///etc/passwd")).startsWith("Fetch failed:");
+    }
+
+    @Test
+    void webFetch_loopbackIp_returnsFetchFailed() {
+        WebTools tools = new WebTools("");
+        assertThat(tools.webFetch("http://127.0.0.1/")).startsWith("Fetch failed:");
+    }
+
+    @Test
+    void webFetch_privateIp_returnsFetchFailed() {
+        WebTools tools = new WebTools("");
+        assertThat(tools.webFetch("http://192.168.1.1/")).startsWith("Fetch failed:");
+    }
+
+    @Test
+    void webFetch_localhostUrl_returnsFetchFailed() {
+        WebTools tools = new WebTools("");
+        assertThat(tools.webFetch("http://localhost/")).startsWith("Fetch failed:");
+    }
 }

@@ -25,7 +25,9 @@ public class WebTools {
     private static final String BRAVE_API_URL = "https://api.search.brave.com/res/v1/web/search";
     private static final int RESULT_COUNT = 5;
     private static final int MAX_FETCH_CHARS = 20_000;
-    private static final HttpClient httpClient = HttpClient.newHttpClient();
+    private static final HttpClient httpClient = HttpClient.newBuilder()
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build();
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private final String apiKey;
@@ -86,7 +88,7 @@ public class WebTools {
     public String webFetch(@P("The URL to fetch") String url) {
         try {
             validateUrl(url);
-            log.info("webFetch {}", url);
+            log.info("webFetch {}", url.replace("\n", "\\n").replace("\r", "\\r"));
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(Duration.ofSeconds(10))
@@ -120,6 +122,7 @@ public class WebTools {
             throw new IllegalArgumentException("URL has no host");
         }
         try {
+            // Note: DNS rebinding is not prevented — host is resolved once here but HttpClient re-resolves on connect.
             InetAddress addr = InetAddress.getByName(host);
             if (addr.isLoopbackAddress() || addr.isLinkLocalAddress() || addr.isSiteLocalAddress()) {
                 throw new IllegalArgumentException("URL resolves to a private or internal address");
