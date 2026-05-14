@@ -8,8 +8,11 @@ import org.jsoup.Jsoup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.InputStream;
+import java.net.InetAddress;
 import java.net.URI;
 import java.net.URLEncoder;
+import java.net.UnknownHostException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -79,9 +82,10 @@ public class WebTools {
         }
     }
 
-    @Tool("Fetch the content of a web page and return its plain text")
+    @Tool("Fetch and return the plain-text content of a specific URL, e.g. to read a documentation page, article, or file linked in search results")
     public String webFetch(@P("The URL to fetch") String url) {
         try {
+            validateUrl(url);
             log.info("webFetch {}", url);
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -89,20 +93,46 @@ public class WebTools {
                     .GET()
                     .build();
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<java.io.InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
             log.info("webFetch status {}", response.statusCode());
 
             if (response.statusCode() != 200) {
+                response.body().close();
                 return "Fetch failed: HTTP " + response.statusCode();
             }
 
-            return processBody(response.body());
+            byte[] bytes = response.body().readNBytes(MAX_FETCH_CHARS * 4);
+            response.body().close();
+            return processBody(new String(bytes, StandardCharsets.UTF_8));
         } catch (Exception e) {
             return "Fetch failed: " + e.getMessage();
         }
     }
 
+    private static void validateUrl(String url) {
+        URI uri = URI.create(url);
+        String scheme = uri.getScheme();
+        if (!"http".equals(scheme) && !"https".equals(scheme)) {
+            throw new IllegalArgumentException("URL scheme must be http or https");
+        }
+        String host = uri.getHost();
+        if (host == null || host.isBlank()) {
+            throw new IllegalArgumentException("URL has no host");
+        }
+        try {
+            InetAddress addr = InetAddress.getByName(host);
+            if (addr.isLoopbackAddress() || addr.isLinkLocalAddress() || addr.isSiteLocalAddress()) {
+                throw new IllegalArgumentException("URL resolves to a private or internal address");
+            }
+        } catch (UnknownHostException e) {
+            throw new IllegalArgumentException("Cannot resolve host: " + host);
+        }
+    }
+
     static String processBody(String html) {
+        if (html == null) {
+            return "No content found.";
+        }
         String text = Jsoup.parse(html).body().text();
         if (text.isBlank()) {
             return "No content found.";

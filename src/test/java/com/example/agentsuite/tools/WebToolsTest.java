@@ -38,4 +38,9 @@ class WebToolsTest {
         String html = "<html><body><script>alert(1)</script><p>Hello world</p></body></html>";
         assertThat(WebTools.processBody(html)).isEqualTo("Hello world");
     }
+
+    @Test
+    void processBody_nullHtml_returnsNoContentFound() {
+        assertThat(WebTools.processBody(null)).isEqualTo("No content found.");
+    }
 }
