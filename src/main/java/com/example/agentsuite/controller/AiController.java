@@ -180,7 +180,7 @@ public class AiController {
                 case "md-writer" -> {
                     if (!rootDirectory.isEmpty()) instances.add(new MarkDownWriter(rootDirectory));
                 }
-                case "web-search" -> instances.add(new WebTools(braveApiKey));
+                case "web" -> instances.add(new WebTools(braveApiKey));
             }
         }
         return instances.toArray(new Object[0]);

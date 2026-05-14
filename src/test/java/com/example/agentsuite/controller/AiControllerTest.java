@@ -249,8 +249,8 @@ class AiControllerTest {
     }
 
     @Test
-    void buildToolInstances_webSearchGroup_returnsWebTools() {
-        Object[] result = AiController.buildToolInstances("web-search", "", "");
+    void buildToolInstances_webGroup_returnsWebTools() {
+        Object[] result = AiController.buildToolInstances("web", "", "");
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(WebTools.class);
     }
