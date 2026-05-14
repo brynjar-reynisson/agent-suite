@@ -88,7 +88,7 @@ function PromptCombobox({ value, onChange, prompts = PROMPT_BANK }: PromptCombob
         ▾
       </button>
       {isOpen && (
-        <ul className="absolute z-10 w-full bg-white border rounded shadow-sm mt-1">
+        <ul className="absolute z-10 w-full bg-white border rounded shadow-sm bottom-full mb-1">
           {prompts.map((entry) => (
             <li
               key={entry.name}
