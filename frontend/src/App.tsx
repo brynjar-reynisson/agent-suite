@@ -31,23 +31,29 @@ const PROMPT_BANK = [
   {
     name: 'Code-request classifier',
     text: 'You are a coding assistant and will use the available tools on the selected codebase to classify the coding requests you receive. Respond in json format 1) intent, which shall be either bug-fix, enhancement, new-feature, architecture-change or unknown, 2) confidence in the classification (percentages)',
+    tools: ['unix'],
   },
   {
-      name: 'Implementation-planner',
-      text: 'Your job is to read a named specification file and create a step-by-step implementation plan. The plan should be broken down into small, actionable tasks that can be easily assigned to developers. The plan should also include any necessary technical details, such as which files or modules will need to be modified.'
+    name: 'Implementation-planner',
+    text: 'Your job is to read a named specification file and create a step-by-step implementation plan. The plan should be broken down into small, actionable tasks that can be easily assigned to developers. The plan should also include any necessary technical details, such as which files or modules will need to be modified.',
+    tools: ['unix', 'md-writer'],
   },
-
   {
-      name: 'Specification-writer',
-      text: 'Your job is to create a new specification file that takes a user request and defines the business requirement, the user problem and the success criteria. Specify what is in scope and out of scope. This is about the what and why, not how it will be implemented.'
+    name: 'Specification-writer',
+    text: 'Your job is to create a new specification file that takes a user request and defines the business requirement, the user problem and the success criteria. Specify what is in scope and out of scope. This is about the what and why, not how it will be implemented.',
+    tools: ['unix', 'md-writer'],
   },
-
+  {
+      name: 'Web-dweller',
+      text: 'You have access to search and fetch information from the internet. Use it to find information on the web to answer user questions. Always use the tool when you need to find up-to-date information or access specific websites. If the user question can be answered with your existing knowledge, you can respond without using the tool.',
+      tools: ['web'],
+  }
 ];
 
 interface PromptComboboxProps {
   value: string;
   onChange: (v: string) => void;
-  prompts?: { name: string; text: string }[];
+  prompts?: { name: string; text: string; tools: string[] }[];
 }
 
 function PromptCombobox({ value, onChange, prompts = PROMPT_BANK }: PromptComboboxProps) {
@@ -156,7 +162,9 @@ function App() {
       return;
     }
 
-    const resolvedPrompt = PROMPT_BANK.find(p => p.name === prompt)?.text ?? prompt;
+    const matched = PROMPT_BANK.find(p => p.name === prompt);
+    const resolvedPrompt = matched?.text ?? prompt;
+    const resolvedTools = (matched?.tools ?? []).join(',');
     try {
       await chatStream(
         {
@@ -164,6 +172,7 @@ function App() {
           prompt: resolvedPrompt,
           rootDirectory: rootDirectory,
           model: model,
+          tools: resolvedTools,
         },
         {
           onToolCall: (tc) => {

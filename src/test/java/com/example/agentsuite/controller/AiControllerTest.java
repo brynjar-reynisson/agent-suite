@@ -2,21 +2,34 @@ package com.example.agentsuite.controller;
 
 import com.example.agentsuite.service.ChatService;
 import com.example.agentsuite.service.ModelRegistry;
+import com.example.agentsuite.tools.MarkDownWriter;
+import com.example.agentsuite.tools.UnixTools;
+import com.example.agentsuite.tools.WebTools;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
+import java.nio.file.Path;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import com.example.agentsuite.service.ChatEvent;
+import java.util.function.Consumer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AiController.class)
 class AiControllerTest {
+
+    @TempDir
+    static Path tempDir;
 
     @Autowired
     private MockMvc mockMvc;
@@ -167,5 +180,101 @@ class AiControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.CoreMatchers.not(
                         org.hamcrest.CoreMatchers.containsString("Unknown git subcommand"))));
+    }
+
+    @Test
+    void buildToolInstances_emptyTools_returnsEmptyArray() {
+        Object[] result = AiController.buildToolInstances("", tempDir.toString(), "");
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void buildToolInstances_unixGroup_noRootDirectory_returnsEmptyArray() {
+        Object[] result = AiController.buildToolInstances("unix", "", "");
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void buildToolInstances_unixGroup_withRootDirectory_returnsUnixTools() {
+        Object[] result = AiController.buildToolInstances("unix", tempDir.toString(), "");
+        assertThat(result).hasSize(1);
+        assertThat(result[0]).isInstanceOf(UnixTools.class);
+    }
+
+    @Test
+    void buildToolInstances_unknownGroup_silentlyIgnored() {
+        Object[] result = AiController.buildToolInstances("unknown", tempDir.toString(), "");
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void buildToolInstances_blankTools_returnsEmptyArray() {
+        Object[] result = AiController.buildToolInstances("  ", tempDir.toString(), "");
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void buildToolInstances_multipleGroups_onlyKnownGroupsAdded() {
+        Object[] result = AiController.buildToolInstances("unix,unknown", tempDir.toString(), "");
+        assertThat(result).hasSize(1);
+        assertThat(result[0]).isInstanceOf(UnixTools.class);
+    }
+
+    @Test
+    void buildToolInstances_mdWriterGroup_withRootDirectory_returnsMarkDownWriter() {
+        Object[] result = AiController.buildToolInstances("md-writer", tempDir.toString(), "");
+        assertThat(result).hasSize(1);
+        assertThat(result[0]).isInstanceOf(MarkDownWriter.class);
+    }
+
+    @Test
+    void buildToolInstances_mdWriterGroup_noRootDirectory_returnsEmptyArray() {
+        Object[] result = AiController.buildToolInstances("md-writer", "", "");
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void buildToolInstances_unixAndMdWriter_withRootDirectory_returnsBothInstances() {
+        Object[] result = AiController.buildToolInstances("unix,md-writer", tempDir.toString(), "");
+        assertThat(result).hasSize(2);
+        assertThat(result[0]).isInstanceOf(UnixTools.class);
+        assertThat(result[1]).isInstanceOf(MarkDownWriter.class);
+    }
+
+    @Test
+    void buildToolInstances_mdWriterAndUnknown_onlyMarkDownWriterAdded() {
+        Object[] result = AiController.buildToolInstances("md-writer,unknown", tempDir.toString(), "");
+        assertThat(result).hasSize(1);
+        assertThat(result[0]).isInstanceOf(MarkDownWriter.class);
+    }
+
+    @Test
+    void buildToolInstances_webGroup_returnsWebTools() {
+        Object[] result = AiController.buildToolInstances("web", "", "");
+        assertThat(result).hasSize(1);
+        assertThat(result[0]).isInstanceOf(WebTools.class);
+    }
+
+    @Test
+    void chat_withUnixToolsAndValidRootDirectory_noErrorEvent() throws Exception {
+        ChatService mockService = mock(ChatService.class);
+        when(modelRegistry.get("deepseek-v4-pro")).thenReturn(mockService);
+        doAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            Consumer<ChatEvent> consumer = inv.getArgument(2);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(mockService).chatStream(any(), any(), any(Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
+                        .param("tools", "unix")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.not(
+                        org.hamcrest.CoreMatchers.containsString("error"))));
     }
 }

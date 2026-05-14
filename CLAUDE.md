@@ -18,7 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./mvnw test -Dtest=AgentSuiteApplicationTests
 ```
 
-Server runs on `http://localhost:8090`. Requires `DEEPSEEK_API_KEY` environment variable. `ANTHROPIC_API_KEY` and `GOOGLE_API_KEY` are optional — those providers are skipped if their keys are absent.
+Server runs on `http://localhost:8090`. Requires `DEEPSEEK_API_KEY` environment variable. `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, and `BRAVE_SEARCH_API_KEY` are optional — those providers are skipped if their keys are absent.
 
 ## Architecture
 
@@ -37,6 +37,8 @@ Spring Boot 3.5 + LangChain4j 0.36.2 agent application. Java 21.
 - `AnthropicChatService` — extends `AbstractLangChain4jChatService` for Claude models.
 - `GoogleChatService` — extends `AbstractLangChain4jChatService` for Gemini models.
 - `UnixTools` — exposes `ls`, `cat`, and `grep` as AI-callable tools. Blocks `..` path traversal; gitignore-aware (filters git-ignored paths).
+- `MarkDownWriter` — exposes `newMarkDownFile` as an AI-callable tool; writes spec/plan markdown files under `docs/specs/` or `docs/plans/`. Registered as the `"md-writer"` tool group.
+- `WebTools` — exposes `webSearch` and `webFetch` as AI-callable tools. Registered as the `"web"` tool group (both tools are granted together). `webSearch` requires `BRAVE_SEARCH_API_KEY`; `webFetch` works without a key but validates URLs against SSRF (rejects private/loopback addresses and non-http(s) schemes).
 - `WebConfig` — CORS config allowing `localhost:5176`, `127.0.0.1:5176`, and `https://agent.breynisson.org`.
 - `LangChain4jConfig` — placeholder for advanced LangChain4j wiring (currently empty).
 

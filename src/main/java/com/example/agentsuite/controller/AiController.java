@@ -4,14 +4,18 @@ import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatService;
 import com.example.agentsuite.service.ModelRegistry;
 import com.example.agentsuite.tools.Git;
+import com.example.agentsuite.tools.MarkDownWriter;
 import com.example.agentsuite.tools.UnixTools;
+import com.example.agentsuite.tools.WebTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -32,10 +36,13 @@ public class AiController {
     );
 
     private final ModelRegistry modelRegistry;
+    private final String braveApiKey;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
-    public AiController(ModelRegistry modelRegistry) {
+    public AiController(ModelRegistry modelRegistry,
+                        @Value("${brave.api-key}") String braveApiKey) {
         this.modelRegistry = modelRegistry;
+        this.braveApiKey = braveApiKey;
     }
 
     @GetMapping("/ai/tools")
@@ -99,7 +106,8 @@ public class AiController {
     public SseEmitter chat(@RequestParam(defaultValue = "Hello, how are you?") String message,
                            @RequestParam(defaultValue = "") String prompt,
                            @RequestParam(defaultValue = "") String rootDirectory,
-                           @RequestParam(defaultValue = "deepseek-v4-pro") String model) {
+                           @RequestParam(defaultValue = "deepseek-v4-pro") String model,
+                           @RequestParam(defaultValue = "") String tools) {
 
         SseEmitter emitter = new SseEmitter(300000L);
 
@@ -116,9 +124,10 @@ public class AiController {
             return emitter;
         }
 
-        log.info("Chat request - model: {}, prompt: {}, message: {}, rootDirectory: {}", model, prompt, message, rootDirectory);
+        log.info("Chat request - model: {}, prompt: {}, message: {}, rootDirectory: {}, tools: {}",
+                model, prompt, message, rootDirectory, tools.replace("\n", "_").replace("\r", "_"));
 
-        Object[] tools = rootDirectory.isEmpty() ? new Object[0] : new Object[]{new UnixTools(rootDirectory)};
+        Object[] toolArray = buildToolInstances(tools, rootDirectory, braveApiKey);
 
         CompletableFuture.runAsync(() -> {
             try {
@@ -135,7 +144,7 @@ public class AiController {
                             emitter.complete();
                         }
                     }
-                }, tools);
+                }, toolArray);
             } catch (Exception e) {
                 sendEvent(emitter, "error", e.getMessage());
                 emitter.complete();
@@ -151,6 +160,30 @@ public class AiController {
         } catch (IOException e) {
             emitter.completeWithError(e);
         }
+    }
+
+    static Object[] buildToolInstances(String tools, String rootDirectory, String braveApiKey) {
+        if (tools.isBlank()) return new Object[0];
+        if (tools.length() > 512) {
+            log.warn("Rejected tools param: length {} exceeds 512 char limit", tools.length());
+            return new Object[0];
+        }
+        List<Object> instances = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (String group : tools.split(",")) {
+            String g = group.trim();
+            if (!seen.add(g)) continue;
+            switch (g) {
+                case "unix" -> {
+                    if (!rootDirectory.isEmpty()) instances.add(new UnixTools(rootDirectory));
+                }
+                case "md-writer" -> {
+                    if (!rootDirectory.isEmpty()) instances.add(new MarkDownWriter(rootDirectory));
+                }
+                case "web" -> instances.add(new WebTools(braveApiKey));
+            }
+        }
+        return instances.toArray(new Object[0]);
     }
 
     private List<String> parseCommand(String input) {
