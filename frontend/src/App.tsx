@@ -43,6 +43,11 @@ const PROMPT_BANK = [
     text: 'Your job is to create a new specification file that takes a user request and defines the business requirement, the user problem and the success criteria. Specify what is in scope and out of scope. This is about the what and why, not how it will be implemented.',
     tools: ['unix', 'md-writer'],
   },
+  {
+      name: 'Web-dweller',
+      text: 'You have access to search and fetch information from the internet. Use it to find information on the web to answer user questions. Always use the tool when you need to find up-to-date information or access specific websites. If the user question can be answered with your existing knowledge, you can respond without using the tool.',
+      tools: ['web'],
+  }
 ];
 
 interface PromptComboboxProps {
