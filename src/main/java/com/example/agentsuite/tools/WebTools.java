@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
+import org.jsoup.Jsoup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,6 +21,7 @@ public class WebTools {
     private static final Logger log = LoggerFactory.getLogger(WebTools.class);
     private static final String BRAVE_API_URL = "https://api.search.brave.com/res/v1/web/search";
     private static final int RESULT_COUNT = 5;
+    private static final int MAX_FETCH_CHARS = 20_000;
     private static final HttpClient httpClient = HttpClient.newHttpClient();
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -75,5 +77,39 @@ public class WebTools {
         } catch (Exception e) {
             return "Search failed: " + e.getMessage();
         }
+    }
+
+    @Tool("Fetch the content of a web page and return its plain text")
+    public String webFetch(@P("The URL to fetch") String url) {
+        try {
+            log.info("webFetch {}", url);
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(10))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            log.info("webFetch status {}", response.statusCode());
+
+            if (response.statusCode() != 200) {
+                return "Fetch failed: HTTP " + response.statusCode();
+            }
+
+            return processBody(response.body());
+        } catch (Exception e) {
+            return "Fetch failed: " + e.getMessage();
+        }
+    }
+
+    static String processBody(String html) {
+        String text = Jsoup.parse(html).body().text();
+        if (text.isBlank()) {
+            return "No content found.";
+        }
+        if (text.length() > MAX_FETCH_CHARS) {
+            return text.substring(0, MAX_FETCH_CHARS) + "\n[truncated]";
+        }
+        return text;
     }
 }

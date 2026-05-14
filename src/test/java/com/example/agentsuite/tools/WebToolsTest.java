@@ -19,4 +19,23 @@ class WebToolsTest {
         String result = tools.webSearch("test query");
         assertThat(result).contains("BRAVE_SEARCH_API_KEY");
     }
+
+    @Test
+    void processBody_emptyHtml_returnsNoContentFound() {
+        assertThat(WebTools.processBody("")).isEqualTo("No content found.");
+    }
+
+    @Test
+    void processBody_longContent_isTruncatedAt20000Chars() {
+        String input = "<p>" + "x".repeat(25000) + "</p>";
+        String result = WebTools.processBody(input);
+        assertThat(result).endsWith("\n[truncated]");
+        assertThat(result).hasSize(20000 + "\n[truncated]".length());
+    }
+
+    @Test
+    void processBody_htmlWithTagsAndScripts_returnsPlainText() {
+        String html = "<html><body><script>alert(1)</script><p>Hello world</p></body></html>";
+        assertThat(WebTools.processBody(html)).isEqualTo("Hello world");
+    }
 }
