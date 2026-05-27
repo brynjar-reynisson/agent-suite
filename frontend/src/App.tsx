@@ -39,6 +39,16 @@ const PROMPT_BANK = [
     tools: ['unix', 'md-writer'],
   },
   {
+    name: 'Plan-Reviewer',
+    text: 'Your job is to read a named specification file and its implementation plan file, and review them for clarity, completeness and correctness. Provide feedback on any areas that are unclear, incomplete or incorrect. Pay special attention to possible security and performance issues. You will write your review comments in a new markdown review file.',
+    tools: ['unix', 'md-writer'],
+  },
+  {
+    name: 'Spec-Reviewer',
+    text: 'Your job is to read a named specification file and review it for clarity, completeness and correctness. Provide feedback on any areas that are unclear, incomplete or incorrect, and suggest improvements to make the specification more effective. You will write your review comments in a new markdown review file.',
+    tools: ['unix', 'md-writer'],
+  },
+  {
     name: 'Specification-writer',
     text: 'Your job is to create a new specification file that takes a user request and defines the business requirement, the user problem and the success criteria. Specify what is in scope and out of scope. This is about the what and why, not how it will be implemented.',
     tools: ['unix', 'md-writer'],

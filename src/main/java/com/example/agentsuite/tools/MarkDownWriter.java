@@ -24,9 +24,9 @@ public class MarkDownWriter {
         }
     }
 
-    @Tool("Create new markdown spec or plan file for a feature with the given content. Actual file name will be auto-generated and returned, based on the document type and current timestamp.")
+    @Tool("Create new markdown spec, plan or review file for a feature with the given content. Actual file name will be auto-generated and returned, based on the document type and current timestamp.")
     public String newMarkDownFile(
-            @P("Document type, spec or plan") String documentType,
+            @P("Document type, spec, plan or review") String documentType,
             @P("Feature name") String featureName,
             @P("The content to write") String content
     ) {
@@ -37,8 +37,10 @@ public class MarkDownWriter {
             mdFolder = docs.resolve("specs");
         } else if (documentType.equalsIgnoreCase("plan")) {
             mdFolder = docs.resolve("plans");
+        } else if (documentType.equalsIgnoreCase("review")) {
+            mdFolder = docs.resolve("reviews");
         } else {
-            return "Error: Unknown document type: " + documentType + ". Use 'spec' or 'plan'.";
+            return "Error: Unknown document type: " + documentType + ". Use 'spec', 'plan' or 'review'.";
         }
 
         try {
