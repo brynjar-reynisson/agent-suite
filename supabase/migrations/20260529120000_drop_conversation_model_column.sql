@@ -1,2 +1,2 @@
 ALTER TABLE conversation
-    DROP COLUMN model;
+    DROP COLUMN IF EXISTS model;
