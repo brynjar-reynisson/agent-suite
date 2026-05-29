@@ -121,7 +121,7 @@ Prerequisites: Local Supabase must be running (`supabase start` if not already u
 Expected: `BUILD SUCCESS`. The following directories will be created under `src/main/java/com/example/agentsuite/jooq/generated/`:
 - `tables/` — `SuiteUser.java`, `Conversation.java`, `Message.java`
 - `tables/records/` — `SuiteUserRecord.java`, `ConversationRecord.java`, `MessageRecord.java`
-- `DefaultCatalog.java`, `DefaultSchema.java`, `Keys.java`, `Tables.java`
+- `DefaultCatalog.java`, `Public.java` (schema class for the `public` schema), `Keys.java`, `Tables.java`
 
 - [ ] **Step 2: Verify compilation with generated classes**
 
