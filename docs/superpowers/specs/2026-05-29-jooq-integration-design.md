@@ -19,7 +19,7 @@ Add to `src/main/resources/application.properties`:
 ```properties
 spring.datasource.url=jdbc:postgresql://127.0.0.1:54322/postgres
 spring.datasource.username=postgres
-spring.datasource.password=postgres
+spring.datasource.password=${SUPABASE_DB_PASSWORD:postgres}
 ```
 
 Add matching entries to `src/test/resources/application.properties`.

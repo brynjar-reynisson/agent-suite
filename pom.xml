@@ -20,6 +20,7 @@
     <properties>
         <java.version>21</java.version>
         <langchain4j.version>0.36.2</langchain4j.version>
+        <supabase.db.password>postgres</supabase.db.password>
     </properties>
 
     <dependencies>
@@ -98,7 +99,7 @@
                         <driver>org.postgresql.Driver</driver>
                         <url>jdbc:postgresql://127.0.0.1:54322/postgres</url>
                         <user>postgres</user>
-                        <password>postgres</password>
+                        <password>${supabase.db.password}</password>
                     </jdbc>
                     <generator>
                         <database>
