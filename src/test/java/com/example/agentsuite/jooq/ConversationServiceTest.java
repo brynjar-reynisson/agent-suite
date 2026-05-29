@@ -39,6 +39,8 @@ class ConversationServiceTest {
 
     @BeforeEach
     void setUp() {
+        // All addMessage calls share the same @Transactional now() timestamp in H2,
+        // so messages are ordered by message_id ASC (secondary sort) = insertion order.
         // Guest is seeded by schema.sql; add the second user
         dsl.insertInto(SUITE_USER).set(SUITE_USER.UUID, "someone@somewhere.com").execute();
         guestId = dsl.select(SUITE_USER.USER_ID).from(SUITE_USER)
@@ -93,8 +95,9 @@ class ConversationServiceTest {
     @Test
     void guestMessageHistoryInOrder() {
         List<MessageRecord> msgs = service.getMessages(guestConvId);
-        assertThat(msgs.get(0).getType()).isEqualTo("model_changed");
-        assertThat(msgs.get(msgs.size() - 1).getType()).isEqualTo("ASSISTANT");
+        assertThat(msgs).extracting(MessageRecord::getType)
+                .containsExactly("model_changed", "SYSTEM", "USER", "ASSISTANT",
+                                  "model_changed", "SYSTEM", "USER", "ASSISTANT");
     }
 
     @Test
