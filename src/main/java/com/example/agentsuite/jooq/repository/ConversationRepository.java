@@ -18,11 +18,10 @@ public class ConversationRepository {
         this.dsl = dsl;
     }
 
-    public long insert(long userId, String name, String model, String rootDirectory) {
+    public long insert(long userId, String name, String rootDirectory) {
         return dsl.insertInto(CONVERSATION)
                 .set(CONVERSATION.USER_ID, userId)
                 .set(CONVERSATION.CONVERSATION_NAME, name)
-                .set(CONVERSATION.MODEL, model)
                 .set(CONVERSATION.ROOT_DIRECTORY, rootDirectory)
                 .returning(CONVERSATION.CONVERSATION_ID)
                 .fetchSingle()
