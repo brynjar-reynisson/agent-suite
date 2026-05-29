@@ -22,8 +22,8 @@ public class ConversationService {
     }
 
     @Transactional
-    public long createConversation(long userId, String name, String model, String rootDirectory) {
-        return conversationRepository.insert(userId, name, model, rootDirectory);
+    public long createConversation(long userId, String name, String rootDirectory) {
+        return conversationRepository.insert(userId, name, rootDirectory);
     }
 
     @Transactional
