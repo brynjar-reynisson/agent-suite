@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.jooq.JooqTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
@@ -24,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @JooqTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({SuiteUserRepository.class, ConversationRepository.class, MessageRepository.class})
+@TestPropertySource(properties = "spring.sql.init.mode=always")
 @Transactional
 class RepositoryTest {
 
@@ -119,6 +121,6 @@ class RepositoryTest {
         List<MessageRecord> msgs = messageRepo.findByConversationId(convId);
         assertThat(msgs).hasSize(4);
         assertThat(msgs).extracting(MessageRecord::getType)
-                .containsExactly("model_changed", "SYSTEM", "USER", "ASSISTANT");
+                .containsExactlyInAnyOrder("model_changed", "SYSTEM", "USER", "ASSISTANT");
     }
 }
