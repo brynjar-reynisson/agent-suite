@@ -80,11 +80,6 @@ public class Conversation extends TableImpl<ConversationRecord> {
     public final TableField<ConversationRecord, OffsetDateTime> CREATE_TIME = createField(DSL.name("create_time"), SQLDataType.TIMESTAMPWITHTIMEZONE(6).nullable(false).defaultValue(DSL.field(DSL.raw("now()"), SQLDataType.TIMESTAMPWITHTIMEZONE)), this, "");
 
     /**
-     * The column <code>public.conversation.model</code>.
-     */
-    public final TableField<ConversationRecord, String> MODEL = createField(DSL.name("model"), SQLDataType.CLOB, this, "");
-
-    /**
      * The column <code>public.conversation.root_directory</code>.
      */
     public final TableField<ConversationRecord, String> ROOT_DIRECTORY = createField(DSL.name("root_directory"), SQLDataType.CLOB, this, "");

@@ -77,31 +77,17 @@ public class ConversationRecord extends UpdatableRecordImpl<ConversationRecord> 
     }
 
     /**
-     * Setter for <code>public.conversation.model</code>.
-     */
-    public void setModel(String value) {
-        set(4, value);
-    }
-
-    /**
-     * Getter for <code>public.conversation.model</code>.
-     */
-    public String getModel() {
-        return (String) get(4);
-    }
-
-    /**
      * Setter for <code>public.conversation.root_directory</code>.
      */
     public void setRootDirectory(String value) {
-        set(5, value);
+        set(4, value);
     }
 
     /**
      * Getter for <code>public.conversation.root_directory</code>.
      */
     public String getRootDirectory() {
-        return (String) get(5);
+        return (String) get(4);
     }
 
     // -------------------------------------------------------------------------
@@ -127,14 +113,13 @@ public class ConversationRecord extends UpdatableRecordImpl<ConversationRecord> 
     /**
      * Create a detached, initialised ConversationRecord
      */
-    public ConversationRecord(Long conversationId, Long userId, String conversationName, OffsetDateTime createTime, String model, String rootDirectory) {
+    public ConversationRecord(Long conversationId, Long userId, String conversationName, OffsetDateTime createTime, String rootDirectory) {
         super(Conversation.CONVERSATION);
 
         setConversationId(conversationId);
         setUserId(userId);
         setConversationName(conversationName);
         setCreateTime(createTime);
-        setModel(model);
         setRootDirectory(rootDirectory);
         resetChangedOnNotNull();
     }
