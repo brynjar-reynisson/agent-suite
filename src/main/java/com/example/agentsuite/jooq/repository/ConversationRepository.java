@@ -25,7 +25,7 @@ public class ConversationRepository {
                 .set(CONVERSATION.MODEL, model)
                 .set(CONVERSATION.ROOT_DIRECTORY, rootDirectory)
                 .returning(CONVERSATION.CONVERSATION_ID)
-                .fetchOne()
+                .fetchSingle()
                 .getConversationId();
     }
 
