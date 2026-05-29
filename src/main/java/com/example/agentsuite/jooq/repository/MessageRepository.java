@@ -29,7 +29,7 @@ public class MessageRepository {
     public List<MessageRecord> findByConversationId(long conversationId) {
         return dsl.selectFrom(MESSAGE)
                 .where(MESSAGE.CONVERSATION_ID.eq(conversationId))
-                .orderBy(MESSAGE.MESSAGE_TIME.asc())
+                .orderBy(MESSAGE.MESSAGE_TIME.asc(), MESSAGE.MESSAGE_ID.asc())
                 .fetch();
     }
 }
