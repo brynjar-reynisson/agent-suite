@@ -9,6 +9,7 @@ import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.jooq.JooqTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,7 @@ import static com.example.agentsuite.jooq.generated.Tables.SUITE_USER;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @JooqTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({SuiteUserRepository.class, ConversationRepository.class, MessageRepository.class})
 @Transactional
 class RepositoryTest {
