@@ -1,6 +1,7 @@
 package com.example.agentsuite.controller;
 
-import com.example.agentsuite.service.ChatService;
+import com.example.agentsuite.service.ChatEvent;
+import com.example.agentsuite.service.ChatOrchestrationService;
 import com.example.agentsuite.service.ModelRegistry;
 import com.example.agentsuite.tools.MarkDownWriter;
 import com.example.agentsuite.tools.UnixTools;
@@ -16,10 +17,9 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import com.example.agentsuite.service.ChatEvent;
 import java.util.function.Consumer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -35,11 +35,22 @@ class AiControllerTest {
     private MockMvc mockMvc;
 
     @MockBean
+    private ChatOrchestrationService orchestrationService;
+
+    @MockBean
     private ModelRegistry modelRegistry;
 
     @Test
     void chat_unknownModel_returnsError() throws Exception {
-        when(modelRegistry.get("gpt-4o")).thenReturn(null);
+        // Model validation now happens inside ChatOrchestrationService; simulate it sending an error event.
+        doAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            Consumer<ChatEvent> consumer = inv.getArgument(5);
+            consumer.accept(new ChatEvent.Error("Unknown model: gpt-4o"));
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), eq("gpt-4o"), any(), any(), any(),
+                any(Consumer.class), any());
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat").param("model", "gpt-4o"))
                 .andExpect(request().asyncStarted())
@@ -47,14 +58,11 @@ class AiControllerTest {
 
         mockMvc.perform(asyncDispatch(mvcResult))
                 .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("Error: Unknown model: gpt-4o")));
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("Unknown model: gpt-4o")));
     }
 
     @Test
     void chat_disallowedDirectory_returnsError() throws Exception {
-        ChatService mockService = mock(ChatService.class);
-        when(modelRegistry.get("deepseek-v4-pro")).thenReturn(mockService);
-
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat").param("rootDirectory", "/etc/passwd"))
                 .andExpect(request().asyncStarted())
                 .andReturn();
@@ -257,14 +265,13 @@ class AiControllerTest {
 
     @Test
     void chat_withUnixToolsAndValidRootDirectory_noErrorEvent() throws Exception {
-        ChatService mockService = mock(ChatService.class);
-        when(modelRegistry.get("deepseek-v4-pro")).thenReturn(mockService);
         doAnswer(inv -> {
             @SuppressWarnings("unchecked")
-            Consumer<ChatEvent> consumer = inv.getArgument(2);
+            Consumer<ChatEvent> consumer = inv.getArgument(5);
             consumer.accept(new ChatEvent.Done());
             return null;
-        }).when(mockService).chatStream(any(), any(), any(Consumer.class), any());
+        }).when(orchestrationService).chatStream(isNull(), any(), any(), any(), any(),
+                any(Consumer.class), any());
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
                         .param("tools", "unix")
