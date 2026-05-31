@@ -115,14 +115,14 @@ class RepositoryTest {
     @Test
     void messageTypesRoundTrip() {
         long convId = conversationRepo.insert(guestId, "Types Test", null, UUID.randomUUID().toString());
-        messageRepo.insert(convId, guestId, "model_changed", "deepseek-v4-pro");
+        messageRepo.insert(convId, guestId, "model_change", "deepseek-v4-pro");
         messageRepo.insert(convId, guestId, "SYSTEM", "You are helpful.");
         messageRepo.insert(convId, guestId, "USER", "Hi");
         messageRepo.insert(convId, guestId, "ASSISTANT", "Hello!");
         List<MessageRecord> msgs = messageRepo.findByConversationId(convId);
         assertThat(msgs).hasSize(4);
         assertThat(msgs).extracting(MessageRecord::getType)
-                .containsExactlyInAnyOrder("model_changed", "SYSTEM", "USER", "ASSISTANT");
+                .containsExactlyInAnyOrder("model_change", "SYSTEM", "USER", "ASSISTANT");
     }
 
     @Test

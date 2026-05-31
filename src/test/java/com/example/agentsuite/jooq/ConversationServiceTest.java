@@ -53,18 +53,18 @@ class ConversationServiceTest {
 
         // Guest conversation: two model switches, two system prompts, user/assistant pairs
         guestConvId = service.createConversation(guestId, "Guest Chat", "/projects", UUID.randomUUID().toString());
-        service.addMessage(guestConvId, guestId, "model_changed",  "deepseek-v4-pro");
+        service.addMessage(guestConvId, guestId, "model_change",  "deepseek-v4-pro");
         service.addMessage(guestConvId, guestId, "SYSTEM",         "You are a helpful assistant.");
         service.addMessage(guestConvId, guestId, "USER",           "Hello, what can you do?");
         service.addMessage(guestConvId, guestId, "ASSISTANT",      "I can help with many things.");
-        service.addMessage(guestConvId, guestId, "model_changed",  "sonnet-4.6");
+        service.addMessage(guestConvId, guestId, "model_change",  "sonnet-4.6");
         service.addMessage(guestConvId, guestId, "SYSTEM",         "You are a concise assistant.");
         service.addMessage(guestConvId, guestId, "USER",           "Summarise that.");
         service.addMessage(guestConvId, guestId, "ASSISTANT",      "I assist.");
 
         // someone@somewhere.com conversation
         someoneConvId = service.createConversation(someoneId, "Coding Chat", "/code", UUID.randomUUID().toString());
-        service.addMessage(someoneConvId, someoneId, "model_changed",  "gemini-2.5-pro");
+        service.addMessage(someoneConvId, someoneId, "model_change",  "gemini-2.5-pro");
         service.addMessage(someoneConvId, someoneId, "SYSTEM",         "You are a coding assistant.");
         service.addMessage(someoneConvId, someoneId, "USER",           "Write hello world in Java.");
         service.addMessage(someoneConvId, someoneId, "ASSISTANT",      "System.out.println(\"Hello, world!\");");
@@ -97,14 +97,14 @@ class ConversationServiceTest {
     void guestMessageHistoryInOrder() {
         List<MessageRecord> msgs = service.getMessages(guestConvId);
         assertThat(msgs).extracting(MessageRecord::getType)
-                .containsExactly("model_changed", "SYSTEM", "USER", "ASSISTANT",
-                                  "model_changed", "SYSTEM", "USER", "ASSISTANT");
+                .containsExactly("model_change", "SYSTEM", "USER", "ASSISTANT",
+                                  "model_change", "SYSTEM", "USER", "ASSISTANT");
     }
 
     @Test
     void modelChangedEventsPreserveValue() {
         List<MessageRecord> modelChanges = service.getMessages(guestConvId).stream()
-                .filter(m -> "model_changed".equals(m.getType()))
+                .filter(m -> "model_change".equals(m.getType()))
                 .toList();
         assertThat(modelChanges).hasSize(2);
         assertThat(modelChanges.get(0).getMessage()).isEqualTo("deepseek-v4-pro");
