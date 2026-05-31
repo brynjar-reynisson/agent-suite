@@ -94,14 +94,17 @@ abstract class AbstractLangChain4jChatService implements ChatService {
                 return;
             }
             messages.add(aiMessage);
+            List<ChatEvent.ToolBatch.ToolExecution> batchExecutions = new ArrayList<>();
             for (ToolExecutionRequest req : aiMessage.toolExecutionRequests()) {
-                emitter.accept(new ChatEvent.ToolCall(req.name(), req.arguments()));
                 ToolExecutor executor = executors.get(req.name());
                 if (executor == null) {
                     throw new IllegalStateException("No executor found for tool: " + req.name());
                 }
-                messages.add(ToolExecutionResultMessage.from(req, executor.execute(req, "default")));
+                String result = executor.execute(req, "default");
+                batchExecutions.add(new ChatEvent.ToolBatch.ToolExecution(req.name(), req.arguments(), result));
+                messages.add(ToolExecutionResultMessage.from(req, result));
             }
+            emitter.accept(new ChatEvent.ToolBatch(batchExecutions));
             iterations++;
         }
     }

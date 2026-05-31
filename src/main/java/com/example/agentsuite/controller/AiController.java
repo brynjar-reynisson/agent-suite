@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -133,8 +134,12 @@ public class AiController {
             try {
                 service.chatStream(prompt, message, event -> {
                     switch (event) {
-                        case ChatEvent.ToolCall tc ->
-                                sendEvent(emitter, "tool_call", tc);
+                        case ChatEvent.ToolBatch tb -> {
+                            for (ChatEvent.ToolBatch.ToolExecution e : tb.executions()) {
+                                sendEvent(emitter, "tool_call",
+                                        Map.of("name", e.name(), "arguments", e.arguments()));
+                            }
+                        }
                         case ChatEvent.Content c ->
                                 sendEvent(emitter, "content", c.text());
                         case ChatEvent.Error e ->

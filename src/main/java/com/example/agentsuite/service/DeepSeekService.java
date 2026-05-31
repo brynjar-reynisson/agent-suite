@@ -97,20 +97,21 @@ public class DeepSeekService implements ChatService {
             messages.add((ObjectNode) msg);
 
             ArrayNode toolCalls = (ArrayNode) msg.get("tool_calls");
+            List<ChatEvent.ToolBatch.ToolExecution> batchExecutions = new ArrayList<>();
             for (JsonNode toolCall : toolCalls) {
                 String funcName = toolCall.get("function").get("name").asText();
                 String funcArgs = toolCall.get("function").get("arguments").asText();
                 String callId = toolCall.get("id").asText();
 
-                emitter.accept(new ChatEvent.ToolCall(funcName, funcArgs));
-
                 String result = executeTool(tools, funcName, funcArgs);
+                batchExecutions.add(new ChatEvent.ToolBatch.ToolExecution(funcName, funcArgs, result));
                 ObjectNode toolMsg = mapper.createObjectNode();
                 toolMsg.put("role", "tool");
                 toolMsg.put("tool_call_id", callId);
                 toolMsg.put("content", result);
                 messages.add(toolMsg);
             }
+            emitter.accept(new ChatEvent.ToolBatch(batchExecutions));
 
             JsonNode followUp = sendRequest(messages, toolDefs);
             processResponseStream(messages, toolDefs, tools, followUp, emitter);
