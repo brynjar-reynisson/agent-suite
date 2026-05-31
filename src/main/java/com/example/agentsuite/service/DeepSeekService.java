@@ -79,6 +79,12 @@ public class DeepSeekService implements ChatService {
         emitter.accept(new ChatEvent.Done());
     }
 
+    @Override
+    public void chatStreamWithHistory(List<HistoryMessage> history, String userMessage,
+                                      Consumer<ChatEvent> emitter, Object... tools) {
+        throw new UnsupportedOperationException("chatStreamWithHistory not yet implemented for DeepSeekService");
+    }
+
     private void processResponseStream(List<ObjectNode> messages, ArrayNode toolDefs,
                                         Object[] tools, JsonNode response, Consumer<ChatEvent> emitter) {
         JsonNode choice = response.get("choices").get(0);
