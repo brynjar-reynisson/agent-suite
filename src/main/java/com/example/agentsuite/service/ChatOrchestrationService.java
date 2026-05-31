@@ -21,7 +21,7 @@ public class ChatOrchestrationService {
 
     private final ModelRegistry modelRegistry;
     private final ConversationService conversationService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     public ChatOrchestrationService(ModelRegistry modelRegistry,
                                      ConversationService conversationService) {
@@ -100,11 +100,14 @@ public class ChatOrchestrationService {
         return conversationService.findByExternalId(externalId)
                 .map(conv -> {
                     long convId = conv.getConversationId();
-                    conversationService.findLastModelChange(convId).ifPresent(lastModel -> {
-                        if (!lastModel.equals(model)) {
-                            conversationService.addMessage(convId, GUEST_USER_ID, "model_change", model);
-                        }
-                    });
+                    conversationService.findLastModelChange(convId).ifPresentOrElse(
+                            lastModel -> {
+                                if (!lastModel.equals(model)) {
+                                    conversationService.addMessage(convId, GUEST_USER_ID, "model_change", model);
+                                }
+                            },
+                            () -> conversationService.addMessage(convId, GUEST_USER_ID, "model_change", model)
+                    );
                     return convId;
                 })
                 .orElseGet(() -> {
@@ -154,7 +157,7 @@ public class ChatOrchestrationService {
 
     private String serializeCalls(List<ChatEvent.ToolBatch.ToolExecution> executions) {
         try {
-            return objectMapper.writeValueAsString(executions.stream()
+            return OBJECT_MAPPER.writeValueAsString(executions.stream()
                     .map(e -> Map.of("name", e.name(), "arguments", e.arguments()))
                     .toList());
         } catch (Exception e) {
@@ -164,7 +167,7 @@ public class ChatOrchestrationService {
 
     private String serializeResults(List<ChatEvent.ToolBatch.ToolExecution> executions) {
         try {
-            return objectMapper.writeValueAsString(executions.stream()
+            return OBJECT_MAPPER.writeValueAsString(executions.stream()
                     .map(e -> Map.of("name", e.name(), "result", e.result()))
                     .toList());
         } catch (Exception e) {
