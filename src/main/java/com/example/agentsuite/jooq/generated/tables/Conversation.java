@@ -84,6 +84,11 @@ public class Conversation extends TableImpl<ConversationRecord> {
      */
     public final TableField<ConversationRecord, String> ROOT_DIRECTORY = createField(DSL.name("root_directory"), SQLDataType.CLOB, this, "");
 
+    /**
+     * The column <code>public.conversation.external_id</code>.
+     */
+    public final TableField<ConversationRecord, String> EXTERNAL_ID = createField(DSL.name("external_id"), SQLDataType.CLOB.nullable(false), this, "");
+
     private Conversation(Name alias, Table<ConversationRecord> aliased) {
         this(alias, aliased, (Field<?>[]) null, null);
     }
@@ -159,6 +164,11 @@ public class Conversation extends TableImpl<ConversationRecord> {
     @Override
     public UniqueKey<ConversationRecord> getPrimaryKey() {
         return Keys.PK_CONVERSATION;
+    }
+
+    @Override
+    public List<UniqueKey<ConversationRecord>> getUniqueKeys() {
+        return Arrays.asList(Keys.CONVERSATION_EXTERNAL_ID_KEY);
     }
 
     @Override
