@@ -15,6 +15,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 import static com.example.agentsuite.jooq.generated.Tables.SUITE_USER;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,7 +52,7 @@ class ConversationServiceTest {
         service = new ConversationService(conversationRepo, messageRepo);
 
         // Guest conversation: two model switches, two system prompts, user/assistant pairs
-        guestConvId = service.createConversation(guestId, "Guest Chat", "/projects");
+        guestConvId = service.createConversation(guestId, "Guest Chat", "/projects", UUID.randomUUID().toString());
         service.addMessage(guestConvId, guestId, "model_changed",  "deepseek-v4-pro");
         service.addMessage(guestConvId, guestId, "SYSTEM",         "You are a helpful assistant.");
         service.addMessage(guestConvId, guestId, "USER",           "Hello, what can you do?");
@@ -62,7 +63,7 @@ class ConversationServiceTest {
         service.addMessage(guestConvId, guestId, "ASSISTANT",      "I assist.");
 
         // someone@somewhere.com conversation
-        someoneConvId = service.createConversation(someoneId, "Coding Chat", "/code");
+        someoneConvId = service.createConversation(someoneId, "Coding Chat", "/code", UUID.randomUUID().toString());
         service.addMessage(someoneConvId, someoneId, "model_changed",  "gemini-2.5-pro");
         service.addMessage(someoneConvId, someoneId, "SYSTEM",         "You are a coding assistant.");
         service.addMessage(someoneConvId, someoneId, "USER",           "Write hello world in Java.");
@@ -71,7 +72,7 @@ class ConversationServiceTest {
 
     @Test
     void createConversationReturnsId() {
-        long id = service.createConversation(guestId, "New Conv", null);
+        long id = service.createConversation(guestId, "New Conv", null, UUID.randomUUID().toString());
         assertThat(id).isPositive();
     }
 

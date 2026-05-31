@@ -5,6 +5,7 @@ import org.jooq.DSLContext;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import static com.example.agentsuite.jooq.generated.Tables.MESSAGE;
 
@@ -31,5 +32,15 @@ public class MessageRepository {
                 .where(MESSAGE.CONVERSATION_ID.eq(conversationId))
                 .orderBy(MESSAGE.MESSAGE_TIME.asc(), MESSAGE.MESSAGE_ID.asc())
                 .fetch();
+    }
+
+    public Optional<String> findLastModelChange(long conversationId) {
+        return dsl.select(MESSAGE.MESSAGE_)
+                .from(MESSAGE)
+                .where(MESSAGE.CONVERSATION_ID.eq(conversationId))
+                .and(MESSAGE.TYPE.eq("model_change"))
+                .orderBy(MESSAGE.MESSAGE_TIME.desc(), MESSAGE.MESSAGE_ID.desc())
+                .limit(1)
+                .fetchOptional(MESSAGE.MESSAGE_);
     }
 }

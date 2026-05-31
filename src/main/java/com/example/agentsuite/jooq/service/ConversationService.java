@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ConversationService {
@@ -22,8 +23,8 @@ public class ConversationService {
     }
 
     @Transactional
-    public long createConversation(long userId, String name, String rootDirectory) {
-        return conversationRepository.insert(userId, name, rootDirectory);
+    public long createConversation(long userId, String name, String rootDirectory, String externalId) {
+        return conversationRepository.insert(userId, name, rootDirectory, externalId);
     }
 
     @Transactional
@@ -40,5 +41,15 @@ public class ConversationService {
     public ConversationRecord getConversation(long conversationId) {
         return conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new IllegalArgumentException("Conversation not found: " + conversationId));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<ConversationRecord> findByExternalId(String externalId) {
+        return conversationRepository.findByExternalId(externalId);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<String> findLastModelChange(long conversationId) {
+        return messageRepository.findLastModelChange(conversationId);
     }
 }
