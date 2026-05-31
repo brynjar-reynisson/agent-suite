@@ -125,11 +125,14 @@ abstract class AbstractLangChain4jChatService implements ChatService {
                     messages.add(AiMessage.from(pendingRequests));
                 }
                 case HistoryMessage.ToolResult tr -> {
-                    List<String> results = parseToolResults(tr.resultsJson());
-                    for (int i = 0; i < results.size(); i++) {
-                        messages.add(ToolExecutionResultMessage.from(pendingRequests.get(i), results.get(i)));
+                    if (pendingRequests != null) {
+                        List<String> results = parseToolResults(tr.resultsJson());
+                        int count = Math.min(results.size(), pendingRequests.size());
+                        for (int i = 0; i < count; i++) {
+                            messages.add(ToolExecutionResultMessage.from(pendingRequests.get(i), results.get(i)));
+                        }
+                        pendingRequests = null;
                     }
-                    pendingRequests = null;
                 }
             }
         }
