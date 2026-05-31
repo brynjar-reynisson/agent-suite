@@ -11,6 +11,7 @@ export interface ChatRequest {
   rootDirectory?: string;
   model?: string;
   tools?: string;
+  conversationId?: string;
 }
 
 export interface StreamCallbacks {
@@ -25,6 +26,7 @@ export const chatStream = (params: ChatRequest, callbacks: StreamCallbacks): Pro
     rootDirectory: params.rootDirectory || '',
     model: params.model || 'deepseek-v4-pro',
     ...(params.tools ? { tools: params.tools } : {}),
+    ...(params.conversationId ? { conversationId: params.conversationId } : {}),
   });
   const url = `${API_BASE_URL}/ai/chat?${urlParams.toString()}`;
 
@@ -55,8 +57,9 @@ export const chatStream = (params: ChatRequest, callbacks: StreamCallbacks): Pro
 
     source.addEventListener('error', (e) => {
       if (resolved) return;
-      if (e.data) {
-        reject(new Error(e.data));
+      const data = (e as MessageEvent).data;
+      if (data) {
+        reject(new Error(data));
       } else {
         reject(new Error('Connection error'));
       }

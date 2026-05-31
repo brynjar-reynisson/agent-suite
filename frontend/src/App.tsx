@@ -125,6 +125,7 @@ function App() {
   const [allowedDirectories, setAllowedDirectories] = useState<string[]>([]);
   const [model, setModel] = useState('deepseek-v4-pro');
   const [loading, setLoading] = useState(false);
+  const conversationId = useRef<string>(crypto.randomUUID());
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -183,6 +184,7 @@ function App() {
           rootDirectory: rootDirectory,
           model: model,
           tools: resolvedTools,
+          conversationId: conversationId.current,
         },
         {
           onToolCall: (tc) => {
