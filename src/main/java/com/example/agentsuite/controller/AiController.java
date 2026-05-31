@@ -123,6 +123,12 @@ public class AiController {
             return emitter;
         }
 
+        if (!conversationId.isEmpty() && !conversationId.matches("[0-9a-fA-F\\-]{36}")) {
+            sendEvent(emitter, "error", "Error: Invalid conversationId format.");
+            emitter.complete();
+            return emitter;
+        }
+
         log.info("Chat request - model: {}, conversationId: {}, rootDirectory: {}",
                 model, conversationId.isEmpty() ? "(none)" : conversationId, rootDirectory);
 
