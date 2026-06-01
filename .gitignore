@@ -29,6 +29,12 @@ mvnw.cmd
 hs_err_pid*
 replay_pid*
 
+# Logs
+logs/
+
+# Visual brainstorming sessions
+.superpowers/
+
 # Restart scripts contain API keys
 restart.sh
 restart.cmd
