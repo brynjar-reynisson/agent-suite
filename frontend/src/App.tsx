@@ -153,6 +153,7 @@ function App() {
     setMessages([]);
     setModel('deepseek-v4-pro');
     setPrompt('');
+    setRootDirectory('');
   };
 
   const loadConversation = async (conv: ConversationSummary): Promise<void> => {
