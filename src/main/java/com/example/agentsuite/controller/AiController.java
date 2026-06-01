@@ -1,5 +1,6 @@
 package com.example.agentsuite.controller;
 
+import com.example.agentsuite.jooq.service.ConversationService;
 import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatOrchestrationService;
 import com.example.agentsuite.service.ModelRegistry;
@@ -10,6 +11,7 @@ import com.example.agentsuite.tools.WebTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -18,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -38,14 +41,17 @@ public class AiController {
 
     private final ChatOrchestrationService orchestrationService;
     private final ModelRegistry modelRegistry;
+    private final ConversationService conversationService;
     private final String braveApiKey;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     public AiController(ChatOrchestrationService orchestrationService,
                         ModelRegistry modelRegistry,
+                        ConversationService conversationService,
                         @Value("${brave.api-key}") String braveApiKey) {
         this.orchestrationService = orchestrationService;
         this.modelRegistry = modelRegistry;
+        this.conversationService = conversationService;
         this.braveApiKey = braveApiKey;
     }
 
@@ -105,6 +111,21 @@ public class AiController {
     @GetMapping("/ai/config/directories")
     public Set<String> getAllowedDirectories() {
         return ALLOWED_ROOT_DIRECTORIES;
+    }
+
+    @GetMapping("/ai/conversations")
+    public List<ConversationSummaryDto> getConversations() {
+        return conversationService.getConversationSummaries();
+    }
+
+    @GetMapping("/ai/conversations/{externalId}")
+    public ResponseEntity<ConversationDetailDto> getConversationDetail(
+            @PathVariable String externalId) {
+        try {
+            return ResponseEntity.ok(conversationService.getConversationDetail(externalId));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @RequestMapping(path = "/ai/chat", method = {RequestMethod.GET, RequestMethod.POST})

@@ -1,5 +1,8 @@
 package com.example.agentsuite.controller;
 
+import com.example.agentsuite.controller.ConversationDetailDto;
+import com.example.agentsuite.controller.ConversationSummaryDto;
+import com.example.agentsuite.jooq.service.ConversationService;
 import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatOrchestrationService;
 import com.example.agentsuite.service.ModelRegistry;
@@ -15,15 +18,19 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.util.List;
+import java.util.NoSuchElementException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.when;
 import java.util.function.Consumer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 @WebMvcTest(AiController.class)
 class AiControllerTest {
@@ -39,6 +46,9 @@ class AiControllerTest {
 
     @MockBean
     private ModelRegistry modelRegistry;
+
+    @MockBean
+    private ConversationService conversationService;
 
     @Test
     void chat_unknownModel_returnsError() throws Exception {
@@ -261,6 +271,53 @@ class AiControllerTest {
         Object[] result = AiController.buildToolInstances("web", "", "");
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(WebTools.class);
+    }
+
+    @Test
+    void conversations_returnsSummaryList() throws Exception {
+        when(conversationService.getConversationSummaries()).thenReturn(List.of(
+                new ConversationSummaryDto("ext-abc", "Hello world", "2026-06-01T10:00:00Z",
+                        "deepseek-v4-pro", "")
+        ));
+
+        mockMvc.perform(get("/ai/conversations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].externalId").value("ext-abc"))
+                .andExpect(jsonPath("$[0].name").value("Hello world"))
+                .andExpect(jsonPath("$[0].lastModel").value("deepseek-v4-pro"));
+    }
+
+    @Test
+    void conversations_emptyList_returnsEmptyArray() throws Exception {
+        when(conversationService.getConversationSummaries()).thenReturn(List.of());
+
+        mockMvc.perform(get("/ai/conversations"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("[]"));
+    }
+
+    @Test
+    void conversationDetail_knownId_returnsMessages() throws Exception {
+        when(conversationService.getConversationDetail("ext-abc")).thenReturn(
+                new ConversationDetailDto("ext-abc", "Hello", "2026-06-01T10:00:00Z",
+                        "deepseek-v4-pro", "",
+                        List.of(new ConversationDetailDto.MessageDto("user", "Hi there", List.of())))
+        );
+
+        mockMvc.perform(get("/ai/conversations/ext-abc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.externalId").value("ext-abc"))
+                .andExpect(jsonPath("$.messages[0].role").value("user"))
+                .andExpect(jsonPath("$.messages[0].content").value("Hi there"));
+    }
+
+    @Test
+    void conversationDetail_unknownId_returns404() throws Exception {
+        when(conversationService.getConversationDetail("unknown"))
+                .thenThrow(new NoSuchElementException("not found"));
+
+        mockMvc.perform(get("/ai/conversations/unknown"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
