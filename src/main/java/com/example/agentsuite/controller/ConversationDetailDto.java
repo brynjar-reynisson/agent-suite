@@ -6,7 +6,7 @@ public record ConversationDetailDto(
         String externalId,
         String name,
         String createTime,
-        String lastModel,
+        String initialModel,
         String systemPrompt,
         List<MessageDto> messages
 ) {

@@ -67,7 +67,7 @@ public class ConversationService {
         return conversationRepository.findByUserId(GUEST_USER_ID).stream()
                 .map(conv -> {
                     List<MessageRecord> msgs = messageRepository.findByConversationId(conv.getConversationId());
-                    String lastModel = msgs.stream()
+                    String initialModel = msgs.stream()
                             .filter(m -> "model_change".equals(m.getType()))
                             .findFirst()
                             .map(MessageRecord::getMessage)
@@ -81,7 +81,7 @@ public class ConversationService {
                             conv.getExternalId(),
                             conv.getConversationName(),
                             conv.getCreateTime().toString(),
-                            lastModel,
+                            initialModel,
                             systemPrompt
                     );
                 })
@@ -95,14 +95,14 @@ public class ConversationService {
 
         List<MessageRecord> records = messageRepository.findByConversationId(conv.getConversationId());
 
-        String lastModel = "";
+        String initialModel = "";
         String systemPrompt = "";
         List<ConversationDetailDto.MessageDto> messages = new ArrayList<>();
         List<ConversationDetailDto.ToolCallDto> toolCallBuffer = new ArrayList<>();
 
         for (MessageRecord r : records) {
             switch (r.getType()) {
-                case "model_change"  -> { if (lastModel.isEmpty()) lastModel = r.getMessage(); }
+                case "model_change"  -> { if (initialModel.isEmpty()) initialModel = r.getMessage(); }
                 case "system_prompt" -> { if (systemPrompt.isEmpty()) systemPrompt = r.getMessage(); }
                 case "user" -> {
                     toolCallBuffer.clear();
@@ -123,7 +123,7 @@ public class ConversationService {
                 conv.getExternalId(),
                 conv.getConversationName(),
                 conv.getCreateTime().toString(),
-                lastModel,
+                initialModel,
                 systemPrompt,
                 messages
         );

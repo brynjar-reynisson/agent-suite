@@ -159,7 +159,7 @@ function App() {
     const detail = await getConversationDetail(conv.externalId);
     conversationId.current = detail.externalId;
     setMessages(detail.messages);
-    setModel(detail.lastModel);
+    setModel(detail.initialModel);
     setPrompt(detail.systemPrompt);
     setIsPanelOpen(false);
   };

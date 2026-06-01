@@ -15,7 +15,7 @@ export interface ConversationSummary {
   externalId: string;
   name: string;
   createTime: string;
-  lastModel: string;
+  initialModel: string;
   systemPrompt: string;
 }
 
