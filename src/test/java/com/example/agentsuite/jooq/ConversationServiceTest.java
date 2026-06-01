@@ -1,5 +1,7 @@
 package com.example.agentsuite.jooq;
 
+import com.example.agentsuite.controller.ConversationSummaryDto;
+import com.example.agentsuite.controller.ConversationDetailDto;
 import com.example.agentsuite.jooq.generated.tables.records.MessageRecord;
 import com.example.agentsuite.jooq.repository.ConversationRepository;
 import com.example.agentsuite.jooq.repository.MessageRepository;
@@ -15,6 +17,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import static com.example.agentsuite.jooq.generated.Tables.SUITE_USER;
@@ -126,5 +129,65 @@ class ConversationServiceTest {
         List<MessageRecord> msgs = service.getMessages(someoneConvId);
         assertThat(msgs).hasSize(4);
         assertThat(msgs).noneMatch(m -> m.getUserId().equals(guestId));
+    }
+
+    @Test
+    void getConversationSummaries_returnsGuestConversations() {
+        List<ConversationSummaryDto> summaries = service.getConversationSummaries();
+        assertThat(summaries).isNotEmpty();
+        assertThat(summaries.get(0).name()).isEqualTo("Guest Chat");
+        assertThat(summaries.get(0).lastModel()).isEqualTo("deepseek-v4-pro");
+    }
+
+    @Test
+    void getConversationDetail_throwsForUnknownExternalId() {
+        assertThrows(NoSuchElementException.class,
+                () -> service.getConversationDetail("no-such-uuid"));
+    }
+
+    @Test
+    void getConversationDetail_reconstructsUserAndAssistantMessages() {
+        String extId = UUID.randomUUID().toString();
+        long convId = service.createConversation(guestId, "Test conv", null, extId);
+        service.addMessage(convId, guestId, "model_change", "deepseek-v4-pro");
+        service.addMessage(convId, guestId, "system_prompt", "Be helpful.");
+        service.addMessage(convId, guestId, "user", "Hello!");
+        service.addMessage(convId, guestId, "assistant", "Hi there!");
+
+        ConversationDetailDto detail = service.getConversationDetail(extId);
+
+        assertThat(detail.externalId()).isEqualTo(extId);
+        assertThat(detail.lastModel()).isEqualTo("deepseek-v4-pro");
+        assertThat(detail.systemPrompt()).isEqualTo("Be helpful.");
+        assertThat(detail.messages()).hasSize(2);
+        assertThat(detail.messages().get(0).role()).isEqualTo("user");
+        assertThat(detail.messages().get(0).content()).isEqualTo("Hello!");
+        assertThat(detail.messages().get(1).role()).isEqualTo("ai");
+        assertThat(detail.messages().get(1).content()).isEqualTo("Hi there!");
+        assertThat(detail.messages().get(1).toolCalls()).isEmpty();
+    }
+
+    @Test
+    void getConversationDetail_groupsToolCallsWithFollowingAssistantMessage() {
+        String extId = UUID.randomUUID().toString();
+        long convId = service.createConversation(guestId, "Tool conv", null, extId);
+        service.addMessage(convId, guestId, "model_change", "deepseek-v4-pro");
+        service.addMessage(convId, guestId, "system_prompt", "");
+        service.addMessage(convId, guestId, "user", "List files");
+        service.addMessage(convId, guestId, "tool_call",
+                "[{\"name\":\"ls\",\"arguments\":\"{}\"}]");
+        service.addMessage(convId, guestId, "tool_result",
+                "[{\"name\":\"ls\",\"result\":\"file.txt\"}]");
+        service.addMessage(convId, guestId, "assistant", "Here are the files.");
+
+        ConversationDetailDto detail = service.getConversationDetail(extId);
+
+        assertThat(detail.messages()).hasSize(2);
+        ConversationDetailDto.MessageDto aiMsg = detail.messages().get(1);
+        assertThat(aiMsg.role()).isEqualTo("ai");
+        assertThat(aiMsg.content()).isEqualTo("Here are the files.");
+        assertThat(aiMsg.toolCalls()).hasSize(1);
+        assertThat(aiMsg.toolCalls().get(0).name()).isEqualTo("ls");
+        assertThat(aiMsg.toolCalls().get(0).arguments()).isEqualTo("{}");
     }
 }
