@@ -190,7 +190,9 @@ function App() {
 
     const matched = PROMPT_BANK.find(p => p.name === prompt);
     const resolvedPrompt = matched?.text ?? prompt;
-    const resolvedTools = (matched?.tools ?? []).join(',');
+    const toolSet = new Set(matched?.tools ?? []);
+    if (rootDirectory) toolSet.add('unix');
+    const resolvedTools = [...toolSet].join(',');
     try {
       await chatStream(
         {
