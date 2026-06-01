@@ -18,11 +18,12 @@ public class ConversationRepository {
         this.dsl = dsl;
     }
 
-    public long insert(long userId, String name, String rootDirectory) {
+    public long insert(long userId, String name, String rootDirectory, String externalId) {
         return dsl.insertInto(CONVERSATION)
                 .set(CONVERSATION.USER_ID, userId)
                 .set(CONVERSATION.CONVERSATION_NAME, name)
                 .set(CONVERSATION.ROOT_DIRECTORY, rootDirectory)
+                .set(CONVERSATION.EXTERNAL_ID, externalId)
                 .returning(CONVERSATION.CONVERSATION_ID)
                 .fetchSingle()
                 .getConversationId();
@@ -31,6 +32,12 @@ public class ConversationRepository {
     public Optional<ConversationRecord> findById(long conversationId) {
         return dsl.selectFrom(CONVERSATION)
                 .where(CONVERSATION.CONVERSATION_ID.eq(conversationId))
+                .fetchOptional();
+    }
+
+    public Optional<ConversationRecord> findByExternalId(String externalId) {
+        return dsl.selectFrom(CONVERSATION)
+                .where(CONVERSATION.EXTERNAL_ID.eq(externalId))
                 .fetchOptional();
     }
 

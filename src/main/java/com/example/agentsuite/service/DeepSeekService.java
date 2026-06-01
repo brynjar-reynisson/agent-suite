@@ -18,6 +18,7 @@ import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
@@ -66,17 +67,80 @@ public class DeepSeekService implements ChatService {
 
     @Override
     public void chatStream(String systemPrompt, String userMessage, Consumer<ChatEvent> emitter, Object... tools) {
-        List<ObjectNode> messages = new ArrayList<>();
-        if (systemPrompt != null && !systemPrompt.isEmpty()) {
-            messages.add(createMessage("system", systemPrompt));
+        List<HistoryMessage> history = new ArrayList<>();
+        if (systemPrompt != null && !systemPrompt.isBlank()) {
+            history.add(new HistoryMessage.SystemPrompt(systemPrompt));
         }
+        chatStreamWithHistory(history, userMessage, emitter, tools);
+    }
+
+    @Override
+    public void chatStreamWithHistory(List<HistoryMessage> history, String userMessage,
+                                      Consumer<ChatEvent> emitter, Object... tools) {
+        List<ObjectNode> messages = buildMessagesFromHistory(history);
         messages.add(createMessage("user", userMessage));
 
         ArrayNode toolDefs = tools.length > 0 ? buildToolDefinitions(tools) : null;
         JsonNode response = sendRequest(messages, toolDefs);
-
         processResponseStream(messages, toolDefs, tools, response, emitter);
         emitter.accept(new ChatEvent.Done());
+    }
+
+    private List<ObjectNode> buildMessagesFromHistory(List<HistoryMessage> history) {
+        List<ObjectNode> messages = new ArrayList<>();
+        List<String> pendingCallIds = null;
+
+        for (HistoryMessage h : history) {
+            switch (h) {
+                case HistoryMessage.SystemPrompt sp ->
+                        messages.add(createMessage("system", sp.content()));
+                case HistoryMessage.User u ->
+                        messages.add(createMessage("user", u.content()));
+                case HistoryMessage.Assistant a ->
+                        messages.add(createMessage("assistant", a.content()));
+                case HistoryMessage.ToolCall tc -> {
+                    try {
+                        JsonNode arr = mapper.readTree(tc.callsJson());
+                        pendingCallIds = new ArrayList<>();
+                        ObjectNode assistantMsg = mapper.createObjectNode();
+                        assistantMsg.put("role", "assistant");
+                        assistantMsg.putNull("content");
+                        ArrayNode toolCallsArr = mapper.createArrayNode();
+                        for (JsonNode item : arr) {
+                            String id = UUID.randomUUID().toString();
+                            pendingCallIds.add(id);
+                            ObjectNode tcNode = mapper.createObjectNode();
+                            tcNode.put("id", id);
+                            tcNode.put("type", "function");
+                            ObjectNode func = mapper.createObjectNode();
+                            func.put("name", item.get("name").asText());
+                            func.put("arguments", item.get("arguments").asText());
+                            tcNode.set("function", func);
+                            toolCallsArr.add(tcNode);
+                        }
+                        assistantMsg.set("tool_calls", toolCallsArr);
+                        messages.add(assistantMsg);
+                    } catch (Exception ignored) {}
+                }
+                case HistoryMessage.ToolResult tr -> {
+                    if (pendingCallIds != null) {
+                        try {
+                            JsonNode arr = mapper.readTree(tr.resultsJson());
+                            int count = Math.min(arr.size(), pendingCallIds.size());
+                            for (int i = 0; i < count; i++) {
+                                ObjectNode toolMsg = mapper.createObjectNode();
+                                toolMsg.put("role", "tool");
+                                toolMsg.put("tool_call_id", pendingCallIds.get(i));
+                                toolMsg.put("content", arr.get(i).get("result").asText());
+                                messages.add(toolMsg);
+                            }
+                            pendingCallIds = null;
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+        }
+        return messages;
     }
 
     private void processResponseStream(List<ObjectNode> messages, ArrayNode toolDefs,
@@ -97,20 +161,21 @@ public class DeepSeekService implements ChatService {
             messages.add((ObjectNode) msg);
 
             ArrayNode toolCalls = (ArrayNode) msg.get("tool_calls");
+            List<ChatEvent.ToolBatch.ToolExecution> batchExecutions = new ArrayList<>();
             for (JsonNode toolCall : toolCalls) {
                 String funcName = toolCall.get("function").get("name").asText();
                 String funcArgs = toolCall.get("function").get("arguments").asText();
                 String callId = toolCall.get("id").asText();
 
-                emitter.accept(new ChatEvent.ToolCall(funcName, funcArgs));
-
                 String result = executeTool(tools, funcName, funcArgs);
+                batchExecutions.add(new ChatEvent.ToolBatch.ToolExecution(funcName, funcArgs, result));
                 ObjectNode toolMsg = mapper.createObjectNode();
                 toolMsg.put("role", "tool");
                 toolMsg.put("tool_call_id", callId);
                 toolMsg.put("content", result);
                 messages.add(toolMsg);
             }
+            emitter.accept(new ChatEvent.ToolBatch(batchExecutions));
 
             JsonNode followUp = sendRequest(messages, toolDefs);
             processResponseStream(messages, toolDefs, tools, followUp, emitter);

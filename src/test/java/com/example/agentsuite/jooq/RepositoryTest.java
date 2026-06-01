@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 
 import static com.example.agentsuite.jooq.generated.Tables.MESSAGE;
 import static com.example.agentsuite.jooq.generated.Tables.SUITE_USER;
@@ -65,13 +66,13 @@ class RepositoryTest {
 
     @Test
     void insertConversationReturnsId() {
-        long id = conversationRepo.insert(guestId, "Test Conv", "/home");
+        long id = conversationRepo.insert(guestId, "Test Conv", "/home", UUID.randomUUID().toString());
         assertThat(id).isPositive();
     }
 
     @Test
     void findConversationByIdRoundTrip() {
-        long id = conversationRepo.insert(guestId, "My Conv", "/projects");
+        long id = conversationRepo.insert(guestId, "My Conv", "/projects", UUID.randomUUID().toString());
         ConversationRecord rec = conversationRepo.findById(id).orElseThrow();
         assertThat(rec.getConversationName()).isEqualTo("My Conv");
         assertThat(rec.getRootDirectory()).isEqualTo("/projects");
@@ -79,15 +80,15 @@ class RepositoryTest {
 
     @Test
     void findConversationsByUserId() {
-        conversationRepo.insert(guestId, "Conv A", null);
-        conversationRepo.insert(guestId, "Conv B", null);
+        conversationRepo.insert(guestId, "Conv A", null, UUID.randomUUID().toString());
+        conversationRepo.insert(guestId, "Conv B", null, UUID.randomUUID().toString());
         assertThat(conversationRepo.findByUserId(guestId)).hasSize(2);
         assertThat(conversationRepo.findByUserId(someoneId)).isEmpty();
     }
 
     @Test
     void insertMessagesReturnedInOrder() {
-        long convId = conversationRepo.insert(guestId, "Order Test", null);
+        long convId = conversationRepo.insert(guestId, "Order Test", null, UUID.randomUUID().toString());
         OffsetDateTime t1 = OffsetDateTime.now().minusSeconds(2);
         OffsetDateTime t2 = OffsetDateTime.now().minusSeconds(1);
         OffsetDateTime t3 = OffsetDateTime.now();
@@ -113,14 +114,43 @@ class RepositoryTest {
 
     @Test
     void messageTypesRoundTrip() {
-        long convId = conversationRepo.insert(guestId, "Types Test", null);
-        messageRepo.insert(convId, guestId, "model_changed", "deepseek-v4-pro");
+        long convId = conversationRepo.insert(guestId, "Types Test", null, UUID.randomUUID().toString());
+        messageRepo.insert(convId, guestId, "model_change", "deepseek-v4-pro");
         messageRepo.insert(convId, guestId, "SYSTEM", "You are helpful.");
         messageRepo.insert(convId, guestId, "USER", "Hi");
         messageRepo.insert(convId, guestId, "ASSISTANT", "Hello!");
         List<MessageRecord> msgs = messageRepo.findByConversationId(convId);
         assertThat(msgs).hasSize(4);
         assertThat(msgs).extracting(MessageRecord::getType)
-                .containsExactlyInAnyOrder("model_changed", "SYSTEM", "USER", "ASSISTANT");
+                .containsExactlyInAnyOrder("model_change", "SYSTEM", "USER", "ASSISTANT");
+    }
+
+    @Test
+    void findConversationByExternalId() {
+        long id = conversationRepo.insert(guestId, "Ext Conv", "/home", "ext-uuid-123");
+        assertThat(conversationRepo.findByExternalId("ext-uuid-123"))
+                .isPresent()
+                .hasValueSatisfying(r -> assertThat(r.getConversationName()).isEqualTo("Ext Conv"));
+    }
+
+    @Test
+    void findConversationByExternalIdMissingReturnsEmpty() {
+        assertThat(conversationRepo.findByExternalId("no-such-uuid")).isEmpty();
+    }
+
+    @Test
+    void findLastModelChangeReturnsLatest() {
+        long convId = conversationRepo.insert(guestId, "Model Test", null, "uuid-model-test");
+        messageRepo.insert(convId, guestId, "model_change", "deepseek-v4-pro");
+        messageRepo.insert(convId, guestId, "model_change", "sonnet-4.6");
+        assertThat(messageRepo.findLastModelChange(convId))
+                .isPresent()
+                .hasValue("sonnet-4.6");
+    }
+
+    @Test
+    void findLastModelChangeEmptyWhenNone() {
+        long convId = conversationRepo.insert(guestId, "No Model", null, "uuid-no-model");
+        assertThat(messageRepo.findLastModelChange(convId)).isEmpty();
     }
 }

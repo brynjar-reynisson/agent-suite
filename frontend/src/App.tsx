@@ -1,13 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { chatStream, execTool, getDirectories, type ToolCall } from './api';
+import {
+  chatStream, execTool, getDirectories, getConversationDetail, type Message, type ConversationSummary,
+} from './api';
+import { ConversationPanel } from './ConversationPanel';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-
-interface Message {
-  role: 'user' | 'ai';
-  content: string;
-  toolCalls?: ToolCall[];
-}
 
 function formatToolArgs(args: string): string {
   try {
@@ -125,6 +122,8 @@ function App() {
   const [allowedDirectories, setAllowedDirectories] = useState<string[]>([]);
   const [model, setModel] = useState('deepseek-v4-pro');
   const [loading, setLoading] = useState(false);
+  const conversationId = useRef<string>(crypto.randomUUID());
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -148,6 +147,23 @@ function App() {
     };
     fetchConfig();
   }, []);
+
+  const startNewConversation = () => {
+    conversationId.current = crypto.randomUUID();
+    setMessages([]);
+    setModel('deepseek-v4-pro');
+    setPrompt('');
+    setRootDirectory('');
+  };
+
+  const loadConversation = async (conv: ConversationSummary): Promise<void> => {
+    const detail = await getConversationDetail(conv.externalId);
+    conversationId.current = detail.externalId;
+    setMessages(detail.messages);
+    setModel(detail.initialModel);
+    setPrompt(detail.systemPrompt);
+    setIsPanelOpen(false);
+  };
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
@@ -174,7 +190,9 @@ function App() {
 
     const matched = PROMPT_BANK.find(p => p.name === prompt);
     const resolvedPrompt = matched?.text ?? prompt;
-    const resolvedTools = (matched?.tools ?? []).join(',');
+    const toolSet = new Set(matched?.tools ?? []);
+    if (rootDirectory) toolSet.add('unix');
+    const resolvedTools = [...toolSet].join(',');
     try {
       await chatStream(
         {
@@ -183,6 +201,7 @@ function App() {
           rootDirectory: rootDirectory,
           model: model,
           tools: resolvedTools,
+          conversationId: conversationId.current,
         },
         {
           onToolCall: (tc) => {
@@ -238,9 +257,9 @@ function App() {
       {/* Header */}
       <header className="bg-white shadow-sm p-4 flex justify-between items-center">
         <h1 className="text-xl font-bold text-gray-800">AgentSuite Chat</h1>
-        <div className="flex gap-4 items-center">
-          <select 
-            value={model} 
+        <div className="flex gap-2 items-center">
+          <select
+            value={model}
             onChange={(e) => setModel(e.target.value)}
             className="border rounded px-2 py-1 text-sm bg-gray-50"
           >
@@ -248,6 +267,24 @@ function App() {
               <option key={m} value={m}>{m}</option>
             ))}
           </select>
+          <button
+            onClick={startNewConversation}
+            disabled={loading}
+            title="New conversation"
+            className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-50 text-gray-600 font-bold text-lg leading-none"
+            aria-label="New conversation"
+          >
+            +
+          </button>
+          <button
+            onClick={() => setIsPanelOpen(true)}
+            disabled={loading}
+            title="Past conversations"
+            className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-50 text-gray-600 text-base leading-none"
+            aria-label="Past conversations"
+          >
+            ☰
+          </button>
         </div>
       </header>
 
@@ -334,6 +371,11 @@ function App() {
           Send
         </button>
       </footer>
+      <ConversationPanel
+        isOpen={isPanelOpen}
+        onClose={() => setIsPanelOpen(false)}
+        onSelect={loadConversation}
+      />
     </div>
   );
 }

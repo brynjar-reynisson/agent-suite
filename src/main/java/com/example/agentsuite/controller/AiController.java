@@ -1,7 +1,8 @@
 package com.example.agentsuite.controller;
 
+import com.example.agentsuite.jooq.service.ConversationService;
 import com.example.agentsuite.service.ChatEvent;
-import com.example.agentsuite.service.ChatService;
+import com.example.agentsuite.service.ChatOrchestrationService;
 import com.example.agentsuite.service.ModelRegistry;
 import com.example.agentsuite.tools.Git;
 import com.example.agentsuite.tools.MarkDownWriter;
@@ -10,6 +11,7 @@ import com.example.agentsuite.tools.WebTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -17,6 +19,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -35,13 +39,19 @@ public class AiController {
             "C:/Users/Lenovo/IdeaProjects/agent-suite"
     );
 
+    private final ChatOrchestrationService orchestrationService;
     private final ModelRegistry modelRegistry;
+    private final ConversationService conversationService;
     private final String braveApiKey;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
-    public AiController(ModelRegistry modelRegistry,
+    public AiController(ChatOrchestrationService orchestrationService,
+                        ModelRegistry modelRegistry,
+                        ConversationService conversationService,
                         @Value("${brave.api-key}") String braveApiKey) {
+        this.orchestrationService = orchestrationService;
         this.modelRegistry = modelRegistry;
+        this.conversationService = conversationService;
         this.braveApiKey = braveApiKey;
     }
 
@@ -97,9 +107,25 @@ public class AiController {
             default -> "Error: Unknown command '" + tool + "'. Use: ls, cat, grep, or git";
         };
     }
+
     @GetMapping("/ai/config/directories")
     public Set<String> getAllowedDirectories() {
         return ALLOWED_ROOT_DIRECTORIES;
+    }
+
+    @GetMapping("/ai/conversations")
+    public List<ConversationSummaryDto> getConversations() {
+        return conversationService.getConversationSummaries();
+    }
+
+    @GetMapping("/ai/conversations/{externalId}")
+    public ResponseEntity<ConversationDetailDto> getConversationDetail(
+            @PathVariable String externalId) {
+        try {
+            return ResponseEntity.ok(conversationService.getConversationDetail(externalId));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @RequestMapping(path = "/ai/chat", method = {RequestMethod.GET, RequestMethod.POST})
@@ -107,16 +133,10 @@ public class AiController {
                            @RequestParam(defaultValue = "") String prompt,
                            @RequestParam(defaultValue = "") String rootDirectory,
                            @RequestParam(defaultValue = "deepseek-v4-pro") String model,
-                           @RequestParam(defaultValue = "") String tools) {
+                           @RequestParam(defaultValue = "") String tools,
+                           @RequestParam(defaultValue = "") String conversationId) {
 
         SseEmitter emitter = new SseEmitter(300000L);
-
-        ChatService service = modelRegistry.get(model);
-        if (service == null) {
-            sendEvent(emitter, "error", "Error: Unknown model: " + model);
-            emitter.complete();
-            return emitter;
-        }
 
         if (!ALLOWED_ROOT_DIRECTORIES.contains(rootDirectory)) {
             sendEvent(emitter, "error", "Error: Access to the specified root directory is not allowed.");
@@ -124,27 +144,39 @@ public class AiController {
             return emitter;
         }
 
-        log.info("Chat request - model: {}, prompt: {}, message: {}, rootDirectory: {}, tools: {}",
-                model, prompt, message, rootDirectory, tools.replace("\n", "_").replace("\r", "_"));
+        if (!conversationId.isEmpty() && !conversationId.matches("[0-9a-fA-F\\-]{36}")) {
+            sendEvent(emitter, "error", "Error: Invalid conversationId format.");
+            emitter.complete();
+            return emitter;
+        }
+
+        log.info("Chat request - model: {}, conversationId: {}, rootDirectory: {}",
+                model, conversationId.isEmpty() ? "(none)" : conversationId, rootDirectory);
 
         Object[] toolArray = buildToolInstances(tools, rootDirectory, braveApiKey);
 
         CompletableFuture.runAsync(() -> {
             try {
-                service.chatStream(prompt, message, event -> {
-                    switch (event) {
-                        case ChatEvent.ToolCall tc ->
-                                sendEvent(emitter, "tool_call", tc);
-                        case ChatEvent.Content c ->
-                                sendEvent(emitter, "content", c.text());
-                        case ChatEvent.Error e ->
-                                sendEvent(emitter, "error", e.message());
-                        case ChatEvent.Done d -> {
-                            sendEvent(emitter, "done", "");
-                            emitter.complete();
-                        }
-                    }
-                }, toolArray);
+                orchestrationService.chatStream(
+                        conversationId.isEmpty() ? null : conversationId,
+                        model, prompt, message, rootDirectory,
+                        event -> {
+                            switch (event) {
+                                case ChatEvent.ToolBatch tb -> {
+                                    for (ChatEvent.ToolBatch.ToolExecution e : tb.executions()) {
+                                        sendEvent(emitter, "tool_call",
+                                                Map.of("name", e.name(), "arguments", e.arguments()));
+                                    }
+                                }
+                                case ChatEvent.Content c -> sendEvent(emitter, "content", c.text());
+                                case ChatEvent.Error e -> sendEvent(emitter, "error", e.message());
+                                case ChatEvent.Done d -> {
+                                    sendEvent(emitter, "done", "");
+                                    emitter.complete();
+                                }
+                            }
+                        },
+                        toolArray);
             } catch (Exception e) {
                 sendEvent(emitter, "error", e.getMessage());
                 emitter.complete();
@@ -203,9 +235,7 @@ public class AiController {
                 current.append(c);
             }
         }
-        if (!current.isEmpty()) {
-            tokens.add(current.toString());
-        }
+        if (!current.isEmpty()) tokens.add(current.toString());
         return tokens;
     }
 }

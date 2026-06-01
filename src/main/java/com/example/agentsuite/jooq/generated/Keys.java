@@ -29,6 +29,7 @@ public class Keys {
     // UNIQUE and PRIMARY KEY definitions
     // -------------------------------------------------------------------------
 
+    public static final UniqueKey<ConversationRecord> CONVERSATION_EXTERNAL_ID_KEY = Internal.createUniqueKey(Conversation.CONVERSATION, DSL.name("conversation_external_id_key"), new TableField[] { Conversation.CONVERSATION.EXTERNAL_ID }, true);
     public static final UniqueKey<ConversationRecord> PK_CONVERSATION = Internal.createUniqueKey(Conversation.CONVERSATION, DSL.name("pk_conversation"), new TableField[] { Conversation.CONVERSATION.CONVERSATION_ID }, true);
     public static final UniqueKey<MessageRecord> PK_MESSAGE = Internal.createUniqueKey(Message.MESSAGE, DSL.name("pk_message"), new TableField[] { Message.MESSAGE.MESSAGE_ID }, true);
     public static final UniqueKey<SuiteUserRecord> PK_SUITE_USER = Internal.createUniqueKey(SuiteUser.SUITE_USER, DSL.name("pk_suite_user"), new TableField[] { SuiteUser.SUITE_USER.USER_ID }, true);

@@ -24,12 +24,14 @@ Server runs on `http://localhost:8090`. Requires `DEEPSEEK_API_KEY` environment 
 
 Spring Boot 3.5 + LangChain4j 0.36.2 agent application. Java 21.
 
-**Request flow:** `AiController` → `ModelRegistry` → provider `ChatService` → LLM API → `UnixTools` (tool calls) → repeat until no tool calls remain → stream SSE events to client
+**Request flow:** `AiController` → `ChatOrchestrationService` → provider `ChatService` → LLM API → `UnixTools` (tool calls) → repeat until no tool calls remain → stream SSE events to client. If `conversationId` is provided, `ChatOrchestrationService` persists all messages to the database and replays conversation history to the LLM on subsequent turns.
 
 **Key layers:**
-- `AiController` — `/ai/chat` (GET/POST, streaming SSE) and `/ai/tools` (GET, returns allowed root directories). Validates `rootDirectory` against a hardcoded allowlist.
-- `ChatService` — interface defining `chat()` and `chatStream()` for all providers.
-- `ChatEvent` — sealed interface (Java records) for SSE event types: `ToolCall`, `Content`, `Error`, `Done`.
+- `AiController` — `/ai/chat` (GET/POST, streaming SSE) and `/ai/tools` (GET, returns allowed root directories). Validates `rootDirectory` against a hardcoded allowlist. Accepts optional `conversationId` param (UUID); blank = stateless mode.
+- `ChatOrchestrationService` — sits between `AiController` and `ChatService`. Owns conversation lifecycle: creates conversation on first turn, loads history from DB, persists messages (system_prompt, user, assistant, tool_call, tool_result, model_change).
+- `ChatService` — interface defining `chat()`, `chatStream()`, and `chatStreamWithHistory()` for all providers.
+- `HistoryMessage` — sealed DTO interface bridging DB message rows to LLM message types (SystemPrompt, User, Assistant, ToolCall, ToolResult).
+- `ChatEvent` — sealed interface (Java records) for SSE event types: `ToolBatch` (per-iteration tool calls+results), `Content`, `Error`, `Done`.
 - `ChatResponse` — data class holding tool call list and response text.
 - `ModelRegistry` — maps model aliases to `ChatService` instances; lazily creates Anthropic/Google services only if API keys are present.
 - `DeepSeekService` — hand-rolled OpenAI-compatible REST client for DeepSeek. Drives the agentic loop manually; caches reasoning content between turns via fingerprinting.
@@ -52,10 +54,22 @@ GET/POST /ai/chat
   ?prompt=<system prompt>          (default: empty)
   ?rootDirectory=<path>            (default: empty; must be in allowlist)
   ?model=<model alias>             (default: "deepseek-v4-pro")
+  ?conversationId=<UUID>           (default: empty; blank = stateless mode)
 
-GET /ai/tools
+GET /ai/config/directories
   Returns JSON array of allowed rootDirectory values
 ```
+
+**Message types** stored in the `message` table:
+
+| Type | Sent to LLM? | Content |
+|---|---|---|
+| `system_prompt` | Yes | System prompt text |
+| `user` | Yes | User message |
+| `assistant` | Yes | LLM text response |
+| `tool_call` | Yes | JSON `[{"name":"...","arguments":"..."}]` per iteration |
+| `tool_result` | Yes | JSON `[{"name":"...","result":"..."}]` per iteration |
+| `model_change` | No | Model alias string |
 
 Streaming response: Server-Sent Events with event types `tool_call`, `content`, `error`, `done`.
 
@@ -82,7 +96,7 @@ npm run build  # output to frontend/dist/
 ```
 
 Key files:
-- `App.tsx` — chat UI: model selector, SSE streaming, tool call display, system prompt and root directory inputs
-- `api.ts` — `chatStream()`, `getDirectories()`, `execTool()` API client
+- `App.tsx` — chat UI: model selector, SSE streaming, tool call display, system prompt and root directory inputs. Generates a UUID per session (`crypto.randomUUID()` in a `useRef`) and passes it as `conversationId` on every request.
+- `api.ts` — `chatStream()`, `getDirectories()`, `execTool()` API client. `ChatRequest` includes optional `conversationId`.
 
 Production deployment: `https://agent.breynisson.org`

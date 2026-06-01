@@ -90,6 +90,20 @@ public class ConversationRecord extends UpdatableRecordImpl<ConversationRecord> 
         return (String) get(4);
     }
 
+    /**
+     * Setter for <code>public.conversation.external_id</code>.
+     */
+    public void setExternalId(String value) {
+        set(5, value);
+    }
+
+    /**
+     * Getter for <code>public.conversation.external_id</code>.
+     */
+    public String getExternalId() {
+        return (String) get(5);
+    }
+
     // -------------------------------------------------------------------------
     // Primary key information
     // -------------------------------------------------------------------------
@@ -113,7 +127,7 @@ public class ConversationRecord extends UpdatableRecordImpl<ConversationRecord> 
     /**
      * Create a detached, initialised ConversationRecord
      */
-    public ConversationRecord(Long conversationId, Long userId, String conversationName, OffsetDateTime createTime, String rootDirectory) {
+    public ConversationRecord(Long conversationId, Long userId, String conversationName, OffsetDateTime createTime, String rootDirectory, String externalId) {
         super(Conversation.CONVERSATION);
 
         setConversationId(conversationId);
@@ -121,6 +135,7 @@ public class ConversationRecord extends UpdatableRecordImpl<ConversationRecord> 
         setConversationName(conversationName);
         setCreateTime(createTime);
         setRootDirectory(rootDirectory);
+        setExternalId(externalId);
         resetChangedOnNotNull();
     }
 }
