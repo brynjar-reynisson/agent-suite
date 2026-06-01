@@ -8,6 +8,7 @@ public record ConversationDetailDto(
         String createTime,
         String initialModel,
         String systemPrompt,
+        String rootDirectory,
         List<MessageDto> messages
 ) {
     public record MessageDto(String role, String content, List<ToolCallDto> toolCalls) {}

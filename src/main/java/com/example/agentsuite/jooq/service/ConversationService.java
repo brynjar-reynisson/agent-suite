@@ -125,6 +125,7 @@ public class ConversationService {
                 conv.getCreateTime().toString(),
                 initialModel,
                 systemPrompt,
+                conv.getRootDirectory() != null ? conv.getRootDirectory() : "",
                 messages
         );
     }

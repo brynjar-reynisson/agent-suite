@@ -162,6 +162,7 @@ function App() {
     setMessages(detail.messages);
     setModel(detail.initialModel);
     setPrompt(detail.systemPrompt);
+    setRootDirectory(detail.rootDirectory ?? '');
     setIsPanelOpen(false);
   };
 

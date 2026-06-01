@@ -299,7 +299,7 @@ class AiControllerTest {
     void conversationDetail_knownId_returnsMessages() throws Exception {
         when(conversationService.getConversationDetail("ext-abc")).thenReturn(
                 new ConversationDetailDto("ext-abc", "Hello", "2026-06-01T10:00:00Z",
-                        "deepseek-v4-pro", "",
+                        "deepseek-v4-pro", "", "",
                         List.of(new ConversationDetailDto.MessageDto("user", "Hi there", List.of())))
         );
 

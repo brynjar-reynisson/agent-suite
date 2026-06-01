@@ -20,6 +20,7 @@ export interface ConversationSummary {
 }
 
 export interface ConversationDetail extends ConversationSummary {
+  rootDirectory: string;
   messages: Message[];
 }
 
