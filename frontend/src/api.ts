@@ -5,6 +5,24 @@ export interface ToolCall {
   arguments: string;
 }
 
+export interface Message {
+  role: 'user' | 'ai';
+  content: string;
+  toolCalls?: ToolCall[];
+}
+
+export interface ConversationSummary {
+  externalId: string;
+  name: string;
+  createTime: string;
+  lastModel: string;
+  systemPrompt: string;
+}
+
+export interface ConversationDetail extends ConversationSummary {
+  messages: Message[];
+}
+
 export interface ChatRequest {
   message: string;
   prompt?: string;
@@ -77,4 +95,18 @@ export const execTool = async (command: string, rootDirectory: string): Promise<
   const urlParams = new URLSearchParams({ command, rootDirectory });
   const response = await fetch(`${API_BASE_URL}/ai/tools?${urlParams.toString()}`);
   return response.text();
+};
+
+export const getConversations = async (): Promise<ConversationSummary[]> => {
+  const response = await fetch(`${API_BASE_URL}/ai/conversations`);
+  if (!response.ok) throw new Error('Failed to fetch conversations');
+  return response.json();
+};
+
+export const getConversationDetail = async (externalId: string): Promise<ConversationDetail> => {
+  const response = await fetch(
+    `${API_BASE_URL}/ai/conversations/${encodeURIComponent(externalId)}`
+  );
+  if (!response.ok) throw new Error('Conversation not found');
+  return response.json();
 };

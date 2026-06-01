@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { chatStream, execTool, getDirectories, type ToolCall } from './api';
+import {
+  chatStream, execTool, getDirectories, type Message,
+} from './api';
+// Imports for Task 6:
+// getConversationDetail, ConversationSummary will be used in Task 6 loadConversation
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-
-interface Message {
-  role: 'user' | 'ai';
-  content: string;
-  toolCalls?: ToolCall[];
-}
 
 function formatToolArgs(args: string): string {
   try {
