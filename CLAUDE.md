@@ -78,10 +78,11 @@ Supported model aliases:
 | Alias | Provider | Requires env var |
 |---|---|---|
 | `deepseek-v4-pro` | DeepSeek (hand-rolled) | `DEEPSEEK_API_KEY` |
+| `deepseek-v4-flash` | DeepSeek (hand-rolled) | `DEEPSEEK_API_KEY` |
 | `sonnet-4.6` | Anthropic Claude Sonnet 4.6 | `ANTHROPIC_API_KEY` |
 | `opus-4.7` | Anthropic Claude Opus 4.7 | `ANTHROPIC_API_KEY` |
+| `opus-4.8` | Anthropic Claude Opus 4.8 | `ANTHROPIC_API_KEY` |
 | `haiku-4.5` | Anthropic Claude Haiku 4.5 | `ANTHROPIC_API_KEY` |
-| `gemini-2.5-pro` | Google Gemini 2.5 Pro | `GOOGLE_API_KEY` |
 | `gemini-2.5-flash` | Google Gemini 2.5 Flash | `GOOGLE_API_KEY` |
 
 ## Frontend

@@ -17,10 +17,11 @@ function formatToolArgs(args: string): string {
 
 const MODELS = [
   'deepseek-v4-pro',
+  'deepseek-v4-flash',
   'sonnet-4.6',
   'opus-4.7',
+  'opus-4.8',
   'haiku-4.5',
-  'gemini-2.5-pro',
   'gemini-2.5-flash',
 ];
 
@@ -114,6 +115,28 @@ function PromptCombobox({ value, onChange, prompts = PROMPT_BANK }: PromptCombob
   );
 }
 
+function MetaMessage({ content }: { content: string }) {
+  let label: string;
+  let value: string;
+  if (content.startsWith('model:')) {
+    label = 'model';
+    value = content.slice(6);
+  } else if (content.startsWith('system:')) {
+    label = 'system';
+    value = content.slice(7);
+  } else {
+    label = '';
+    value = content;
+  }
+  return (
+    <div className="self-start max-w-[80%] px-3 py-2 rounded-lg bg-white shadow-sm text-xs font-mono text-gray-400">
+      <span className="font-semibold text-gray-500">{label}</span>
+      {label && <span className="mx-1 text-gray-300">·</span>}
+      <span className="whitespace-pre-wrap">{value}</span>
+    </div>
+  );
+}
+
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -123,6 +146,8 @@ function App() {
   const [model, setModel] = useState('deepseek-v4-pro');
   const [loading, setLoading] = useState(false);
   const conversationId = useRef<string>(crypto.randomUUID());
+  const lastSentModel = useRef<string | null>(null);
+  const lastSentPrompt = useRef<string | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -150,6 +175,8 @@ function App() {
 
   const startNewConversation = () => {
     conversationId.current = crypto.randomUUID();
+    lastSentModel.current = null;
+    lastSentPrompt.current = null;
     setMessages([]);
     setModel('deepseek-v4-pro');
     setPrompt('');
@@ -159,6 +186,8 @@ function App() {
   const loadConversation = async (conv: ConversationSummary): Promise<void> => {
     const detail = await getConversationDetail(conv.externalId);
     conversationId.current = detail.externalId;
+    lastSentModel.current = detail.initialModel;
+    lastSentPrompt.current = detail.systemPrompt;
     setMessages(detail.messages);
     setModel(detail.initialModel);
     setPrompt(detail.systemPrompt);
@@ -170,7 +199,16 @@ function App() {
     if (!input.trim() || loading) return;
 
     const userMessage: Message = { role: 'user', content: input };
-    setMessages((prev) => [...prev, userMessage]);
+    const metaMessages: Message[] = [];
+    if (model !== lastSentModel.current) {
+      metaMessages.push({ role: 'meta', content: 'model:' + model });
+      lastSentModel.current = model;
+    }
+    if (prompt !== lastSentPrompt.current) {
+      if (prompt) metaMessages.push({ role: 'meta', content: 'system:' + prompt });
+      lastSentPrompt.current = prompt;
+    }
+    setMessages((prev) => [...prev, ...metaMessages, userMessage]);
     const message = input;
     setInput('');
     setLoading(true);
@@ -296,34 +334,37 @@ function App() {
             Start a conversation...
           </div>
         )}
-        {messages.map((msg, i) => (
-          <div 
-            key={i} 
-            className={`max-w-[80%] p-3 rounded-lg shadow-sm ${
-              msg.role === 'user' 
-                ? 'self-end bg-blue-600 text-white' 
-                : 'self-start bg-white text-gray-800'
-            }`}
-          >
-            {msg.toolCalls && msg.toolCalls.length > 0 && (
-              <div className="mb-3 pb-3 border-b border-gray-200">
-                {msg.toolCalls.map((tc, j) => (
-                  <div key={j} className="text-xs text-gray-400 font-mono mb-1">
-                    <span className="font-semibold text-gray-500">{tc.name}</span>
-                    <span className="ml-1 text-gray-400">{formatToolArgs(tc.arguments)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {msg.content && (
-              <div className={`prose max-w-none ${msg.role === 'user' ? 'prose-invert' : ''}`}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {msg.content}
-                </ReactMarkdown>
-              </div>
-            )}
-          </div>
-        ))}
+        {messages.map((msg, i) => {
+          if (msg.role === 'meta') return <MetaMessage key={i} content={msg.content} />;
+          return (
+            <div
+              key={i}
+              className={`max-w-[80%] p-3 rounded-lg shadow-sm ${
+                msg.role === 'user'
+                  ? 'self-end bg-blue-600 text-white'
+                  : 'self-start bg-white text-gray-800'
+              }`}
+            >
+              {msg.toolCalls && msg.toolCalls.length > 0 && (
+                <div className="mb-3 pb-3 border-b border-gray-200">
+                  {msg.toolCalls.map((tc, j) => (
+                    <div key={j} className="text-xs text-gray-400 font-mono mb-1">
+                      <span className="font-semibold text-gray-500">{tc.name}</span>
+                      <span className="ml-1 text-gray-400">{formatToolArgs(tc.arguments)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {msg.content && (
+                <div className={`prose max-w-none ${msg.role === 'user' ? 'prose-invert' : ''}`}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {msg.content}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </div>
+          );
+        })}
         {loading && (
           <div className="self-start bg-white p-3 rounded-lg shadow-sm text-gray-400 animate-pulse">
             Thinking...

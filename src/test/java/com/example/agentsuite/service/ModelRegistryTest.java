@@ -12,28 +12,28 @@ class ModelRegistryTest {
 
     @BeforeEach
     void setUp() {
-        registry = new ModelRegistry(
-                mock(DeepSeekService.class),
-                "test-anthropic-key",
-                "test-google-key"
-        );
+        DeepSeekService deepSeekService = mock(DeepSeekService.class);
+        org.mockito.Mockito.when(deepSeekService.withModel(org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(mock(DeepSeekService.class));
+        registry = new ModelRegistry(deepSeekService, "test-anthropic-key", "test-google-key");
     }
 
     @Test
     void get_deepseekAlias_returnsDeepSeekService() {
         assertThat(registry.get("deepseek-v4-pro")).isInstanceOf(DeepSeekService.class);
+        assertThat(registry.get("deepseek-v4-flash")).isInstanceOf(DeepSeekService.class);
     }
 
     @Test
     void get_anthropicAliases_returnAnthropicService() {
         assertThat(registry.get("sonnet-4.6")).isInstanceOf(AnthropicChatService.class);
         assertThat(registry.get("opus-4.7")).isInstanceOf(AnthropicChatService.class);
+        assertThat(registry.get("opus-4.8")).isInstanceOf(AnthropicChatService.class);
         assertThat(registry.get("haiku-4.5")).isInstanceOf(AnthropicChatService.class);
     }
 
     @Test
     void get_googleAliases_returnGoogleService() {
-        assertThat(registry.get("gemini-2.5-pro")).isInstanceOf(GoogleChatService.class);
         assertThat(registry.get("gemini-2.5-flash")).isInstanceOf(GoogleChatService.class);
     }
 

@@ -16,13 +16,14 @@ public class ModelRegistry {
                          @Value("${google.api-key}") String googleApiKey) {
         registry = new HashMap<>();
         registry.put("deepseek-v4-pro", deepSeekService);
+        registry.put("deepseek-v4-flash", deepSeekService.withModel("deepseek-v4-flash"));
         if (!anthropicApiKey.isBlank()) {
             registry.put("sonnet-4.6", new AnthropicChatService(anthropicApiKey, "claude-sonnet-4-6"));
             registry.put("opus-4.7", new AnthropicChatService(anthropicApiKey, "claude-opus-4-7"));
+            registry.put("opus-4.8", new AnthropicChatService(anthropicApiKey, "claude-opus-4-8"));
             registry.put("haiku-4.5", new AnthropicChatService(anthropicApiKey, "claude-haiku-4-5-20251001"));
         }
         if (!googleApiKey.isBlank()) {
-            registry.put("gemini-2.5-pro", new GoogleChatService(googleApiKey, "gemini-2.5-pro"));
             registry.put("gemini-2.5-flash", new GoogleChatService(googleApiKey, "gemini-2.5-flash"));
         }
     }

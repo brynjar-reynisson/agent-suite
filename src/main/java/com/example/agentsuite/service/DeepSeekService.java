@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,7 @@ public class DeepSeekService implements ChatService {
     private final int maxTokens;
     private final Map<String, String> reasoningCache = new ConcurrentHashMap<>();
 
+    @Autowired
     public DeepSeekService(@Value("${langchain4j.open-ai.chat-model.api-key}") String apiKey,
                            @Value("${langchain4j.open-ai.chat-model.base-url}") String baseUrl,
                            @Value("${langchain4j.open-ai.chat-model.model-name}") String model,
@@ -50,6 +52,19 @@ public class DeepSeekService implements ChatService {
                 .defaultHeader("Authorization", "Bearer " + apiKey)
                 .defaultHeader("Content-Type", "application/json")
                 .build();
+    }
+
+    private DeepSeekService(RestClient restClient, String apiKey, String model, double temperature, int maxTokens) {
+        this.restClient = restClient;
+        this.apiKey = apiKey;
+        this.model = model;
+        this.temperature = temperature;
+        this.maxTokens = maxTokens;
+        this.mapper = new ObjectMapper();
+    }
+
+    public DeepSeekService withModel(String newModel) {
+        return new DeepSeekService(this.restClient, this.apiKey, newModel, this.temperature, this.maxTokens);
     }
 
     public ChatResponse chat(String systemPrompt, String userMessage, Object... tools) {

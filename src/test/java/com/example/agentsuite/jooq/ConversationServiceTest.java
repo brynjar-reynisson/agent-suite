@@ -159,12 +159,16 @@ class ConversationServiceTest {
         assertThat(detail.externalId()).isEqualTo(extId);
         assertThat(detail.initialModel()).isEqualTo("deepseek-v4-pro");
         assertThat(detail.systemPrompt()).isEqualTo("Be helpful.");
-        assertThat(detail.messages()).hasSize(2);
-        assertThat(detail.messages().get(0).role()).isEqualTo("user");
-        assertThat(detail.messages().get(0).content()).isEqualTo("Hello!");
-        assertThat(detail.messages().get(1).role()).isEqualTo("ai");
-        assertThat(detail.messages().get(1).content()).isEqualTo("Hi there!");
-        assertThat(detail.messages().get(1).toolCalls()).isEmpty();
+        assertThat(detail.messages()).hasSize(4);
+        assertThat(detail.messages().get(0).role()).isEqualTo("meta");
+        assertThat(detail.messages().get(0).content()).isEqualTo("model:deepseek-v4-pro");
+        assertThat(detail.messages().get(1).role()).isEqualTo("meta");
+        assertThat(detail.messages().get(1).content()).isEqualTo("system:Be helpful.");
+        assertThat(detail.messages().get(2).role()).isEqualTo("user");
+        assertThat(detail.messages().get(2).content()).isEqualTo("Hello!");
+        assertThat(detail.messages().get(3).role()).isEqualTo("ai");
+        assertThat(detail.messages().get(3).content()).isEqualTo("Hi there!");
+        assertThat(detail.messages().get(3).toolCalls()).isEmpty();
     }
 
     @Test
@@ -182,8 +186,8 @@ class ConversationServiceTest {
 
         ConversationDetailDto detail = service.getConversationDetail(extId);
 
-        assertThat(detail.messages()).hasSize(2);
-        ConversationDetailDto.MessageDto aiMsg = detail.messages().get(1);
+        assertThat(detail.messages()).hasSize(3);
+        ConversationDetailDto.MessageDto aiMsg = detail.messages().get(2);
         assertThat(aiMsg.role()).isEqualTo("ai");
         assertThat(aiMsg.content()).isEqualTo("Here are the files.");
         assertThat(aiMsg.toolCalls()).hasSize(1);

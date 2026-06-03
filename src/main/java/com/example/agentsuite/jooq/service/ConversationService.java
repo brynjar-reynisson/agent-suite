@@ -102,8 +102,16 @@ public class ConversationService {
 
         for (MessageRecord r : records) {
             switch (r.getType()) {
-                case "model_change"  -> { if (initialModel.isEmpty()) initialModel = r.getMessage(); }
-                case "system_prompt" -> { if (systemPrompt.isEmpty()) systemPrompt = r.getMessage(); }
+                case "model_change" -> {
+                    if (initialModel.isEmpty()) initialModel = r.getMessage();
+                    if (!r.getMessage().isEmpty())
+                        messages.add(new ConversationDetailDto.MessageDto("meta", "model:" + r.getMessage(), List.of()));
+                }
+                case "system_prompt" -> {
+                    if (systemPrompt.isEmpty()) systemPrompt = r.getMessage();
+                    if (!r.getMessage().isEmpty())
+                        messages.add(new ConversationDetailDto.MessageDto("meta", "system:" + r.getMessage(), List.of()));
+                }
                 case "user" -> {
                     toolCallBuffer.clear();
                     messages.add(new ConversationDetailDto.MessageDto("user", r.getMessage(), List.of()));
