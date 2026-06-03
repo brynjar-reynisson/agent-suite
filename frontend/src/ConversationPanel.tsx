@@ -57,7 +57,7 @@ export function ConversationPanel({ isOpen, onClose, onSelect }: Props) {
       {/* Backdrop */}
       <div className="fixed inset-0 z-10" onClick={onClose} />
       {/* Panel */}
-      <div className="fixed top-0 right-0 h-full w-72 bg-white shadow-xl z-20 flex flex-col border-l border-gray-200">
+      <div className="fixed top-0 right-0 h-full w-96 bg-white shadow-xl z-20 flex flex-col border-l border-gray-200">
         <div className="p-4 border-b flex justify-between items-center shrink-0">
           <h2 className="font-semibold text-gray-800 text-sm">Past Conversations</h2>
           <button
@@ -88,10 +88,11 @@ export function ConversationPanel({ isOpen, onClose, onSelect }: Props) {
               key={conv.externalId}
               onClick={() => handleSelect(conv)}
               disabled={selecting !== null}
-              className="w-full text-left px-4 py-3 border-b hover:bg-gray-50 transition-colors disabled:opacity-50"
+              title={conv.name}
+              className="w-full text-left px-4 py-5 border-b hover:bg-gray-50 transition-colors disabled:opacity-50"
             >
               <div className="flex justify-between items-baseline gap-2">
-                <span className="font-medium text-gray-800 text-sm truncate">
+                <span className="text-gray-800 text-sm truncate">
                   {selecting === conv.externalId ? 'Loading...' : conv.name}
                 </span>
                 <span className="text-xs text-gray-400 shrink-0">
