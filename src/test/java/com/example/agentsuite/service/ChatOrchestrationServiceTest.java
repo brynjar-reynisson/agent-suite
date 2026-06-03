@@ -118,6 +118,7 @@ class ChatOrchestrationServiceTest {
         when(conv.getConversationId()).thenReturn(convDbId);
         when(conversationService.findByExternalId(externalId)).thenReturn(Optional.of(conv));
         when(conversationService.findLastModelChange(convDbId)).thenReturn(Optional.of("deepseek-v4-pro"));
+        when(conversationService.findLastSystemPrompt(convDbId)).thenReturn(Optional.of(""));
         when(conversationService.getMessages(convDbId)).thenReturn(List.of());
 
         doAnswer(inv -> {
@@ -131,6 +132,7 @@ class ChatOrchestrationServiceTest {
                 "/projects", e -> {}, new Object[0]);
 
         verify(conversationService, never()).addMessage(eq(convDbId), anyLong(), eq("model_change"), any());
+        verify(conversationService, never()).addMessage(eq(convDbId), anyLong(), eq("system_prompt"), any());
     }
 
     @Test
@@ -142,6 +144,7 @@ class ChatOrchestrationServiceTest {
         when(conv.getConversationId()).thenReturn(convDbId);
         when(conversationService.findByExternalId(externalId)).thenReturn(Optional.of(conv));
         when(conversationService.findLastModelChange(convDbId)).thenReturn(Optional.of("deepseek-v4-pro"));
+        when(conversationService.findLastSystemPrompt(convDbId)).thenReturn(Optional.of(""));
         when(conversationService.getMessages(convDbId)).thenReturn(List.of());
 
         doAnswer(inv -> {
@@ -166,6 +169,7 @@ class ChatOrchestrationServiceTest {
         when(conv.getConversationId()).thenReturn(convDbId);
         when(conversationService.findByExternalId(externalId)).thenReturn(Optional.of(conv));
         when(conversationService.findLastModelChange(convDbId)).thenReturn(Optional.of("deepseek-v4-pro"));
+        when(conversationService.findLastSystemPrompt(convDbId)).thenReturn(Optional.of(""));
         when(conversationService.getMessages(convDbId)).thenReturn(List.of());
 
         doAnswer(inv -> {

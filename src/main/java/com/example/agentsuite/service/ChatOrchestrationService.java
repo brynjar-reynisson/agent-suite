@@ -108,6 +108,15 @@ public class ChatOrchestrationService {
                             },
                             () -> conversationService.addMessage(convId, GUEST_USER_ID, "model_change", model)
                     );
+                    String normalizedPrompt = systemPrompt != null ? systemPrompt : "";
+                    conversationService.findLastSystemPrompt(convId).ifPresentOrElse(
+                            lastPrompt -> {
+                                if (!lastPrompt.equals(normalizedPrompt)) {
+                                    conversationService.addMessage(convId, GUEST_USER_ID, "system_prompt", normalizedPrompt);
+                                }
+                            },
+                            () -> conversationService.addMessage(convId, GUEST_USER_ID, "system_prompt", normalizedPrompt)
+                    );
                     return convId;
                 })
                 .orElseGet(() -> {
@@ -122,15 +131,25 @@ public class ChatOrchestrationService {
     }
 
     private List<HistoryMessage> loadHistory(long conversationDbId) {
+        List<MessageRecord> records = conversationService.getMessages(conversationDbId);
+
+        String lastSystemPrompt = null;
+        for (MessageRecord r : records) {
+            if ("system_prompt".equals(r.getType())) lastSystemPrompt = r.getMessage();
+        }
+
         List<HistoryMessage> history = new ArrayList<>();
-        for (MessageRecord r : conversationService.getMessages(conversationDbId)) {
+        if (lastSystemPrompt != null && !lastSystemPrompt.isEmpty()) {
+            history.add(new HistoryMessage.SystemPrompt(lastSystemPrompt));
+        }
+
+        for (MessageRecord r : records) {
             HistoryMessage msg = switch (r.getType()) {
-                case "system_prompt" -> new HistoryMessage.SystemPrompt(r.getMessage());
-                case "user"          -> new HistoryMessage.User(r.getMessage());
-                case "assistant"     -> new HistoryMessage.Assistant(r.getMessage());
-                case "tool_call"     -> new HistoryMessage.ToolCall(r.getMessage());
-                case "tool_result"   -> new HistoryMessage.ToolResult(r.getMessage());
-                default              -> null;
+                case "user"        -> new HistoryMessage.User(r.getMessage());
+                case "assistant"   -> new HistoryMessage.Assistant(r.getMessage());
+                case "tool_call"   -> new HistoryMessage.ToolCall(r.getMessage());
+                case "tool_result" -> new HistoryMessage.ToolResult(r.getMessage());
+                default            -> null;
             };
             if (msg != null) history.add(msg);
         }

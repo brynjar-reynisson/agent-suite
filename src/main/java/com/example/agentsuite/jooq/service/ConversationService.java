@@ -63,6 +63,11 @@ public class ConversationService {
     }
 
     @Transactional(readOnly = true)
+    public Optional<String> findLastSystemPrompt(long conversationId) {
+        return messageRepository.findLastSystemPrompt(conversationId);
+    }
+
+    @Transactional(readOnly = true)
     public List<ConversationSummaryDto> getConversationSummaries() {
         return conversationRepository.findByUserId(GUEST_USER_ID).stream()
                 .map(conv -> {
@@ -108,7 +113,7 @@ public class ConversationService {
                         messages.add(new ConversationDetailDto.MessageDto("meta", "model:" + r.getMessage(), List.of()));
                 }
                 case "system_prompt" -> {
-                    if (systemPrompt.isEmpty()) systemPrompt = r.getMessage();
+                    systemPrompt = r.getMessage();
                     if (!r.getMessage().isEmpty())
                         messages.add(new ConversationDetailDto.MessageDto("meta", "system:" + r.getMessage(), List.of()));
                 }

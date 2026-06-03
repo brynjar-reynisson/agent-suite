@@ -43,4 +43,14 @@ public class MessageRepository {
                 .limit(1)
                 .fetchOptional(MESSAGE.MESSAGE_);
     }
+
+    public Optional<String> findLastSystemPrompt(long conversationId) {
+        return dsl.select(MESSAGE.MESSAGE_)
+                .from(MESSAGE)
+                .where(MESSAGE.CONVERSATION_ID.eq(conversationId))
+                .and(MESSAGE.TYPE.eq("system_prompt"))
+                .orderBy(MESSAGE.MESSAGE_TIME.desc(), MESSAGE.MESSAGE_ID.desc())
+                .limit(1)
+                .fetchOptional(MESSAGE.MESSAGE_);
+    }
 }
