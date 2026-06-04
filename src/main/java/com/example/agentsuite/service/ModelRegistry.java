@@ -13,7 +13,8 @@ public class ModelRegistry {
 
     public ModelRegistry(DeepSeekService deepSeekService,
                          @Value("${anthropic.api-key}") String anthropicApiKey,
-                         @Value("${google.api-key}") String googleApiKey) {
+                         @Value("${google.api-key}") String googleApiKey,
+                         @Value("${mistral.api-key}") String mistralApiKey) {
         registry = new HashMap<>();
         registry.put("deepseek-v4-pro", deepSeekService);
         registry.put("deepseek-v4-flash", deepSeekService.withModel("deepseek-v4-flash"));
@@ -25,6 +26,10 @@ public class ModelRegistry {
         }
         if (!googleApiKey.isBlank()) {
             registry.put("gemini-2.5-flash", new GoogleChatService(googleApiKey, "gemini-2.5-flash"));
+        }
+        if (!mistralApiKey.isBlank()) {
+            registry.put("mistral-large", new MistralChatService(mistralApiKey, "mistral-large-latest"));
+            registry.put("mistral-small", new MistralChatService(mistralApiKey, "mistral-small-latest"));
         }
     }
 

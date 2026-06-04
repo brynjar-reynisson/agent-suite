@@ -23,6 +23,8 @@ const MODELS = [
   'opus-4.8',
   'haiku-4.5',
   'gemini-2.5-flash',
+  'mistral-large',
+  'mistral-small',
 ];
 
 const PROMPT_BANK = [

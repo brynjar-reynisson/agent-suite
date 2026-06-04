@@ -84,6 +84,8 @@ Supported model aliases:
 | `opus-4.8` | Anthropic Claude Opus 4.8 | `ANTHROPIC_API_KEY` |
 | `haiku-4.5` | Anthropic Claude Haiku 4.5 | `ANTHROPIC_API_KEY` |
 | `gemini-2.5-flash` | Google Gemini 2.5 Flash | `GOOGLE_API_KEY` |
+| `mistral-large` | Mistral Large (latest) | `MISTRAL_AI_API_KEY` |
+| `mistral-small` | Mistral Small (latest) | `MISTRAL_AI_API_KEY` |
 
 ## Frontend
 
