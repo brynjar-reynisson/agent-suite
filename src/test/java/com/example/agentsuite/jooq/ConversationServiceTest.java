@@ -172,6 +172,18 @@ class ConversationServiceTest {
     }
 
     @Test
+    void getConversationDetail_returnsLastModelWhenModelChangedMidConversation() {
+        String extId = conversationRepo.findById(guestConvId)
+                .orElseThrow().getExternalId();
+
+        ConversationDetailDto detail = service.getConversationDetail(extId);
+
+        // Guest conversation switched from deepseek-v4-pro to sonnet-4.6 mid-conversation;
+        // loading should restore the last-used model, not the initial one.
+        assertThat(detail.initialModel()).isEqualTo("sonnet-4.6");
+    }
+
+    @Test
     void getConversationDetail_groupsToolCallsWithFollowingAssistantMessage() {
         String extId = UUID.randomUUID().toString();
         long convId = service.createConversation(guestId, "Tool conv", null, extId);

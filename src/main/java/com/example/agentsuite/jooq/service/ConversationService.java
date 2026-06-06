@@ -108,7 +108,7 @@ public class ConversationService {
         for (MessageRecord r : records) {
             switch (r.getType()) {
                 case "model_change" -> {
-                    if (initialModel.isEmpty()) initialModel = r.getMessage();
+                    initialModel = r.getMessage();
                     if (!r.getMessage().isEmpty())
                         messages.add(new ConversationDetailDto.MessageDto("meta", "model:" + r.getMessage(), List.of()));
                 }
