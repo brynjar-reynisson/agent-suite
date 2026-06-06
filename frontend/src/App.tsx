@@ -5,6 +5,8 @@ import {
 import { ConversationPanel } from './ConversationPanel';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useAuth } from './auth';
+import { UserAvatar } from './UserAvatar';
 
 function formatToolArgs(args: string): string {
   try {
@@ -139,25 +141,6 @@ function MetaMessage({ content }: { content: string }) {
   );
 }
 
-function UserAvatar() {
-  return (
-    <div
-      role="img"
-      aria-label="Guest user avatar"
-      title="Guest"
-      className="relative w-8 h-8"
-    >
-      <div className="w-full h-full rounded-full flex items-center justify-center font-bold text-gray-500 bg-gray-200 border-2 border-gray-300 text-[0.85rem]">
-        G
-      </div>
-      <div
-        aria-hidden="true"
-        className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-white"
-      />
-    </div>
-  );
-}
-
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -171,6 +154,7 @@ function App() {
   const lastSentPrompt = useRef<string | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { user, signIn, signOut } = useAuth();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -345,7 +329,7 @@ function App() {
           >
             ☰
           </button>
-          <UserAvatar />
+          <UserAvatar user={user} signIn={signIn} signOut={signOut} />
         </div>
       </header>
 
