@@ -133,7 +133,7 @@ class ConversationServiceTest {
 
     @Test
     void getConversationSummaries_returnsGuestConversations() {
-        List<ConversationSummaryDto> summaries = service.getConversationSummaries();
+        List<ConversationSummaryDto> summaries = service.getConversationSummaries(guestId);
         assertThat(summaries).isNotEmpty();
         assertThat(summaries.get(0).name()).isEqualTo("Guest Chat");
         assertThat(summaries.get(0).initialModel()).isEqualTo("deepseek-v4-pro");
@@ -142,7 +142,7 @@ class ConversationServiceTest {
     @Test
     void getConversationDetail_throwsForUnknownExternalId() {
         assertThrows(NoSuchElementException.class,
-                () -> service.getConversationDetail("no-such-uuid"));
+                () -> service.getConversationDetail("no-such-uuid", guestId));
     }
 
     @Test
@@ -154,7 +154,7 @@ class ConversationServiceTest {
         service.addMessage(convId, guestId, "user", "Hello!");
         service.addMessage(convId, guestId, "assistant", "Hi there!");
 
-        ConversationDetailDto detail = service.getConversationDetail(extId);
+        ConversationDetailDto detail = service.getConversationDetail(extId, guestId);
 
         assertThat(detail.externalId()).isEqualTo(extId);
         assertThat(detail.initialModel()).isEqualTo("deepseek-v4-pro");
@@ -172,11 +172,19 @@ class ConversationServiceTest {
     }
 
     @Test
+    void getConversationDetail_throwsWhenUserDoesNotOwnConversation() {
+        String extId = conversationRepo.findById(guestConvId)
+                .orElseThrow().getExternalId();
+        assertThrows(NoSuchElementException.class,
+                () -> service.getConversationDetail(extId, someoneId));
+    }
+
+    @Test
     void getConversationDetail_returnsLastModelWhenModelChangedMidConversation() {
         String extId = conversationRepo.findById(guestConvId)
                 .orElseThrow().getExternalId();
 
-        ConversationDetailDto detail = service.getConversationDetail(extId);
+        ConversationDetailDto detail = service.getConversationDetail(extId, guestId);
 
         // Guest conversation switched from deepseek-v4-pro to sonnet-4.6 mid-conversation;
         // loading should restore the last-used model, not the initial one.
@@ -196,7 +204,7 @@ class ConversationServiceTest {
                 "[{\"name\":\"ls\",\"result\":\"file.txt\"}]");
         service.addMessage(convId, guestId, "assistant", "Here are the files.");
 
-        ConversationDetailDto detail = service.getConversationDetail(extId);
+        ConversationDetailDto detail = service.getConversationDetail(extId, guestId);
 
         assertThat(detail.messages()).hasSize(3);
         ConversationDetailDto.MessageDto aiMsg = detail.messages().get(2);

@@ -17,7 +17,6 @@ import java.util.function.Consumer;
 public class ChatOrchestrationService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatOrchestrationService.class);
-    private static final long GUEST_USER_ID = 1L;
 
     private final ModelRegistry modelRegistry;
     private final ConversationService conversationService;
@@ -29,7 +28,7 @@ public class ChatOrchestrationService {
         this.conversationService = conversationService;
     }
 
-    public void chatStream(String conversationId, String model, String systemPrompt,
+    public void chatStream(String conversationId, long userId, String model, String systemPrompt,
                            String userMessage, String rootDirectory,
                            Consumer<ChatEvent> emitter, Object[] tools) {
 
@@ -46,7 +45,7 @@ public class ChatOrchestrationService {
 
         long conversationDbId;
         try {
-            conversationDbId = resolveConversation(conversationId, model, systemPrompt, userMessage, rootDirectory);
+            conversationDbId = resolveConversation(conversationId, userId, model, systemPrompt, userMessage, rootDirectory);
         } catch (Exception e) {
             log.error("Failed to resolve conversation {}", conversationId, e);
             emitter.accept(new ChatEvent.Error("Database error: " + e.getMessage()));
@@ -57,7 +56,7 @@ public class ChatOrchestrationService {
         List<HistoryMessage> history = loadHistory(conversationDbId);
 
         try {
-            conversationService.addMessage(conversationDbId, GUEST_USER_ID, "user", userMessage);
+            conversationService.addMessage(conversationDbId, userId, "user", userMessage);
         } catch (Exception e) {
             log.error("Failed to save user message for conversation {}", conversationDbId, e);
             emitter.accept(new ChatEvent.Error("Database error: " + e.getMessage()));
@@ -87,7 +86,7 @@ public class ChatOrchestrationService {
                     contentBuffer.append(c.text());
                 }
                 case ChatEvent.Done d -> {
-                    persistTurnResult(convId, toolBatchBuffer, contentBuffer.toString());
+                    persistTurnResult(convId, userId, toolBatchBuffer, contentBuffer.toString());
                     emitter.accept(event);
                 }
                 case ChatEvent.Error e -> emitter.accept(event);
@@ -95,7 +94,7 @@ public class ChatOrchestrationService {
         }, tools);
     }
 
-    private long resolveConversation(String externalId, String model, String systemPrompt,
+    private long resolveConversation(String externalId, long userId, String model, String systemPrompt,
                                       String userMessage, String rootDirectory) {
         return conversationService.findByExternalId(externalId)
                 .map(conv -> {
@@ -103,28 +102,28 @@ public class ChatOrchestrationService {
                     conversationService.findLastModelChange(convId).ifPresentOrElse(
                             lastModel -> {
                                 if (!lastModel.equals(model)) {
-                                    conversationService.addMessage(convId, GUEST_USER_ID, "model_change", model);
+                                    conversationService.addMessage(convId, userId, "model_change", model);
                                 }
                             },
-                            () -> conversationService.addMessage(convId, GUEST_USER_ID, "model_change", model)
+                            () -> conversationService.addMessage(convId, userId, "model_change", model)
                     );
                     String normalizedPrompt = systemPrompt != null ? systemPrompt : "";
                     conversationService.findLastSystemPrompt(convId).ifPresentOrElse(
                             lastPrompt -> {
                                 if (!lastPrompt.equals(normalizedPrompt)) {
-                                    conversationService.addMessage(convId, GUEST_USER_ID, "system_prompt", normalizedPrompt);
+                                    conversationService.addMessage(convId, userId, "system_prompt", normalizedPrompt);
                                 }
                             },
-                            () -> conversationService.addMessage(convId, GUEST_USER_ID, "system_prompt", normalizedPrompt)
+                            () -> conversationService.addMessage(convId, userId, "system_prompt", normalizedPrompt)
                     );
                     return convId;
                 })
                 .orElseGet(() -> {
                     String name = userMessage.length() > 80 ? userMessage.substring(0, 80) : userMessage;
                     long convId = conversationService.createConversation(
-                            GUEST_USER_ID, name, rootDirectory, externalId);
-                    conversationService.addMessage(convId, GUEST_USER_ID, "model_change", model);
-                    conversationService.addMessage(convId, GUEST_USER_ID, "system_prompt",
+                            userId, name, rootDirectory, externalId);
+                    conversationService.addMessage(convId, userId, "model_change", model);
+                    conversationService.addMessage(convId, userId, "system_prompt",
                             systemPrompt != null ? systemPrompt : "");
                     return convId;
                 });
@@ -156,18 +155,18 @@ public class ChatOrchestrationService {
         return history;
     }
 
-    private void persistTurnResult(long conversationDbId,
+    private void persistTurnResult(long conversationDbId, long userId,
                                     List<ChatEvent.ToolBatch> batches,
                                     String content) {
         try {
             for (ChatEvent.ToolBatch batch : batches) {
-                conversationService.addMessage(conversationDbId, GUEST_USER_ID,
+                conversationService.addMessage(conversationDbId, userId,
                         "tool_call", serializeCalls(batch.executions()));
-                conversationService.addMessage(conversationDbId, GUEST_USER_ID,
+                conversationService.addMessage(conversationDbId, userId,
                         "tool_result", serializeResults(batch.executions()));
             }
             if (!content.isBlank()) {
-                conversationService.addMessage(conversationDbId, GUEST_USER_ID, "assistant", content);
+                conversationService.addMessage(conversationDbId, userId, "assistant", content);
             }
         } catch (Exception e) {
             log.error("Failed to persist turn result for conversation {}", conversationDbId, e);
