@@ -39,3 +39,8 @@ logs/
 restart.sh
 restart.cmd
 restart-agent-suite.ps1
+
+# Frontend env files with real secrets (prod anon key, URLs)
+frontend/.env.production
+frontend/.env.*.local
+frontend/.env.local

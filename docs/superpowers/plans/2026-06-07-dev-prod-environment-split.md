@@ -47,7 +47,9 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 VITE_AUTH_REDIRECT_URL=http://localhost:5177
 ```
 
-- [ ] **Step 2: Create `frontend/.env.production`**
+- [ ] **Step 2: Create `frontend/.env.production` (local only — gitignored, never commit)**
+
+This file is listed in `.gitignore`. Create it locally but do not stage or commit it.
 
 Replace `<ref>` with your actual supabase.co project reference (e.g. `abcdefghijklmnop`) and `<prod-anon-key>` with the anon key from Project Settings → API:
 
@@ -71,11 +73,11 @@ Update the `scripts` section:
 },
 ```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Commit (do NOT include `.env.production` — it is gitignored)**
 
 ```bash
-git -C "C:\Users\Lenovo\IdeaProjects\agent-suite" add frontend/.env frontend/.env.production frontend/package.json
-git -C "C:\Users\Lenovo\IdeaProjects\agent-suite" commit -m "feat: add prod frontend env file and npm script"
+git -C "C:\Users\Lenovo\IdeaProjects\agent-suite" add frontend/.env frontend/package.json
+git -C "C:\Users\Lenovo\IdeaProjects\agent-suite" commit -m "feat: add prod npm script and update dev redirect URL to port 5177"
 ```
 
 ---
