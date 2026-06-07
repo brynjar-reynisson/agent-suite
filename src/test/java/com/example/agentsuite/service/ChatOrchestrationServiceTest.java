@@ -116,6 +116,7 @@ class ChatOrchestrationServiceTest {
 
         ConversationRecord conv = mock(ConversationRecord.class);
         when(conv.getConversationId()).thenReturn(convDbId);
+        when(conv.getUserId()).thenReturn(1L);
         when(conversationService.findByExternalId(externalId)).thenReturn(Optional.of(conv));
         when(conversationService.findLastModelChange(convDbId)).thenReturn(Optional.of("deepseek-v4-pro"));
         when(conversationService.findLastSystemPrompt(convDbId)).thenReturn(Optional.of(""));
@@ -142,6 +143,7 @@ class ChatOrchestrationServiceTest {
 
         ConversationRecord conv = mock(ConversationRecord.class);
         when(conv.getConversationId()).thenReturn(convDbId);
+        when(conv.getUserId()).thenReturn(1L);
         when(conversationService.findByExternalId(externalId)).thenReturn(Optional.of(conv));
         when(conversationService.findLastModelChange(convDbId)).thenReturn(Optional.of("deepseek-v4-pro"));
         when(conversationService.findLastSystemPrompt(convDbId)).thenReturn(Optional.of(""));
@@ -167,6 +169,7 @@ class ChatOrchestrationServiceTest {
 
         ConversationRecord conv = mock(ConversationRecord.class);
         when(conv.getConversationId()).thenReturn(convDbId);
+        when(conv.getUserId()).thenReturn(1L);
         when(conversationService.findByExternalId(externalId)).thenReturn(Optional.of(conv));
         when(conversationService.findLastModelChange(convDbId)).thenReturn(Optional.of("deepseek-v4-pro"));
         when(conversationService.findLastSystemPrompt(convDbId)).thenReturn(Optional.of(""));

@@ -98,6 +98,9 @@ public class ChatOrchestrationService {
                                       String userMessage, String rootDirectory) {
         return conversationService.findByExternalId(externalId)
                 .map(conv -> {
+                    if (!conv.getUserId().equals(userId)) {
+                        throw new java.util.NoSuchElementException("Conversation not found: " + externalId);
+                    }
                     long convId = conv.getConversationId();
                     conversationService.findLastModelChange(convId).ifPresentOrElse(
                             lastModel -> {

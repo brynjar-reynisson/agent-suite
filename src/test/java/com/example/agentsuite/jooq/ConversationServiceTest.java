@@ -46,11 +46,11 @@ class ConversationServiceTest {
         // All addMessage calls share the same @Transactional now() timestamp in H2,
         // so messages are ordered by message_id ASC (secondary sort) = insertion order.
         // Guest is seeded by schema.sql; add the second user
-        dsl.insertInto(SUITE_USER).set(SUITE_USER.UUID, "someone@somewhere.com").execute();
+        dsl.insertInto(SUITE_USER).set(SUITE_USER.UUID, "00000000-0000-0000-0000-000000000002").execute();
         guestId = dsl.select(SUITE_USER.USER_ID).from(SUITE_USER)
                 .where(SUITE_USER.UUID.eq("Guest")).fetchOne(SUITE_USER.USER_ID);
         someoneId = dsl.select(SUITE_USER.USER_ID).from(SUITE_USER)
-                .where(SUITE_USER.UUID.eq("someone@somewhere.com")).fetchOne(SUITE_USER.USER_ID);
+                .where(SUITE_USER.UUID.eq("00000000-0000-0000-0000-000000000002")).fetchOne(SUITE_USER.USER_ID);
 
         service = new ConversationService(conversationRepo, messageRepo);
 

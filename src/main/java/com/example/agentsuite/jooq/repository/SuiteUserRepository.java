@@ -23,10 +23,6 @@ public class SuiteUserRepository {
                 .fetchOptional();
     }
 
-    public Optional<SuiteUserRecord> findGuest() {
-        return findByUuid("Guest");
-    }
-
     public long insert(String uuid, String email) {
         return dsl.insertInto(SUITE_USER)
                 .set(SUITE_USER.UUID, uuid)

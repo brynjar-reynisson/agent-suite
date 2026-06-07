@@ -117,7 +117,7 @@ public class AiController {
 
     @GetMapping("/ai/conversations")
     public List<ConversationSummaryDto> getConversations(HttpServletRequest request) {
-        long userId = (Long) request.getAttribute(UserResolverFilter.ATTR_USER_ID);
+        long userId = currentUserId(request);
         return conversationService.getConversationSummaries(userId);
     }
 
@@ -126,7 +126,7 @@ public class AiController {
             @PathVariable String externalId,
             HttpServletRequest request) {
         try {
-            long userId = (Long) request.getAttribute(UserResolverFilter.ATTR_USER_ID);
+            long userId = currentUserId(request);
             return ResponseEntity.ok(conversationService.getConversationDetail(externalId, userId));
         } catch (NoSuchElementException e) {
             return ResponseEntity.notFound().build();
@@ -143,7 +143,7 @@ public class AiController {
                            HttpServletRequest request) {
 
         SseEmitter emitter = new SseEmitter(300000L);
-        long userId = (Long) request.getAttribute(UserResolverFilter.ATTR_USER_ID);
+        long userId = currentUserId(request);
 
         if (!ALLOWED_ROOT_DIRECTORIES.contains(rootDirectory)) {
             sendEvent(emitter, "error", "Error: Access to the specified root directory is not allowed.");
@@ -192,6 +192,11 @@ public class AiController {
         }, executor);
 
         return emitter;
+    }
+
+    private long currentUserId(HttpServletRequest request) {
+        Object attr = request.getAttribute(UserResolverFilter.ATTR_USER_ID);
+        return attr instanceof Long id ? id : 1L;
     }
 
     private void sendEvent(SseEmitter emitter, String name, Object data) {

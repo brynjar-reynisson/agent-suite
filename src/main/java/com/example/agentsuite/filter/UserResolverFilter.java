@@ -58,6 +58,9 @@ public class UserResolverFilter extends OncePerRequestFilter {
         } catch (JwtException e) {
             log.warn("Invalid JWT, falling back to guest: {}", e.getMessage());
             return GUEST_USER_ID;
+        } catch (Exception e) {
+            log.error("Failed to resolve user from JWT, falling back to guest: {}", e.getMessage());
+            return GUEST_USER_ID;
         }
     }
 }
