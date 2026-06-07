@@ -105,6 +105,7 @@ React 19 + Vite 8 + Tailwind CSS 4 chat UI located in `frontend/`. Dev server: `
 
 ```bash
 cd frontend
+cp frontend/.env.example frontend/.env  # first-time setup: copy dev defaults
 npm install
 npm run dev    # http://localhost:5177 (dev environment)
 npm run prod   # http://localhost:5176 (prod environment, uses supabase.co)
