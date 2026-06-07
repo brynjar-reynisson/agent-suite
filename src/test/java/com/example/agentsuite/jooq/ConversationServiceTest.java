@@ -46,11 +46,11 @@ class ConversationServiceTest {
         // All addMessage calls share the same @Transactional now() timestamp in H2,
         // so messages are ordered by message_id ASC (secondary sort) = insertion order.
         // Guest is seeded by schema.sql; add the second user
-        dsl.insertInto(SUITE_USER).set(SUITE_USER.UUID, "someone@somewhere.com").execute();
+        dsl.insertInto(SUITE_USER).set(SUITE_USER.UUID, "00000000-0000-0000-0000-000000000002").execute();
         guestId = dsl.select(SUITE_USER.USER_ID).from(SUITE_USER)
                 .where(SUITE_USER.UUID.eq("Guest")).fetchOne(SUITE_USER.USER_ID);
         someoneId = dsl.select(SUITE_USER.USER_ID).from(SUITE_USER)
-                .where(SUITE_USER.UUID.eq("someone@somewhere.com")).fetchOne(SUITE_USER.USER_ID);
+                .where(SUITE_USER.UUID.eq("00000000-0000-0000-0000-000000000002")).fetchOne(SUITE_USER.USER_ID);
 
         service = new ConversationService(conversationRepo, messageRepo);
 
@@ -133,7 +133,7 @@ class ConversationServiceTest {
 
     @Test
     void getConversationSummaries_returnsGuestConversations() {
-        List<ConversationSummaryDto> summaries = service.getConversationSummaries();
+        List<ConversationSummaryDto> summaries = service.getConversationSummaries(guestId);
         assertThat(summaries).isNotEmpty();
         assertThat(summaries.get(0).name()).isEqualTo("Guest Chat");
         assertThat(summaries.get(0).initialModel()).isEqualTo("deepseek-v4-pro");
@@ -142,7 +142,7 @@ class ConversationServiceTest {
     @Test
     void getConversationDetail_throwsForUnknownExternalId() {
         assertThrows(NoSuchElementException.class,
-                () -> service.getConversationDetail("no-such-uuid"));
+                () -> service.getConversationDetail("no-such-uuid", guestId));
     }
 
     @Test
@@ -154,7 +154,7 @@ class ConversationServiceTest {
         service.addMessage(convId, guestId, "user", "Hello!");
         service.addMessage(convId, guestId, "assistant", "Hi there!");
 
-        ConversationDetailDto detail = service.getConversationDetail(extId);
+        ConversationDetailDto detail = service.getConversationDetail(extId, guestId);
 
         assertThat(detail.externalId()).isEqualTo(extId);
         assertThat(detail.initialModel()).isEqualTo("deepseek-v4-pro");
@@ -172,6 +172,26 @@ class ConversationServiceTest {
     }
 
     @Test
+    void getConversationDetail_throwsWhenUserDoesNotOwnConversation() {
+        String extId = conversationRepo.findById(guestConvId)
+                .orElseThrow().getExternalId();
+        assertThrows(NoSuchElementException.class,
+                () -> service.getConversationDetail(extId, someoneId));
+    }
+
+    @Test
+    void getConversationDetail_returnsLastModelWhenModelChangedMidConversation() {
+        String extId = conversationRepo.findById(guestConvId)
+                .orElseThrow().getExternalId();
+
+        ConversationDetailDto detail = service.getConversationDetail(extId, guestId);
+
+        // Guest conversation switched from deepseek-v4-pro to sonnet-4.6 mid-conversation;
+        // loading should restore the last-used model, not the initial one.
+        assertThat(detail.initialModel()).isEqualTo("sonnet-4.6");
+    }
+
+    @Test
     void getConversationDetail_groupsToolCallsWithFollowingAssistantMessage() {
         String extId = UUID.randomUUID().toString();
         long convId = service.createConversation(guestId, "Tool conv", null, extId);
@@ -184,7 +204,7 @@ class ConversationServiceTest {
                 "[{\"name\":\"ls\",\"result\":\"file.txt\"}]");
         service.addMessage(convId, guestId, "assistant", "Here are the files.");
 
-        ConversationDetailDto detail = service.getConversationDetail(extId);
+        ConversationDetailDto detail = service.getConversationDetail(extId, guestId);
 
         assertThat(detail.messages()).hasSize(3);
         ConversationDetailDto.MessageDto aiMsg = detail.messages().get(2);

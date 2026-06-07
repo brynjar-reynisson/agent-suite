@@ -1,5 +1,6 @@
 package com.example.agentsuite.controller;
 
+import com.example.agentsuite.filter.UserResolverFilter;
 import com.example.agentsuite.jooq.service.ConversationService;
 import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatOrchestrationService;
@@ -8,6 +9,7 @@ import com.example.agentsuite.tools.Git;
 import com.example.agentsuite.tools.MarkDownWriter;
 import com.example.agentsuite.tools.UnixTools;
 import com.example.agentsuite.tools.WebTools;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -114,15 +116,18 @@ public class AiController {
     }
 
     @GetMapping("/ai/conversations")
-    public List<ConversationSummaryDto> getConversations() {
-        return conversationService.getConversationSummaries();
+    public List<ConversationSummaryDto> getConversations(HttpServletRequest request) {
+        long userId = currentUserId(request);
+        return conversationService.getConversationSummaries(userId);
     }
 
     @GetMapping("/ai/conversations/{externalId}")
     public ResponseEntity<ConversationDetailDto> getConversationDetail(
-            @PathVariable String externalId) {
+            @PathVariable String externalId,
+            HttpServletRequest request) {
         try {
-            return ResponseEntity.ok(conversationService.getConversationDetail(externalId));
+            long userId = currentUserId(request);
+            return ResponseEntity.ok(conversationService.getConversationDetail(externalId, userId));
         } catch (NoSuchElementException e) {
             return ResponseEntity.notFound().build();
         }
@@ -134,9 +139,11 @@ public class AiController {
                            @RequestParam(defaultValue = "") String rootDirectory,
                            @RequestParam(defaultValue = "deepseek-v4-pro") String model,
                            @RequestParam(defaultValue = "") String tools,
-                           @RequestParam(defaultValue = "") String conversationId) {
+                           @RequestParam(defaultValue = "") String conversationId,
+                           HttpServletRequest request) {
 
         SseEmitter emitter = new SseEmitter(300000L);
+        long userId = currentUserId(request);
 
         if (!ALLOWED_ROOT_DIRECTORIES.contains(rootDirectory)) {
             sendEvent(emitter, "error", "Error: Access to the specified root directory is not allowed.");
@@ -159,6 +166,7 @@ public class AiController {
             try {
                 orchestrationService.chatStream(
                         conversationId.isEmpty() ? null : conversationId,
+                        userId,
                         model, prompt, message, rootDirectory,
                         event -> {
                             switch (event) {
@@ -184,6 +192,11 @@ public class AiController {
         }, executor);
 
         return emitter;
+    }
+
+    private long currentUserId(HttpServletRequest request) {
+        Object attr = request.getAttribute(UserResolverFilter.ATTR_USER_ID);
+        return attr instanceof Long id ? id : 1L;
     }
 
     private void sendEvent(SseEmitter emitter, String name, Object data) {

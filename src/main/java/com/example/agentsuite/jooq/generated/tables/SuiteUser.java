@@ -10,7 +10,9 @@ import com.example.agentsuite.jooq.generated.tables.Conversation.ConversationPat
 import com.example.agentsuite.jooq.generated.tables.Message.MessagePath;
 import com.example.agentsuite.jooq.generated.tables.records.SuiteUserRecord;
 
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 
 import org.jooq.Condition;
 import org.jooq.Field;
@@ -65,6 +67,11 @@ public class SuiteUser extends TableImpl<SuiteUserRecord> {
      * The column <code>public.suite_user.uuid</code>.
      */
     public final TableField<SuiteUserRecord, String> UUID = createField(DSL.name("uuid"), SQLDataType.CLOB.nullable(false), this, "");
+
+    /**
+     * The column <code>public.suite_user.email</code>.
+     */
+    public final TableField<SuiteUserRecord, String> EMAIL = createField(DSL.name("email"), SQLDataType.CLOB, this, "");
 
     private SuiteUser(Name alias, Table<SuiteUserRecord> aliased) {
         this(alias, aliased, (Field<?>[]) null, null);
@@ -141,6 +148,11 @@ public class SuiteUser extends TableImpl<SuiteUserRecord> {
     @Override
     public UniqueKey<SuiteUserRecord> getPrimaryKey() {
         return Keys.PK_SUITE_USER;
+    }
+
+    @Override
+    public List<UniqueKey<SuiteUserRecord>> getUniqueKeys() {
+        return Arrays.asList(Keys.SUITE_USER_UUID_UNIQUE);
     }
 
     private transient ConversationPath _conversation;

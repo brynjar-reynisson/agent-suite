@@ -41,7 +41,7 @@ class ChatOrchestrationServiceTest {
         }).when(chatService).chatStream(any(), any(), any());
 
         List<ChatEvent> events = new ArrayList<>();
-        orchestration.chatStream(null, "deepseek-v4-pro", "Be helpful", "Hi", "",
+        orchestration.chatStream(null, 1L, "deepseek-v4-pro", "Be helpful", "Hi", "",
                 events::add, new Object[0]);
 
         verifyNoInteractions(conversationService);
@@ -67,7 +67,7 @@ class ChatOrchestrationServiceTest {
         }).when(chatService).chatStreamWithHistory(any(), any(), any());
 
         List<ChatEvent> events = new ArrayList<>();
-        orchestration.chatStream(externalId, "deepseek-v4-pro", "Be helpful", "Hello",
+        orchestration.chatStream(externalId, 1L, "deepseek-v4-pro", "Be helpful", "Hello",
                 "/projects", events::add, new Object[0]);
 
         verify(conversationService).createConversation(eq(1L), eq("Hello"), eq("/projects"), eq(externalId));
@@ -97,7 +97,7 @@ class ChatOrchestrationServiceTest {
             return null;
         }).when(chatService).chatStreamWithHistory(any(), any(), any());
 
-        orchestration.chatStream(externalId, "deepseek-v4-pro", "Be helpful", "Hello",
+        orchestration.chatStream(externalId, 1L, "deepseek-v4-pro", "Be helpful", "Hello",
                 "/projects", e -> {}, new Object[0]);
 
         @SuppressWarnings("unchecked")
@@ -116,6 +116,7 @@ class ChatOrchestrationServiceTest {
 
         ConversationRecord conv = mock(ConversationRecord.class);
         when(conv.getConversationId()).thenReturn(convDbId);
+        when(conv.getUserId()).thenReturn(1L);
         when(conversationService.findByExternalId(externalId)).thenReturn(Optional.of(conv));
         when(conversationService.findLastModelChange(convDbId)).thenReturn(Optional.of("deepseek-v4-pro"));
         when(conversationService.findLastSystemPrompt(convDbId)).thenReturn(Optional.of(""));
@@ -128,7 +129,7 @@ class ChatOrchestrationServiceTest {
             return null;
         }).when(chatService).chatStreamWithHistory(any(), any(), any());
 
-        orchestration.chatStream(externalId, "deepseek-v4-pro", "", "Follow up",
+        orchestration.chatStream(externalId, 1L, "deepseek-v4-pro", "", "Follow up",
                 "/projects", e -> {}, new Object[0]);
 
         verify(conversationService, never()).addMessage(eq(convDbId), anyLong(), eq("model_change"), any());
@@ -142,6 +143,7 @@ class ChatOrchestrationServiceTest {
 
         ConversationRecord conv = mock(ConversationRecord.class);
         when(conv.getConversationId()).thenReturn(convDbId);
+        when(conv.getUserId()).thenReturn(1L);
         when(conversationService.findByExternalId(externalId)).thenReturn(Optional.of(conv));
         when(conversationService.findLastModelChange(convDbId)).thenReturn(Optional.of("deepseek-v4-pro"));
         when(conversationService.findLastSystemPrompt(convDbId)).thenReturn(Optional.of(""));
@@ -154,7 +156,7 @@ class ChatOrchestrationServiceTest {
             return null;
         }).when(chatService).chatStreamWithHistory(any(), any(), any());
 
-        orchestration.chatStream(externalId, "sonnet-4.6", "", "Continue",
+        orchestration.chatStream(externalId, 1L, "sonnet-4.6", "", "Continue",
                 "/projects", e -> {}, new Object[0]);
 
         verify(conversationService).addMessage(eq(convDbId), eq(1L), eq("model_change"), eq("sonnet-4.6"));
@@ -167,6 +169,7 @@ class ChatOrchestrationServiceTest {
 
         ConversationRecord conv = mock(ConversationRecord.class);
         when(conv.getConversationId()).thenReturn(convDbId);
+        when(conv.getUserId()).thenReturn(1L);
         when(conversationService.findByExternalId(externalId)).thenReturn(Optional.of(conv));
         when(conversationService.findLastModelChange(convDbId)).thenReturn(Optional.of("deepseek-v4-pro"));
         when(conversationService.findLastSystemPrompt(convDbId)).thenReturn(Optional.of(""));
@@ -182,7 +185,7 @@ class ChatOrchestrationServiceTest {
             return null;
         }).when(chatService).chatStreamWithHistory(any(), any(), any());
 
-        orchestration.chatStream(externalId, "deepseek-v4-pro", "", "List files",
+        orchestration.chatStream(externalId, 1L, "deepseek-v4-pro", "", "List files",
                 "/projects", e -> {}, new Object[0]);
 
         verify(conversationService).addMessage(eq(convDbId), eq(1L), eq("tool_call"),

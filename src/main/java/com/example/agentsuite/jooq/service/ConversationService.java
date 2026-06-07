@@ -19,7 +19,6 @@ import java.util.Optional;
 @Service
 public class ConversationService {
 
-    private static final long GUEST_USER_ID = 1L;
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final ConversationRepository conversationRepository;
@@ -68,8 +67,8 @@ public class ConversationService {
     }
 
     @Transactional(readOnly = true)
-    public List<ConversationSummaryDto> getConversationSummaries() {
-        return conversationRepository.findByUserId(GUEST_USER_ID).stream()
+    public List<ConversationSummaryDto> getConversationSummaries(long userId) {
+        return conversationRepository.findByUserId(userId).stream()
                 .map(conv -> {
                     List<MessageRecord> msgs = messageRepository.findByConversationId(conv.getConversationId());
                     String initialModel = msgs.stream()
@@ -94,9 +93,13 @@ public class ConversationService {
     }
 
     @Transactional(readOnly = true)
-    public ConversationDetailDto getConversationDetail(String externalId) {
+    public ConversationDetailDto getConversationDetail(String externalId, long userId) {
         ConversationRecord conv = conversationRepository.findByExternalId(externalId)
                 .orElseThrow(() -> new NoSuchElementException("Conversation not found: " + externalId));
+
+        if (!conv.getUserId().equals(userId)) {
+            throw new NoSuchElementException("Conversation not found: " + externalId);
+        }
 
         List<MessageRecord> records = messageRepository.findByConversationId(conv.getConversationId());
 
@@ -108,7 +111,7 @@ public class ConversationService {
         for (MessageRecord r : records) {
             switch (r.getType()) {
                 case "model_change" -> {
-                    if (initialModel.isEmpty()) initialModel = r.getMessage();
+                    initialModel = r.getMessage();
                     if (!r.getMessage().isEmpty())
                         messages.add(new ConversationDetailDto.MessageDto("meta", "model:" + r.getMessage(), List.of()));
                 }
@@ -122,13 +125,13 @@ public class ConversationService {
                     messages.add(new ConversationDetailDto.MessageDto("user", r.getMessage(), List.of()));
                 }
                 case "tool_call"  -> toolCallBuffer.addAll(parseToolCalls(r.getMessage()));
-                case "tool_result" -> {} // not shown in UI
+                case "tool_result" -> {}
                 case "assistant" -> {
                     messages.add(new ConversationDetailDto.MessageDto(
                             "ai", r.getMessage(), List.copyOf(toolCallBuffer)));
                     toolCallBuffer.clear();
                 }
-                default -> {} // ignore unknown types
+                default -> {}
             }
         }
 

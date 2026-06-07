@@ -5,6 +5,8 @@ import {
 import { ConversationPanel } from './ConversationPanel';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useAuth, getAccessToken } from './auth';
+import { UserAvatar } from './UserAvatar';
 
 function formatToolArgs(args: string): string {
   try {
@@ -152,6 +154,7 @@ function App() {
   const lastSentPrompt = useRef<string | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { user, signIn, signOut } = useAuth();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -186,7 +189,8 @@ function App() {
   };
 
   const loadConversation = async (conv: ConversationSummary): Promise<void> => {
-    const detail = await getConversationDetail(conv.externalId);
+    const token = await getAccessToken();
+    const detail = await getConversationDetail(conv.externalId, token);
     conversationId.current = detail.externalId;
     lastSentModel.current = detail.initialModel;
     lastSentPrompt.current = detail.systemPrompt;
@@ -235,6 +239,7 @@ function App() {
     if (rootDirectory) toolSet.add('unix');
     const resolvedTools = [...toolSet].join(',');
     try {
+      const token = await getAccessToken();
       await chatStream(
         {
           message: message,
@@ -270,7 +275,8 @@ function App() {
               return msgs;
             });
           },
-        }
+        },
+        token,
       );
     } catch (error: any) {
       setMessages((prev) => {
@@ -326,6 +332,7 @@ function App() {
           >
             ☰
           </button>
+          <UserAvatar user={user} signIn={signIn} signOut={signOut} />
         </div>
       </header>
 

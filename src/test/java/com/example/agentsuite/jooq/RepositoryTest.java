@@ -41,13 +41,13 @@ class RepositoryTest {
     @BeforeEach
     void setUp() {
         dsl.insertInto(SUITE_USER).set(SUITE_USER.UUID, "someone@somewhere.com").execute();
-        guestId = suiteUserRepo.findGuest().orElseThrow().getUserId();
+        guestId = suiteUserRepo.findByUuid("Guest").orElseThrow().getUserId();
         someoneId = suiteUserRepo.findByUuid("someone@somewhere.com").orElseThrow().getUserId();
     }
 
     @Test
-    void findGuestReturnsGuestUser() {
-        assertThat(suiteUserRepo.findGuest())
+    void findByUuidGuestReturnsGuestUser() {
+        assertThat(suiteUserRepo.findByUuid("Guest"))
                 .isPresent()
                 .hasValueSatisfying(u -> assertThat(u.getUuid()).isEqualTo("Guest"));
     }

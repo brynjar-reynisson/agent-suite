@@ -46,6 +46,20 @@ public class SuiteUserRecord extends UpdatableRecordImpl<SuiteUserRecord> {
         return (String) get(1);
     }
 
+    /**
+     * Setter for <code>public.suite_user.email</code>.
+     */
+    public void setEmail(String value) {
+        set(2, value);
+    }
+
+    /**
+     * Getter for <code>public.suite_user.email</code>.
+     */
+    public String getEmail() {
+        return (String) get(2);
+    }
+
     // -------------------------------------------------------------------------
     // Primary key information
     // -------------------------------------------------------------------------
@@ -69,11 +83,12 @@ public class SuiteUserRecord extends UpdatableRecordImpl<SuiteUserRecord> {
     /**
      * Create a detached, initialised SuiteUserRecord
      */
-    public SuiteUserRecord(Long userId, String uuid) {
+    public SuiteUserRecord(Long userId, String uuid, String email) {
         super(SuiteUser.SUITE_USER);
 
         setUserId(userId);
         setUuid(uuid);
+        setEmail(email);
         resetChangedOnNotNull();
     }
 }

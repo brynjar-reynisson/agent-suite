@@ -3,6 +3,7 @@ package com.example.agentsuite.controller;
 import com.example.agentsuite.controller.ConversationDetailDto;
 import com.example.agentsuite.controller.ConversationSummaryDto;
 import com.example.agentsuite.jooq.service.ConversationService;
+import com.example.agentsuite.jooq.service.SuiteUserService;
 import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatOrchestrationService;
 import com.example.agentsuite.service.ModelRegistry;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
@@ -49,16 +51,19 @@ class AiControllerTest {
     @MockBean
     private ConversationService conversationService;
 
+    @MockBean
+    private SuiteUserService suiteUserService;
+
     @Test
     void chat_unknownModel_returnsError() throws Exception {
         // Model validation now happens inside ChatOrchestrationService; simulate it sending an error event.
         doAnswer(inv -> {
             @SuppressWarnings("unchecked")
-            Consumer<ChatEvent> consumer = inv.getArgument(5);
+            Consumer<ChatEvent> consumer = inv.getArgument(6);
             consumer.accept(new ChatEvent.Error("Unknown model: gpt-4o"));
             consumer.accept(new ChatEvent.Done());
             return null;
-        }).when(orchestrationService).chatStream(isNull(), eq("gpt-4o"), any(), any(), any(),
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), eq("gpt-4o"), any(), any(), any(),
                 any(Consumer.class), any());
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat").param("model", "gpt-4o"))
@@ -274,7 +279,7 @@ class AiControllerTest {
 
     @Test
     void conversations_returnsSummaryList() throws Exception {
-        when(conversationService.getConversationSummaries()).thenReturn(List.of(
+        when(conversationService.getConversationSummaries(anyLong())).thenReturn(List.of(
                 new ConversationSummaryDto("ext-abc", "Hello world", "2026-06-01T10:00:00Z",
                         "deepseek-v4-pro", "")
         ));
@@ -288,7 +293,7 @@ class AiControllerTest {
 
     @Test
     void conversations_emptyList_returnsEmptyArray() throws Exception {
-        when(conversationService.getConversationSummaries()).thenReturn(List.of());
+        when(conversationService.getConversationSummaries(anyLong())).thenReturn(List.of());
 
         mockMvc.perform(get("/ai/conversations"))
                 .andExpect(status().isOk())
@@ -297,7 +302,7 @@ class AiControllerTest {
 
     @Test
     void conversationDetail_knownId_returnsMessages() throws Exception {
-        when(conversationService.getConversationDetail("ext-abc")).thenReturn(
+        when(conversationService.getConversationDetail(eq("ext-abc"), anyLong())).thenReturn(
                 new ConversationDetailDto("ext-abc", "Hello", "2026-06-01T10:00:00Z",
                         "deepseek-v4-pro", "", "",
                         List.of(new ConversationDetailDto.MessageDto("user", "Hi there", List.of())))
@@ -312,7 +317,7 @@ class AiControllerTest {
 
     @Test
     void conversationDetail_unknownId_returns404() throws Exception {
-        when(conversationService.getConversationDetail("unknown"))
+        when(conversationService.getConversationDetail(eq("unknown"), anyLong()))
                 .thenThrow(new NoSuchElementException("not found"));
 
         mockMvc.perform(get("/ai/conversations/unknown"))
@@ -323,10 +328,10 @@ class AiControllerTest {
     void chat_withUnixToolsAndValidRootDirectory_noErrorEvent() throws Exception {
         doAnswer(inv -> {
             @SuppressWarnings("unchecked")
-            Consumer<ChatEvent> consumer = inv.getArgument(5);
+            Consumer<ChatEvent> consumer = inv.getArgument(6);
             consumer.accept(new ChatEvent.Done());
             return null;
-        }).when(orchestrationService).chatStream(isNull(), any(), any(), any(), any(),
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(),
                 any(Consumer.class), any());
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
