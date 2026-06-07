@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getConversations, type ConversationSummary } from './api';
+import { getAccessToken } from './auth';
 
 interface Props {
   isOpen: boolean;
@@ -23,7 +24,8 @@ export function ConversationPanel({ isOpen, onClose, onSelect }: Props) {
     setListLoading(true);
     setListError(null);
     setSelectError(null);
-    getConversations()
+    getAccessToken()
+      .then(token => getConversations(token))
       .then(setConversations)
       .catch(() => setListError('Failed to load conversations'))
       .finally(() => setListLoading(false));

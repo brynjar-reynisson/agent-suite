@@ -7,6 +7,11 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY as string,
 );
 
+export async function getAccessToken(): Promise<string | null> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token ?? null;
+}
+
 export function useAuth(): {
   user: User | null;
   loading: boolean;
