@@ -33,6 +33,7 @@ public class Keys {
     public static final UniqueKey<ConversationRecord> PK_CONVERSATION = Internal.createUniqueKey(Conversation.CONVERSATION, DSL.name("pk_conversation"), new TableField[] { Conversation.CONVERSATION.CONVERSATION_ID }, true);
     public static final UniqueKey<MessageRecord> PK_MESSAGE = Internal.createUniqueKey(Message.MESSAGE, DSL.name("pk_message"), new TableField[] { Message.MESSAGE.MESSAGE_ID }, true);
     public static final UniqueKey<SuiteUserRecord> PK_SUITE_USER = Internal.createUniqueKey(SuiteUser.SUITE_USER, DSL.name("pk_suite_user"), new TableField[] { SuiteUser.SUITE_USER.USER_ID }, true);
+    public static final UniqueKey<SuiteUserRecord> SUITE_USER_UUID_UNIQUE = Internal.createUniqueKey(SuiteUser.SUITE_USER, DSL.name("suite_user_uuid_unique"), new TableField[] { SuiteUser.SUITE_USER.UUID }, true);
 
     // -------------------------------------------------------------------------
     // FOREIGN KEY definitions
