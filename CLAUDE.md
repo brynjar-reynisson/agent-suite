@@ -53,7 +53,7 @@ Spring Boot 3.5 + LangChain4j 0.36.2 agent application. Java 21.
 - `UnixTools` — exposes `ls`, `cat`, and `grep` as AI-callable tools. Blocks `..` path traversal; gitignore-aware (filters git-ignored paths).
 - `MarkDownWriter` — exposes `newMarkDownFile` as an AI-callable tool; writes spec/plan markdown files under `docs/specs/` or `docs/plans/`. Registered as the `"md-writer"` tool group.
 - `WebTools` — exposes `webSearch` and `webFetch` as AI-callable tools. Registered as the `"web"` tool group (both tools are granted together). `webSearch` requires `BRAVE_SEARCH_API_KEY`; `webFetch` works without a key but validates URLs against SSRF (rejects private/loopback addresses and non-http(s) schemes).
-- `WebConfig` — CORS config allowing `localhost:5176`, `127.0.0.1:5176`, and `https://agent.breynisson.org`.
+- `WebConfig` — CORS config allowing `localhost:5176/5177`, `127.0.0.1:5176/5177`, `https://agent.breynisson.org`, and `https://dev.agent.breynisson.org`.
 - `LangChain4jConfig` — placeholder for advanced LangChain4j wiring (currently empty).
 
 **AI model config** (`application.properties`): default model `deepseek-v4-pro`, temperature `0.1`, max tokens `8192`, request/response logging enabled, LangChain4j debug logging on.
@@ -101,12 +101,13 @@ Supported model aliases:
 
 ## Frontend
 
-React 19 + Vite 8 + Tailwind CSS 4 chat UI located in `frontend/`. Dev server runs on port 5176 and proxies `/ai` requests to the backend.
+React 19 + Vite 8 + Tailwind CSS 4 chat UI located in `frontend/`. Dev server: `npm run dev` runs on port `5177` (dev, proxies to backend 8090); `npm run prod` runs on port `5176` (prod, proxies to backend 8091).
 
 ```bash
 cd frontend
 npm install
-npm run dev    # http://localhost:5176
+npm run dev    # http://localhost:5177 (dev environment)
+npm run prod   # http://localhost:5176 (prod environment, uses supabase.co)
 npm run build  # output to frontend/dist/
 ```
 
