@@ -3,6 +3,7 @@ package com.example.agentsuite.controller;
 import com.example.agentsuite.controller.ConversationDetailDto;
 import com.example.agentsuite.controller.ConversationSummaryDto;
 import com.example.agentsuite.jooq.service.ConversationService;
+import com.example.agentsuite.jooq.service.SuiteUserService;
 import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatOrchestrationService;
 import com.example.agentsuite.service.ModelRegistry;
@@ -48,6 +49,9 @@ class AiControllerTest {
 
     @MockBean
     private ConversationService conversationService;
+
+    @MockBean
+    private SuiteUserService suiteUserService;
 
     @Test
     void chat_unknownModel_returnsError() throws Exception {
