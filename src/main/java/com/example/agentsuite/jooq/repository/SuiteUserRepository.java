@@ -26,4 +26,13 @@ public class SuiteUserRepository {
     public Optional<SuiteUserRecord> findGuest() {
         return findByUuid("Guest");
     }
+
+    public long insert(String uuid, String email) {
+        return dsl.insertInto(SUITE_USER)
+                .set(SUITE_USER.UUID, uuid)
+                .set(SUITE_USER.EMAIL, email)
+                .returning(SUITE_USER.USER_ID)
+                .fetchSingle()
+                .getUserId();
+    }
 }
