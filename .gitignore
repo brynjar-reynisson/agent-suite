@@ -36,6 +36,9 @@ logs/
 .superpowers/
 
 # Restart scripts contain API keys
-restart.sh
-restart.cmd
-restart-agent-suite.ps1
+restart*
+
+# Frontend env files with real secrets (prod anon key, URLs)
+frontend/.env.production
+frontend/.env.*.local
+frontend/.env.local

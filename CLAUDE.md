@@ -5,11 +5,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Run
 
 ```bash
-# Build
-./mvnw clean package
+# Build (kills all four processes, rebuilds JAR)
+./build.sh        # or build.cmd on Windows
 
-# Run (requires DEEPSEEK_API_KEY env var)
-./mvnw spring-boot:run
+# Run dev environment (local Supabase, port 5177 frontend / 8090 backend)
+./mvnw spring-boot:run -Dspring-boot.run.arguments=--spring.profiles.active=dev
+cd frontend && npm run dev    # port 5177, proxies to 8090
+
+# Run prod environment (supabase.co, port 5176 frontend / 8091 backend)
+./mvnw spring-boot:run -Dspring-boot.run.arguments=--spring.profiles.active=prod
+cd frontend && npm run prod   # port 5176, proxies to 8091
 
 # Test
 ./mvnw test
@@ -18,7 +23,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./mvnw test -Dtest=AgentSuiteApplicationTests
 ```
 
-Server runs on `http://localhost:8090`. Requires `DEEPSEEK_API_KEY` environment variable. `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, and `BRAVE_SEARCH_API_KEY` are optional — those providers are skipped if their keys are absent.
+**Dev:** frontend `http://localhost:5177`, backend `http://localhost:8090` (local Supabase, no external OAuth).  
+**Prod:** frontend `http://localhost:5176` → `https://agent.breynisson.org`, backend `http://localhost:8091` (supabase.co, OAuth enabled).
+
+**Required env vars (dev):** `DEEPSEEK_API_KEY`, `SUPABASE_JWT_SECRET` (fallback to local Supabase default if unset).  
+**Required env vars (prod):** `DEEPSEEK_API_KEY`, `SUPABASE_PROD_DB_HOST`, `SUPABASE_PROD_DB_PASSWORD`, `SUPABASE_PROD_JWT_SECRET`, `SUPABASE_PROD_URL`, `SPRING_PROFILES_ACTIVE=prod`.  
+**Optional:** `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `MISTRAL_AI_API_KEY`, `BRAVE_SEARCH_API_KEY`.
+
+Auto-starts on login via `C:\Users\Lenovo\start-agent-suite-dev.ps1` and `start-agent-suite-prod.ps1` (Windows Startup folder shortcuts).
+
+## Database Migrations
+
+Migrations live in `supabase/migrations/`. Local dev migrations are applied automatically by the local Supabase instance.
+
+```bash
+# Apply all pending migrations to prod (supabase.co)
+npx supabase db push
+
+# First-time setup (one-off, persists credentials):
+npx supabase login                                          # opens browser
+npx supabase link --project-ref grgspbzqzjblsoxmmojy       # prompts for DB password
+```
 
 ## Architecture
 
@@ -41,7 +66,7 @@ Spring Boot 3.5 + LangChain4j 0.36.2 agent application. Java 21.
 - `UnixTools` — exposes `ls`, `cat`, and `grep` as AI-callable tools. Blocks `..` path traversal; gitignore-aware (filters git-ignored paths).
 - `MarkDownWriter` — exposes `newMarkDownFile` as an AI-callable tool; writes spec/plan markdown files under `docs/specs/` or `docs/plans/`. Registered as the `"md-writer"` tool group.
 - `WebTools` — exposes `webSearch` and `webFetch` as AI-callable tools. Registered as the `"web"` tool group (both tools are granted together). `webSearch` requires `BRAVE_SEARCH_API_KEY`; `webFetch` works without a key but validates URLs against SSRF (rejects private/loopback addresses and non-http(s) schemes).
-- `WebConfig` — CORS config allowing `localhost:5176`, `127.0.0.1:5176`, and `https://agent.breynisson.org`.
+- `WebConfig` — CORS config allowing `localhost:5176/5177`, `127.0.0.1:5176/5177`, `https://agent.breynisson.org`, and `https://dev.agent.breynisson.org`.
 - `LangChain4jConfig` — placeholder for advanced LangChain4j wiring (currently empty).
 
 **AI model config** (`application.properties`): default model `deepseek-v4-pro`, temperature `0.1`, max tokens `8192`, request/response logging enabled, LangChain4j debug logging on.
@@ -89,12 +114,14 @@ Supported model aliases:
 
 ## Frontend
 
-React 19 + Vite 8 + Tailwind CSS 4 chat UI located in `frontend/`. Dev server runs on port 5176 and proxies `/ai` requests to the backend.
+React 19 + Vite 8 + Tailwind CSS 4 chat UI located in `frontend/`. Dev server: `npm run dev` runs on port `5177` (dev, proxies to backend 8090); `npm run prod` runs on port `5176` (prod, proxies to backend 8091).
 
 ```bash
 cd frontend
+cp frontend/.env.example frontend/.env  # first-time setup: copy dev defaults
 npm install
-npm run dev    # http://localhost:5176
+npm run dev    # http://localhost:5177 (dev environment)
+npm run prod   # http://localhost:5176 (prod environment, uses supabase.co)
 npm run build  # output to frontend/dist/
 ```
 

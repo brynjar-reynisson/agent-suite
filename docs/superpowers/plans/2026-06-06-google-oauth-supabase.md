@@ -67,7 +67,7 @@ Expected output: Supabase starts cleanly with all services listed as `started`. 
 - [ ] **Step 5: Commit**
 
 ```bash
-git -C . add supabase/config.toml restart.sh frontend/.env
+git -C . add supabase/config.toml restart-dev.sh frontend/.env
 git -C . commit -m "feat: configure Supabase Google OAuth provider and local env vars"
 ```
 

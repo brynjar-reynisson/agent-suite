@@ -147,7 +147,7 @@ Expected: `BUILD SUCCESS`. Maven downloads the three JJWT jars.
 - [ ] **Step 5: Commit**
 
 ```bash
-git -C . add pom.xml src/main/resources/application.properties restart.sh
+git -C . add pom.xml src/main/resources/application.properties restart-dev.sh
 git -C . commit -m "feat: add JJWT dependency and Supabase JWT secret config"
 ```
 
