@@ -7,6 +7,8 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       port: isProd ? 5176 : 5177,
+      host: '0.0.0.0',
+      hmr: isProd ? false : true,
       allowedHosts: [isProd ? 'agent.breynisson.org' : 'dev.agent.breynisson.org'],
       proxy: {
         '/ai': {

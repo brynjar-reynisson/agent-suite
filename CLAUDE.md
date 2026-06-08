@@ -32,6 +32,19 @@ cd frontend && npm run prod   # port 5176, proxies to 8091
 
 Auto-starts on login via `C:\Users\Lenovo\start-agent-suite-dev.ps1` and `start-agent-suite-prod.ps1` (Windows Startup folder shortcuts).
 
+## Database Migrations
+
+Migrations live in `supabase/migrations/`. Local dev migrations are applied automatically by the local Supabase instance.
+
+```bash
+# Apply all pending migrations to prod (supabase.co)
+npx supabase db push
+
+# First-time setup (one-off, persists credentials):
+npx supabase login                                          # opens browser
+npx supabase link --project-ref grgspbzqzjblsoxmmojy       # prompts for DB password
+```
+
 ## Architecture
 
 Spring Boot 3.5 + LangChain4j 0.36.2 agent application. Java 21.
