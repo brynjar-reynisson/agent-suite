@@ -1,6 +1,7 @@
 package com.example.agentsuite.filter;
 
 import com.example.agentsuite.jooq.service.SuiteUserService;
+import com.example.agentsuite.service.AuthorizationService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.*;
@@ -30,10 +31,12 @@ import java.util.Base64;
 public class UserResolverFilter extends OncePerRequestFilter {
 
     public static final String ATTR_USER_ID = "currentUserId";
+    public static final String ATTR_IS_ADMIN = "currentUserIsAdmin";
     private static final long GUEST_USER_ID = 1L;
     private static final Logger log = LoggerFactory.getLogger(UserResolverFilter.class);
 
     private final SuiteUserService suiteUserService;
+    private final AuthorizationService authorizationService;
     private final String jwtSecret;
     private final String supabaseUrl;
     private final ObjectMapper objectMapper;
@@ -41,10 +44,12 @@ public class UserResolverFilter extends OncePerRequestFilter {
     private volatile PublicKey cachedPublicKey;
 
     public UserResolverFilter(SuiteUserService suiteUserService,
+                               AuthorizationService authorizationService,
                                @Value("${supabase.jwt-secret}") String jwtSecret,
                                @Value("${supabase.url}") String supabaseUrl,
                                ObjectMapper objectMapper) {
         this.suiteUserService = suiteUserService;
+        this.authorizationService = authorizationService;
         this.jwtSecret = jwtSecret;
         this.supabaseUrl = supabaseUrl;
         this.objectMapper = objectMapper;
@@ -54,7 +59,15 @@ public class UserResolverFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                      HttpServletResponse response,
                                      FilterChain chain) throws ServletException, IOException {
-        request.setAttribute(ATTR_USER_ID, resolveUserId(request));
+        long userId = resolveUserId(request);
+        request.setAttribute(ATTR_USER_ID, userId);
+        boolean isAdmin = false;
+        try {
+            isAdmin = authorizationService.isAdmin(userId);
+        } catch (Exception e) {
+            log.error("Failed to load roles for user {}, defaulting to non-admin: {}", userId, e.getMessage());
+        }
+        request.setAttribute(ATTR_IS_ADMIN, isAdmin);
         chain.doFilter(request, response);
     }
 

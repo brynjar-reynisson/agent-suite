@@ -1,6 +1,7 @@
 package com.example.agentsuite.filter;
 
 import com.example.agentsuite.jooq.service.SuiteUserService;
+import com.example.agentsuite.service.AuthorizationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -18,6 +19,7 @@ import java.security.spec.ECGenParameterSpec;
 import java.util.Date;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -27,12 +29,15 @@ class UserResolverFilterTest {
     private static final long GUEST_USER_ID = 1L;
 
     private SuiteUserService suiteUserService;
+    private AuthorizationService authorizationService;
     private UserResolverFilter filter;
 
     @BeforeEach
     void setUp() {
         suiteUserService = mock(SuiteUserService.class);
-        filter = new UserResolverFilter(suiteUserService, SECRET, "http://127.0.0.1:54321", new ObjectMapper());
+        authorizationService = mock(AuthorizationService.class);
+        when(authorizationService.isAdmin(anyLong())).thenReturn(false);
+        filter = new UserResolverFilter(suiteUserService, authorizationService, SECRET, "http://127.0.0.1:54321", new ObjectMapper());
     }
 
     private String makeHs256Jwt(String sub, String email, boolean expired) {
@@ -105,5 +110,32 @@ class UserResolverFilterTest {
         request.addHeader("Authorization", "Bearer " + makeHs256Jwt("uuid-abc", "user@example.com", true));
         filter.doFilterInternal(request, new MockHttpServletResponse(), new MockFilterChain());
         assertThat(request.getAttribute(UserResolverFilter.ATTR_USER_ID)).isEqualTo(GUEST_USER_ID);
+    }
+
+    @Test
+    void noAuthHeader_setsIsAdminFalse() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        filter.doFilterInternal(request, new MockHttpServletResponse(), new MockFilterChain());
+        assertThat(request.getAttribute(UserResolverFilter.ATTR_IS_ADMIN)).isEqualTo(false);
+    }
+
+    @Test
+    void validHs256Jwt_regularUser_setsIsAdminFalse() throws Exception {
+        when(suiteUserService.findOrCreate("uuid-abc", "user@example.com")).thenReturn(42L);
+        when(authorizationService.isAdmin(42L)).thenReturn(false);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer " + makeHs256Jwt("uuid-abc", "user@example.com", false));
+        filter.doFilterInternal(request, new MockHttpServletResponse(), new MockFilterChain());
+        assertThat(request.getAttribute(UserResolverFilter.ATTR_IS_ADMIN)).isEqualTo(false);
+    }
+
+    @Test
+    void validHs256Jwt_adminUser_setsIsAdminTrue() throws Exception {
+        when(suiteUserService.findOrCreate("admin-uuid", "admin@example.com")).thenReturn(99L);
+        when(authorizationService.isAdmin(99L)).thenReturn(true);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer " + makeHs256Jwt("admin-uuid", "admin@example.com", false));
+        filter.doFilterInternal(request, new MockHttpServletResponse(), new MockFilterChain());
+        assertThat(request.getAttribute(UserResolverFilter.ATTR_IS_ADMIN)).isEqualTo(true);
     }
 }
