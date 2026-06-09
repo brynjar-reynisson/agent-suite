@@ -16,9 +16,9 @@ public class UserRoleRepository {
     public boolean isAdmin(long userId) {
         return dsl.fetchExists(
                 dsl.selectOne()
-                        .from(DSL.table("user_role"))
-                        .where(DSL.field("user_id", Long.class).eq(userId)
-                                .and(DSL.field("role", String.class).eq("admin")))
+                        .from(DSL.table(DSL.name("user_role")))
+                        .where(DSL.field(DSL.name("user_id"), Long.class).eq(userId)
+                                .and(DSL.field(DSL.name("role"), String.class).eq("admin")))
         );
     }
 }

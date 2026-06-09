@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @JooqTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+// SuiteUserRepository is imported for test setup only (inserting users in @BeforeEach), not the class under test.
 @Import({SuiteUserRepository.class, UserRoleRepository.class})
 @TestPropertySource(properties = "spring.sql.init.mode=always")
 @Transactional
@@ -40,9 +41,9 @@ class UserRoleRepositoryTest {
 
     @Test
     void isAdmin_adminRoleRow_returnsTrue() {
-        dsl.insertInto(DSL.table("user_role"))
-                .set(DSL.field("user_id", Long.class), userId)
-                .set(DSL.field("role", String.class), "admin")
+        dsl.insertInto(DSL.table(DSL.name("user_role")))
+                .set(DSL.field(DSL.name("user_id"), Long.class), userId)
+                .set(DSL.field(DSL.name("role"), String.class), "admin")
                 .execute();
         assertThat(userRoleRepo.isAdmin(userId)).isTrue();
     }
@@ -50,9 +51,9 @@ class UserRoleRepositoryTest {
     @Test
     void isAdmin_otherUserIsAdmin_returnsFalse() {
         long otherId = suiteUserRepo.insert("other-uuid", "other@example.com");
-        dsl.insertInto(DSL.table("user_role"))
-                .set(DSL.field("user_id", Long.class), otherId)
-                .set(DSL.field("role", String.class), "admin")
+        dsl.insertInto(DSL.table(DSL.name("user_role")))
+                .set(DSL.field(DSL.name("user_id"), Long.class), otherId)
+                .set(DSL.field(DSL.name("role"), String.class), "admin")
                 .execute();
         assertThat(userRoleRepo.isAdmin(userId)).isFalse();
     }
