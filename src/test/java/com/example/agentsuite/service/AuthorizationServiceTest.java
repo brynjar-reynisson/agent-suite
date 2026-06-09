@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -49,5 +50,11 @@ class AuthorizationServiceTest {
     @Test
     void canUseToolGroup_mdWriter_adminUser_returnsTrue() {
         assertThat(authorizationService.canUseToolGroup("md-writer", true)).isTrue();
+    }
+
+    @Test
+    void canUseToolGroup_nullGroup_throwsNullPointerException() {
+        assertThatThrownBy(() -> authorizationService.canUseToolGroup(null, false))
+                .isInstanceOf(NullPointerException.class);
     }
 }
