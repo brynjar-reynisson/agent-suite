@@ -62,7 +62,7 @@ Spring Boot 3.5 + LangChain4j 0.36.2 agent application. Java 21.
 - `GoogleChatService` — extends `AbstractLangChain4jChatService` for Gemini models.
 - `UserResolverFilter` — extracts Supabase JWT, resolves to `user_id`, loads admin flag via `AuthorizationService` (skipped for guest), sets both as request attributes (`ATTR_USER_ID`, `ATTR_IS_ADMIN`). Falls back to guest `user_id = 1` and `isAdmin = false` on invalid/missing JWT.
 - `UserRoleRepository` — checks `user_role` table for admin membership. Manual jOOQ DSL (no codegen). Single method: `isAdmin(userId)`.
-- `AuthorizationService` — wraps `UserRoleRepository`. `isAdmin(userId)` delegates to repo. `canUseToolGroup(group, isAdmin)` currently returns true for all groups; future md-writer/mcp gating goes here.
+- `AuthorizationService` — wraps `UserRoleRepository`. `isAdmin(userId)` delegates to repo. `canUseToolGroup(group, isAdmin)` gates tool access by role: `md-writer` requires admin; all other groups are open to everyone.
 - `UnixTools` — exposes `ls`, `cat`, and `grep` as AI-callable tools. Blocks `..` path traversal; gitignore-aware (filters git-ignored paths).
 - `MarkDownWriter` — exposes `newMarkDownFile` as an AI-callable tool; writes spec/plan markdown files under `docs/specs/` or `docs/plans/`. Registered as the `"md-writer"` tool group.
 - `WebTools` — exposes `webSearch` and `webFetch` as AI-callable tools. Registered as the `"web"` tool group (both tools are granted together). `webSearch` requires `BRAVE_SEARCH_API_KEY`; `webFetch` works without a key but validates URLs against SSRF (rejects private/loopback addresses and non-http(s) schemes).
@@ -79,10 +79,14 @@ GET/POST /ai/chat
   ?prompt=<system prompt>          (default: empty)
   ?rootDirectory=<path>            (default: empty; must be in allowlist)
   ?model=<model alias>             (default: "deepseek-v4-pro")
+  ?tools=<comma-separated groups>  (default: empty; filtered by AuthorizationService before use)
   ?conversationId=<UUID>           (default: empty; blank = stateless mode)
 
 GET /ai/config/directories
   Returns JSON array of allowed rootDirectory values
+
+GET /ai/config/user
+  Returns { "isAdmin": boolean } for the authenticated user (guest → false)
 ```
 
 **Message types** stored in the `message` table:
@@ -126,7 +130,8 @@ npm run build  # output to frontend/dist/
 ```
 
 Key files:
-- `App.tsx` — chat UI: model selector, SSE streaming, tool call display, system prompt and root directory inputs. Generates a UUID per session (`crypto.randomUUID()` in a `useRef`) and passes it as `conversationId` on every request.
-- `api.ts` — `chatStream()`, `getDirectories()`, `execTool()` API client. `ChatRequest` includes optional `conversationId`.
+- `App.tsx` — chat UI: model selector, SSE streaming, tool call display, system prompt and root directory inputs. Generates a UUID per session (`crypto.randomUUID()` in a `useRef`) and passes it as `conversationId` on every request. Fetches `isAdmin` via `/ai/config/user` on load and auth change; filters `PROMPT_BANK` to hide `md-writer` prompts for non-admins; resets all conversation state on sign-out.
+- `ToolStrip.tsx` — icon-only strip rendered above the input showing active tool groups (`web` always present; `unix` when a root directory is set; `md-writer` for admins only). Click-to-toggle disabled state is visual scaffolding for future wiring.
+- `api.ts` — `chatStream()`, `getDirectories()`, `getUserConfig()`, `execTool()` API client. `ChatRequest` includes optional `conversationId` and `tools`.
 
 Production deployment: `https://agent.breynisson.org`
