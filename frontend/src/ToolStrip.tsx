@@ -24,7 +24,7 @@ export function ToolStrip({ availableTools, disabledTools, onToggle }: ToolStrip
             type="button"
             title={meta.tooltip}
             onClick={() => onToggle(tool)}
-            aria-label={`${meta.tooltip}${disabled ? ' (disabled)' : ''}`}
+            aria-label={`Toggle ${meta.tooltip}${disabled ? ' — currently disabled' : ''}`}
             aria-pressed={!disabled}
             className={`relative p-1.5 rounded-md text-base leading-none cursor-pointer transition-all ${
               disabled ? 'bg-gray-100 opacity-40 grayscale' : 'bg-blue-100'
