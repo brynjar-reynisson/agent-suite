@@ -3,6 +3,8 @@ package com.example.agentsuite.service;
 import com.example.agentsuite.jooq.repository.UserRoleRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 @Service
@@ -31,5 +33,12 @@ public class AuthorizationService {
             case "md-writer" -> isAdmin;
             default -> true;
         };
+    }
+
+    public List<String> grantedToolGroups(boolean isAdmin) {
+        List<String> groups = new ArrayList<>();
+        groups.add("web");
+        if (isAdmin) groups.add("md-writer");
+        return groups;
     }
 }

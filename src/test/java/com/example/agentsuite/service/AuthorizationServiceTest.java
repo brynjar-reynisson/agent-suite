@@ -57,4 +57,14 @@ class AuthorizationServiceTest {
         assertThatThrownBy(() -> authorizationService.canUseToolGroup(null, false))
                 .isInstanceOf(NullPointerException.class);
     }
+
+    @Test
+    void grantedToolGroups_nonAdmin_returnsWebOnly() {
+        assertThat(authorizationService.grantedToolGroups(false)).containsExactly("web");
+    }
+
+    @Test
+    void grantedToolGroups_admin_returnsWebAndMdWriter() {
+        assertThat(authorizationService.grantedToolGroups(true)).containsExactly("web", "md-writer");
+    }
 }
