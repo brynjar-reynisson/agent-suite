@@ -2,6 +2,7 @@ package com.example.agentsuite.controller;
 
 import com.example.agentsuite.filter.UserResolverFilter;
 import com.example.agentsuite.jooq.service.ConversationService;
+import com.example.agentsuite.service.AuthorizationService;
 import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatOrchestrationService;
 import com.example.agentsuite.service.ModelRegistry;
@@ -19,6 +20,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 @RestController
 @CrossOrigin(origins = {"http://localhost:5176", "http://127.0.0.1:5176", "https://agent.breynisson.org"})
@@ -44,16 +47,19 @@ public class AiController {
     private final ChatOrchestrationService orchestrationService;
     private final ModelRegistry modelRegistry;
     private final ConversationService conversationService;
+    private final AuthorizationService authorizationService;
     private final String braveApiKey;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     public AiController(ChatOrchestrationService orchestrationService,
                         ModelRegistry modelRegistry,
                         ConversationService conversationService,
+                        AuthorizationService authorizationService,
                         @Value("${brave.api-key}") String braveApiKey) {
         this.orchestrationService = orchestrationService;
         this.modelRegistry = modelRegistry;
         this.conversationService = conversationService;
+        this.authorizationService = authorizationService;
         this.braveApiKey = braveApiKey;
     }
 
@@ -160,7 +166,9 @@ public class AiController {
         log.info("Chat request - model: {}, conversationId: {}, rootDirectory: {}",
                 model, conversationId.isEmpty() ? "(none)" : conversationId, rootDirectory);
 
-        Object[] toolArray = buildToolInstances(tools, rootDirectory, braveApiKey);
+        boolean isAdmin = Boolean.TRUE.equals(request.getAttribute(UserResolverFilter.ATTR_IS_ADMIN));
+        String filteredTools = filterToolGroups(tools, isAdmin);
+        Object[] toolArray = buildToolInstances(filteredTools, rootDirectory, braveApiKey);
 
         CompletableFuture.runAsync(() -> {
             try {
@@ -205,6 +213,14 @@ public class AiController {
         } catch (IOException e) {
             emitter.completeWithError(e);
         }
+    }
+
+    private String filterToolGroups(String tools, boolean isAdmin) {
+        if (tools.isBlank()) return tools;
+        return Arrays.stream(tools.split(","))
+                .map(String::trim)
+                .filter(g -> authorizationService.canUseToolGroup(g, isAdmin))
+                .collect(Collectors.joining(","));
     }
 
     static Object[] buildToolInstances(String tools, String rootDirectory, String braveApiKey) {

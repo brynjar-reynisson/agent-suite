@@ -4,12 +4,14 @@ import com.example.agentsuite.controller.ConversationDetailDto;
 import com.example.agentsuite.controller.ConversationSummaryDto;
 import com.example.agentsuite.jooq.service.ConversationService;
 import com.example.agentsuite.jooq.service.SuiteUserService;
+import com.example.agentsuite.service.AuthorizationService;
 import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatOrchestrationService;
 import com.example.agentsuite.service.ModelRegistry;
 import com.example.agentsuite.tools.MarkDownWriter;
 import com.example.agentsuite.tools.UnixTools;
 import com.example.agentsuite.tools.WebTools;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,10 +25,14 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import java.util.function.Consumer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
@@ -53,6 +59,14 @@ class AiControllerTest {
 
     @MockBean
     private SuiteUserService suiteUserService;
+
+    @MockBean
+    private AuthorizationService authorizationService;
+
+    @BeforeEach
+    void setUpAuth() {
+        when(authorizationService.canUseToolGroup(anyString(), anyBoolean())).thenReturn(true);
+    }
 
     @Test
     void chat_unknownModel_returnsError() throws Exception {
@@ -344,5 +358,31 @@ class AiControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.CoreMatchers.not(
                         org.hamcrest.CoreMatchers.containsString("error"))));
+    }
+
+    @Test
+    void chat_toolGroupFilteredByAuth_filteredGroupNotPassedToOrchestration() throws Exception {
+        when(authorizationService.canUseToolGroup(eq("md-writer"), anyBoolean())).thenReturn(false);
+
+        doAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            Consumer<ChatEvent> consumer = inv.getArgument(6);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(),
+                any(Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
+                        .param("tools", "unix,md-writer")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
+
+        verify(orchestrationService).chatStream(
+                isNull(), anyLong(), any(), any(), any(), any(),
+                any(Consumer.class),
+                argThat(arr -> arr instanceof Object[] t && t.length == 1 && t[0] instanceof UnixTools));
     }
 }
