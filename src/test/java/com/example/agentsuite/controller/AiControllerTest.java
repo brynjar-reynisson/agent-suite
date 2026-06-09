@@ -385,4 +385,30 @@ class AiControllerTest {
                 any(Consumer.class),
                 argThat(arr -> arr instanceof Object[] t && t.length == 1 && t[0] instanceof UnixTools));
     }
+
+    @Test
+    void chat_allToolGroupsDenied_orchestrationReceivesEmptyToolArray() throws Exception {
+        when(authorizationService.canUseToolGroup(anyString(), anyBoolean())).thenReturn(false);
+
+        doAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            Consumer<ChatEvent> consumer = inv.getArgument(6);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(),
+                any(Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
+                        .param("tools", "unix,md-writer")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
+
+        verify(orchestrationService).chatStream(
+                isNull(), anyLong(), any(), any(), any(), any(),
+                any(Consumer.class),
+                argThat(arr -> arr instanceof Object[] t && t.length == 0));
+    }
 }

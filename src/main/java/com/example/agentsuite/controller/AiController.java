@@ -219,6 +219,7 @@ public class AiController {
         if (tools.isBlank()) return tools;
         return Arrays.stream(tools.split(","))
                 .map(String::trim)
+                .filter(g -> !g.isEmpty())
                 .filter(g -> authorizationService.canUseToolGroup(g, isAdmin))
                 .collect(Collectors.joining(","));
     }
