@@ -59,7 +59,7 @@ const PROMPT_BANK = [
   {
       name: 'Web-dweller',
       text: 'You have access to search and fetch information from the internet. Use it to find information on the web to answer user questions. Always use the tool when you need to find up-to-date information or access specific websites. If the user question can be answered with your existing knowledge, you can respond without using the tool.',
-      tools: ['web'],
+      tools: [],
   }
 ];
 
@@ -158,6 +158,7 @@ function App() {
     const matched = PROMPT_BANK.find(p => p.name === prompt);
     const toolSet = new Set(matched?.tools ?? []);
     if (rootDirectory) toolSet.add('unix');
+    toolSet.add('web');
     return [...toolSet];
   }, [prompt, rootDirectory]);
 
@@ -260,6 +261,7 @@ function App() {
     const resolvedPrompt = matched?.text ?? prompt;
     const toolSet = new Set(matched?.tools ?? []);
     if (rootDirectory) toolSet.add('unix');
+    toolSet.add('web');
     const resolvedTools = [...toolSet].join(',');
     try {
       const token = await getAccessToken();
