@@ -1,3 +1,11 @@
+# Secrets
+.mcp.json
+.env
+.env.production
+
+# Production release artifacts
+release/
+
 # IntelliJ Idea
 .idea/
 target/

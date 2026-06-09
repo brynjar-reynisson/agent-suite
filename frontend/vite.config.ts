@@ -1,18 +1,27 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig(({ mode }) => {
-  const isProd = mode === 'production'
+export default defineConfig(() => {
   return {
     plugins: [react()],
     server: {
-      port: isProd ? 5176 : 5177,
+      port: 5177,
       host: '0.0.0.0',
-      hmr: isProd ? false : true,
-      allowedHosts: [isProd ? 'agent.breynisson.org' : 'dev.agent.breynisson.org'],
+      allowedHosts: ['dev.agent.breynisson.org'],
       proxy: {
         '/ai': {
-          target: isProd ? 'http://localhost:8091' : 'http://localhost:8090',
+          target: 'http://localhost:8090',
+          changeOrigin: true,
+        },
+      },
+    },
+    preview: {
+      port: 5176,
+      host: '0.0.0.0',
+      allowedHosts: ['agent.breynisson.org'],
+      proxy: {
+        '/ai': {
+          target: 'http://localhost:8091',
           changeOrigin: true,
         },
       },
