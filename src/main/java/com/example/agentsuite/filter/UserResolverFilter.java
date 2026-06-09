@@ -62,10 +62,12 @@ public class UserResolverFilter extends OncePerRequestFilter {
         long userId = resolveUserId(request);
         request.setAttribute(ATTR_USER_ID, userId);
         boolean isAdmin = false;
-        try {
-            isAdmin = authorizationService.isAdmin(userId);
-        } catch (Exception e) {
-            log.error("Failed to load roles for user {}, defaulting to non-admin: {}", userId, e.getMessage());
+        if (userId != GUEST_USER_ID) {
+            try {
+                isAdmin = authorizationService.isAdmin(userId);
+            } catch (Exception e) {
+                log.error("Failed to load roles for user {}, defaulting to non-admin", userId, e);
+            }
         }
         request.setAttribute(ATTR_IS_ADMIN, isAdmin);
         chain.doFilter(request, response);

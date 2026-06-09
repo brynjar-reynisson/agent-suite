@@ -122,7 +122,6 @@ class UserResolverFilterTest {
     @Test
     void validHs256Jwt_regularUser_setsIsAdminFalse() throws Exception {
         when(suiteUserService.findOrCreate("uuid-abc", "user@example.com")).thenReturn(42L);
-        when(authorizationService.isAdmin(42L)).thenReturn(false);
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer " + makeHs256Jwt("uuid-abc", "user@example.com", false));
         filter.doFilterInternal(request, new MockHttpServletResponse(), new MockFilterChain());
@@ -137,5 +136,17 @@ class UserResolverFilterTest {
         request.addHeader("Authorization", "Bearer " + makeHs256Jwt("admin-uuid", "admin@example.com", false));
         filter.doFilterInternal(request, new MockHttpServletResponse(), new MockFilterChain());
         assertThat(request.getAttribute(UserResolverFilter.ATTR_IS_ADMIN)).isEqualTo(true);
+    }
+
+    @Test
+    void isAdminThrows_setsIsAdminFalseAndContinuesChain() throws Exception {
+        when(suiteUserService.findOrCreate("uuid-throws", "throws@example.com")).thenReturn(77L);
+        when(authorizationService.isAdmin(77L)).thenThrow(new RuntimeException("DB down"));
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockFilterChain chain = new MockFilterChain();
+        request.addHeader("Authorization", "Bearer " + makeHs256Jwt("uuid-throws", "throws@example.com", false));
+        filter.doFilterInternal(request, new MockHttpServletResponse(), chain);
+        assertThat(request.getAttribute(UserResolverFilter.ATTR_IS_ADMIN)).isEqualTo(false);
+        assertThat(chain.getRequest()).isNotNull();
     }
 }
