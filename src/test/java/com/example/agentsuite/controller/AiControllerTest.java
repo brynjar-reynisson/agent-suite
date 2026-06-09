@@ -30,9 +30,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -70,7 +68,8 @@ class AiControllerTest {
 
     @BeforeEach
     void setUpAuth() {
-        when(authorizationService.canUseToolGroup(anyString(), anyBoolean())).thenReturn(true);
+        when(authorizationService.grantedToolGroups(false)).thenReturn(List.of("web"));
+        when(authorizationService.grantedToolGroups(true)).thenReturn(List.of("web", "md-writer"));
     }
 
     @Test
@@ -366,9 +365,27 @@ class AiControllerTest {
     }
 
     @Test
-    void chat_toolGroupFilteredByAuth_filteredGroupNotPassedToOrchestration() throws Exception {
-        when(authorizationService.canUseToolGroup(eq("md-writer"), anyBoolean())).thenReturn(false);
+    void chat_guestUser_noToolsParam_onlyWebToolPassedToOrchestration() throws Exception {
+        doAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            Consumer<ChatEvent> consumer = inv.getArgument(6);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(),
+                any(Consumer.class), any());
 
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat"))
+                .andExpect(request().asyncStarted()).andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
+
+        verify(orchestrationService).chatStream(
+                isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
+                argThat(arr -> arr instanceof Object[] t && t.length == 1 && t[0] instanceof WebTools));
+    }
+
+    @Test
+    void chat_guestUserWithRootDirectory_webAndUnixPassedToOrchestration() throws Exception {
         doAnswer(inv -> {
             @SuppressWarnings("unchecked")
             Consumer<ChatEvent> consumer = inv.getArgument(6);
@@ -378,23 +395,19 @@ class AiControllerTest {
                 any(Consumer.class), any());
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
-                        .param("tools", "unix,md-writer")
                         .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
-                .andExpect(request().asyncStarted())
-                .andReturn();
+                .andExpect(request().asyncStarted()).andReturn();
 
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
 
         verify(orchestrationService).chatStream(
-                isNull(), anyLong(), any(), any(), any(), any(),
-                any(Consumer.class),
-                argThat(arr -> arr instanceof Object[] t && t.length == 1 && t[0] instanceof UnixTools));
+                isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
+                argThat(arr -> arr instanceof Object[] t && t.length == 2
+                        && t[0] instanceof WebTools && t[1] instanceof UnixTools));
     }
 
     @Test
-    void chat_allToolGroupsDenied_orchestrationReceivesEmptyToolArray() throws Exception {
-        when(authorizationService.canUseToolGroup(anyString(), anyBoolean())).thenReturn(false);
-
+    void chat_guestUserRequestsMdWriter_mdWriterStrippedServerSide() throws Exception {
         doAnswer(inv -> {
             @SuppressWarnings("unchecked")
             Consumer<ChatEvent> consumer = inv.getArgument(6);
@@ -404,21 +417,18 @@ class AiControllerTest {
                 any(Consumer.class), any());
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
-                        .param("tools", "unix,md-writer")
-                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
-                .andExpect(request().asyncStarted())
-                .andReturn();
+                        .param("tools", "web,md-writer"))
+                .andExpect(request().asyncStarted()).andReturn();
 
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
 
         verify(orchestrationService).chatStream(
-                isNull(), anyLong(), any(), any(), any(), any(),
-                any(Consumer.class),
-                argThat(arr -> arr instanceof Object[] t && t.length == 0));
+                isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
+                argThat(arr -> arr instanceof Object[] t && t.length == 1 && t[0] instanceof WebTools));
     }
 
     @Test
-    void chat_adminUser_canUseToolGroupReceivesIsAdminTrue() throws Exception {
+    void chat_adminUserWithRootDirectory_allThreeToolsPassedToOrchestration() throws Exception {
         when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
         when(authorizationService.isAdmin(42L)).thenReturn(true);
 
@@ -432,14 +442,44 @@ class AiControllerTest {
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
                         .header("Authorization", "Bearer " + makeAdminJwt("admin-sub", "admin@test.com"))
-                        .param("tools", "unix")
                         .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
-                .andExpect(request().asyncStarted())
-                .andReturn();
+                .andExpect(request().asyncStarted()).andReturn();
 
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
 
-        verify(authorizationService).canUseToolGroup(eq("unix"), eq(true));
+        verify(orchestrationService).chatStream(
+                isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
+                argThat(arr -> arr instanceof Object[] t && t.length == 3
+                        && t[0] instanceof WebTools
+                        && t[1] instanceof MarkDownWriter
+                        && t[2] instanceof UnixTools));
+    }
+
+    @Test
+    void chat_adminOptOutMdWriter_onlyWebAndUnixPassedToOrchestration() throws Exception {
+        when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
+        when(authorizationService.isAdmin(42L)).thenReturn(true);
+
+        doAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            Consumer<ChatEvent> consumer = inv.getArgument(6);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(),
+                any(Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
+                        .header("Authorization", "Bearer " + makeAdminJwt("admin-sub", "admin@test.com"))
+                        .param("tools", "web,unix")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(request().asyncStarted()).andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
+
+        verify(orchestrationService).chatStream(
+                isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
+                argThat(arr -> arr instanceof Object[] t && t.length == 2
+                        && t[0] instanceof WebTools && t[1] instanceof UnixTools));
     }
 
     private static String makeAdminJwt(String sub, String email) {

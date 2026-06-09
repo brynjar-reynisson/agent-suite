@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -173,8 +174,16 @@ public class AiController {
                 model, conversationId.isEmpty() ? "(none)" : conversationId, rootDirectory);
 
         boolean isAdmin = Boolean.TRUE.equals(request.getAttribute(UserResolverFilter.ATTR_IS_ADMIN));
-        String filteredTools = filterToolGroups(tools, isAdmin);
-        Object[] toolArray = buildToolInstances(filteredTools, rootDirectory, braveApiKey);
+        Set<String> authorized = new LinkedHashSet<>(authorizationService.grantedToolGroups(isAdmin));
+        if (!rootDirectory.isEmpty()) authorized.add("unix");
+        if (!tools.isBlank()) {
+            Set<String> requested = Arrays.stream(tools.split(","))
+                    .map(String::trim)
+                    .filter(g -> !g.isEmpty())
+                    .collect(Collectors.toSet());
+            authorized.retainAll(requested);
+        }
+        Object[] toolArray = buildToolInstances(String.join(",", authorized), rootDirectory, braveApiKey);
 
         CompletableFuture.runAsync(() -> {
             try {
@@ -219,15 +228,6 @@ public class AiController {
         } catch (IOException e) {
             emitter.completeWithError(e);
         }
-    }
-
-    private String filterToolGroups(String tools, boolean isAdmin) {
-        if (tools.isBlank()) return tools;
-        return Arrays.stream(tools.split(","))
-                .map(String::trim)
-                .filter(g -> !g.isEmpty())
-                .filter(g -> authorizationService.canUseToolGroup(g, isAdmin))
-                .collect(Collectors.joining(","));
     }
 
     static Object[] buildToolInstances(String tools, String rootDirectory, String braveApiKey) {
