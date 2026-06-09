@@ -163,9 +163,10 @@ function App() {
 
   const [disabledTools, setDisabledTools] = useState<Set<string>>(new Set());
 
+  const availableToolsKey = availableTools.join(',');
   useEffect(() => {
     setDisabledTools(new Set());
-  }, [availableTools]);
+  }, [availableToolsKey]);
 
   const toggleTool = (tool: string) =>
     setDisabledTools(prev => {
