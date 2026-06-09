@@ -27,14 +27,13 @@ export function ToolStrip({ availableTools, disabledTools, onToggle }: ToolStrip
             aria-label={`${meta.tooltip}${disabled ? ' (disabled)' : ''}`}
             aria-pressed={!disabled}
             className={`relative p-1.5 rounded-md text-base leading-none cursor-pointer transition-all ${
-              disabled ? 'bg-gray-100 opacity-40' : 'bg-blue-100'
+              disabled ? 'bg-gray-100 opacity-40 grayscale' : 'bg-blue-100'
             }`}
-            style={{ filter: disabled ? 'grayscale(1)' : undefined }}
           >
             {meta.icon}
             {disabled && (
               <span className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
-                <span style={{ display: 'block', width: '80%', height: '1.5px', background: '#6b7280', transform: 'rotate(-20deg)' }} />
+                <span className="block w-4/5 bg-gray-500" style={{ height: '1.5px', transform: 'rotate(-35deg)' }} />
               </span>
             )}
           </button>
