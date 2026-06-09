@@ -121,6 +121,12 @@ public class AiController {
         return ALLOWED_ROOT_DIRECTORIES;
     }
 
+    @GetMapping("/ai/config/user")
+    public Map<String, Object> getUserConfig(HttpServletRequest request) {
+        boolean isAdmin = Boolean.TRUE.equals(request.getAttribute(UserResolverFilter.ATTR_IS_ADMIN));
+        return Map.of("isAdmin", isAdmin);
+    }
+
     @GetMapping("/ai/conversations")
     public List<ConversationSummaryDto> getConversations(HttpServletRequest request) {
         long userId = currentUserId(request);

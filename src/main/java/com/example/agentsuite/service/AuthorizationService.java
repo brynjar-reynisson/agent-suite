@@ -19,17 +19,17 @@ public class AuthorizationService {
     }
 
     /**
-     * Returns true if the given tool group is accessible.
+     * Returns true if the given tool group is accessible for the given role.
      *
-     * @param group the tool group name (e.g. "unix", "web", "md-writer")
-     * @param isAdmin reserved for future gating — currently has no effect; all groups return true
+     * @param group   the tool group name (e.g. "unix", "web", "md-writer")
+     * @param isAdmin whether the requesting user holds the admin role
      * @return true if the tool group is accessible
      */
     public boolean canUseToolGroup(String group, boolean isAdmin) {
         Objects.requireNonNull(group, "group must not be null");
-
-        // All groups open to all users today.
-        // Future: case "md-writer" -> isAdmin; case "mcp" -> isAdmin; default -> true;
-        return true;
+        return switch (group) {
+            case "md-writer" -> isAdmin;
+            default -> true;
+        };
     }
 }

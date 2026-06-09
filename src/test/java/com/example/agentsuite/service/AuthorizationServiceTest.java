@@ -43,8 +43,8 @@ class AuthorizationServiceTest {
     }
 
     @Test
-    void canUseToolGroup_mdWriter_returnsTrue() {
-        assertThat(authorizationService.canUseToolGroup("md-writer", false)).isTrue();
+    void canUseToolGroup_mdWriter_nonAdmin_returnsFalse() {
+        assertThat(authorizationService.canUseToolGroup("md-writer", false)).isFalse();
     }
 
     @Test

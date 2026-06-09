@@ -77,6 +77,14 @@ export const getDirectories = async (): Promise<string[]> => {
   return response.json();
 };
 
+export const getUserConfig = async (token?: string | null): Promise<{ isAdmin: boolean }> => {
+  const response = await fetch(`${API_BASE_URL}/ai/config/user`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) throw new Error('Failed to fetch user config');
+  return response.json();
+};
+
 export const execTool = async (command: string, rootDirectory: string): Promise<string> => {
   const urlParams = new URLSearchParams({ command, rootDirectory });
   const response = await fetch(`${API_BASE_URL}/ai/tools?${urlParams.toString()}`);

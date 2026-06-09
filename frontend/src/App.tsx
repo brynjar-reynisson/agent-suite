@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  chatStream, execTool, getDirectories, getConversationDetail, type Message, type ConversationSummary,
+  chatStream, execTool, getDirectories, getConversationDetail, getUserConfig, type Message, type ConversationSummary,
 } from './api';
 import { ConversationPanel } from './ConversationPanel';
 import ReactMarkdown from 'react-markdown';
@@ -150,6 +150,7 @@ function App() {
   const [allowedDirectories, setAllowedDirectories] = useState<string[]>([]);
   const [model, setModel] = useState('deepseek-v4-pro');
   const [loading, setLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const conversationId = useRef<string>(crypto.randomUUID());
   const lastSentModel = useRef<string | null>(null);
   const lastSentPrompt = useRef<string | null>(null);
@@ -201,6 +202,19 @@ function App() {
     };
     fetchConfig();
   }, []);
+
+  useEffect(() => {
+    const fetchUserConfig = async () => {
+      try {
+        const token = await getAccessToken();
+        const config = await getUserConfig(token);
+        setIsAdmin(config.isAdmin);
+      } catch {
+        setIsAdmin(false);
+      }
+    };
+    fetchUserConfig();
+  }, [user]);
 
   const startNewConversation = () => {
     conversationId.current = crypto.randomUUID();
@@ -411,7 +425,11 @@ function App() {
       <div className="bg-white border-t p-4 flex gap-4 flex-wrap">
         <div className="flex-1 min-w-[300px]">
           <label className="block text-xs font-semibold text-gray-500 mb-1">SYSTEM PROMPT</label>
-          <PromptCombobox value={prompt} onChange={setPrompt} />
+          <PromptCombobox
+            value={prompt}
+            onChange={setPrompt}
+            prompts={isAdmin ? PROMPT_BANK : PROMPT_BANK.filter(p => !p.tools.includes('md-writer'))}
+          />
         </div>
         <div className="flex-1 min-w-[300px]">
           <label className="block text-xs font-semibold text-gray-500 mb-1">ROOT DIRECTORY</label>
