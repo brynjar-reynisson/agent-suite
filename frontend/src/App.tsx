@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   chatStream, execTool, getDirectories, getConversationDetail, type Message, type ConversationSummary,
 } from './api';
@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuth, getAccessToken } from './auth';
 import { UserAvatar } from './UserAvatar';
+import { ToolStrip } from './ToolStrip';
 
 function formatToolArgs(args: string): string {
   try {
@@ -152,6 +153,27 @@ function App() {
   const conversationId = useRef<string>(crypto.randomUUID());
   const lastSentModel = useRef<string | null>(null);
   const lastSentPrompt = useRef<string | null>(null);
+
+  const availableTools = useMemo(() => {
+    const matched = PROMPT_BANK.find(p => p.name === prompt);
+    const toolSet = new Set(matched?.tools ?? []);
+    if (rootDirectory) toolSet.add('unix');
+    return [...toolSet];
+  }, [prompt, rootDirectory]);
+
+  const [disabledTools, setDisabledTools] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setDisabledTools(new Set());
+  }, [availableTools]);
+
+  const toggleTool = (tool: string) =>
+    setDisabledTools(prev => {
+      const next = new Set(prev);
+      next.has(tool) ? next.delete(tool) : next.add(tool);
+      return next;
+    });
+
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const { user, signIn, signOut } = useAuth();
@@ -403,6 +425,12 @@ function App() {
           </select>
         </div>
       </div>
+
+      <ToolStrip
+        availableTools={availableTools}
+        disabledTools={disabledTools}
+        onToggle={toggleTool}
+      />
 
       {/* Input Area */}
       <footer className="bg-white border-t p-4 flex gap-2">
