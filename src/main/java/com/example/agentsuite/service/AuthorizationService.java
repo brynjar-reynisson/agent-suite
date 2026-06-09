@@ -3,7 +3,6 @@ package com.example.agentsuite.service;
 import com.example.agentsuite.jooq.repository.UserRoleRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -35,10 +34,13 @@ public class AuthorizationService {
         };
     }
 
+    /**
+     * Returns the tool groups the given role is entitled to use.
+     *
+     * @param isAdmin whether the requesting user holds the admin role
+     * @return list of granted tool group names
+     */
     public List<String> grantedToolGroups(boolean isAdmin) {
-        List<String> groups = new ArrayList<>();
-        groups.add("web");
-        if (isAdmin) groups.add("md-writer");
-        return groups;
+        return isAdmin ? List.of("web", "md-writer") : List.of("web");
     }
 }
