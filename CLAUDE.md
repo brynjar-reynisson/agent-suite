@@ -5,16 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Run
 
 ```bash
-# Build (kills all four processes, rebuilds JAR)
+# Build JAR, restart dev servers (kills dev ports only, leaves prod untouched)
 ./build.sh        # or build.cmd on Windows
 
-# Run dev environment (local Supabase, port 5177 frontend / 8090 backend)
-./mvnw spring-boot:run -Dspring-boot.run.arguments=--spring.profiles.active=dev
-cd frontend && npm run dev    # port 5177, proxies to 8090
-
-# Run prod environment (supabase.co, port 5176 frontend / 8091 backend)
-./mvnw spring-boot:run -Dspring-boot.run.arguments=--spring.profiles.active=prod
-cd frontend && npm run prod   # port 5176, proxies to 8091
+# Promote to prod (freeze JAR to release/, build frontend dist/, restart prod servers)
+./promote.sh      # or promote.cmd on Windows
 
 # Test
 ./mvnw test
@@ -25,6 +20,8 @@ cd frontend && npm run prod   # port 5176, proxies to 8091
 
 **Dev:** frontend `http://localhost:5177`, backend `http://localhost:8090` (local Supabase, no external OAuth).  
 **Prod:** frontend `http://localhost:5176` → `https://agent.breynisson.org`, backend `http://localhost:8091` (supabase.co, OAuth enabled).
+
+**Prod artifacts:** JAR is frozen in `release/` (copied from `target/` by `promote.*`); frontend is a static build in `frontend/dist/` served by `vite preview`. Neither updates unless you explicitly promote.
 
 **Required env vars (dev):** `DEEPSEEK_API_KEY`, `SUPABASE_JWT_SECRET` (fallback to local Supabase default if unset).  
 **Required env vars (prod):** `DEEPSEEK_API_KEY`, `SUPABASE_PROD_DB_HOST`, `SUPABASE_PROD_DB_PASSWORD`, `SUPABASE_PROD_JWT_SECRET`, `SUPABASE_PROD_URL`, `SPRING_PROFILES_ACTIVE=prod`.  
