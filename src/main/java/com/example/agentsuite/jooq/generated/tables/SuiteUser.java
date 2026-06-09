@@ -8,6 +8,7 @@ import com.example.agentsuite.jooq.generated.Keys;
 import com.example.agentsuite.jooq.generated.Public;
 import com.example.agentsuite.jooq.generated.tables.Conversation.ConversationPath;
 import com.example.agentsuite.jooq.generated.tables.Message.MessagePath;
+import com.example.agentsuite.jooq.generated.tables.UserRole.UserRolePath;
 import com.example.agentsuite.jooq.generated.tables.records.SuiteUserRecord;
 
 import java.util.Arrays;
@@ -179,6 +180,19 @@ public class SuiteUser extends TableImpl<SuiteUserRecord> {
             _message = new MessagePath(this, null, Keys.MESSAGE__FK_MESSAGE_USER.getInverseKey());
 
         return _message;
+    }
+
+    private transient UserRolePath _userRole;
+
+    /**
+     * Get the implicit to-many join path to the <code>public.user_role</code>
+     * table
+     */
+    public UserRolePath userRole() {
+        if (_userRole == null)
+            _userRole = new UserRolePath(this, null, Keys.USER_ROLE__USER_ROLE_USER_ID_FKEY.getInverseKey());
+
+        return _userRole;
     }
 
     @Override

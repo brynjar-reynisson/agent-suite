@@ -7,6 +7,7 @@ package com.example.agentsuite.jooq.generated;
 import com.example.agentsuite.jooq.generated.tables.Conversation;
 import com.example.agentsuite.jooq.generated.tables.Message;
 import com.example.agentsuite.jooq.generated.tables.SuiteUser;
+import com.example.agentsuite.jooq.generated.tables.UserRole;
 
 
 /**
@@ -29,4 +30,9 @@ public class Tables {
      * The table <code>public.suite_user</code>.
      */
     public static final SuiteUser SUITE_USER = SuiteUser.SUITE_USER;
+
+    /**
+     * The table <code>public.user_role</code>.
+     */
+    public static final UserRole USER_ROLE = UserRole.USER_ROLE;
 }

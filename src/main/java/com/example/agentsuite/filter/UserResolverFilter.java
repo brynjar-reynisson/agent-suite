@@ -32,6 +32,9 @@ public class UserResolverFilter extends OncePerRequestFilter {
 
     public static final String ATTR_USER_ID = "currentUserId";
     public static final String ATTR_IS_ADMIN = "currentUserIsAdmin";
+    // Assumes the Guest row always holds user_id = 1 (first insert, sequence starts at 1).
+    // The isAdmin DB lookup is skipped for this id — if the row is ever deleted and re-inserted
+    // it would receive a new id and this guard would need updating.
     private static final long GUEST_USER_ID = 1L;
     private static final Logger log = LoggerFactory.getLogger(UserResolverFilter.class);
 

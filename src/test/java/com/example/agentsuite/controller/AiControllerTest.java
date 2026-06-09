@@ -21,6 +21,11 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
 import java.util.List;
 import java.util.NoSuchElementException;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -410,5 +415,41 @@ class AiControllerTest {
                 isNull(), anyLong(), any(), any(), any(), any(),
                 any(Consumer.class),
                 argThat(arr -> arr instanceof Object[] t && t.length == 0));
+    }
+
+    @Test
+    void chat_adminUser_canUseToolGroupReceivesIsAdminTrue() throws Exception {
+        when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
+        when(authorizationService.isAdmin(42L)).thenReturn(true);
+
+        doAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            Consumer<ChatEvent> consumer = inv.getArgument(6);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(),
+                any(Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
+                        .header("Authorization", "Bearer " + makeAdminJwt("admin-sub", "admin@test.com"))
+                        .param("tools", "unix")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
+
+        verify(authorizationService).canUseToolGroup(eq("unix"), eq(true));
+    }
+
+    private static String makeAdminJwt(String sub, String email) {
+        return Jwts.builder()
+                .setSubject(sub)
+                .claim("email", email)
+                .setExpiration(new Date(System.currentTimeMillis() + 3_600_000))
+                .signWith(Keys.hmacShaKeyFor(
+                        "test-secret-padded-to-at-least-32-characters".getBytes(StandardCharsets.UTF_8)),
+                        SignatureAlgorithm.HS256)
+                .compact();
     }
 }

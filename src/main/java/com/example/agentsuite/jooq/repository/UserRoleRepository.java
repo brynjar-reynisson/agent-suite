@@ -1,8 +1,9 @@
 package com.example.agentsuite.jooq.repository;
 
 import org.jooq.DSLContext;
-import org.jooq.impl.DSL;
 import org.springframework.stereotype.Repository;
+
+import static com.example.agentsuite.jooq.generated.Tables.USER_ROLE;
 
 @Repository
 public class UserRoleRepository {
@@ -16,9 +17,9 @@ public class UserRoleRepository {
     public boolean isAdmin(long userId) {
         return dsl.fetchExists(
                 dsl.selectOne()
-                        .from(DSL.table(DSL.name("user_role")))
-                        .where(DSL.field(DSL.name("user_id"), Long.class).eq(userId)
-                                .and(DSL.field(DSL.name("role"), String.class).eq("admin")))
+                        .from(USER_ROLE)
+                        .where(USER_ROLE.USER_ID.eq(userId)
+                                .and(USER_ROLE.ROLE.eq("admin")))
         );
     }
 }

@@ -7,6 +7,7 @@ package com.example.agentsuite.jooq.generated;
 import com.example.agentsuite.jooq.generated.tables.Conversation;
 import com.example.agentsuite.jooq.generated.tables.Message;
 import com.example.agentsuite.jooq.generated.tables.SuiteUser;
+import com.example.agentsuite.jooq.generated.tables.UserRole;
 
 import java.util.Arrays;
 import java.util.List;
@@ -45,6 +46,11 @@ public class Public extends SchemaImpl {
     public final SuiteUser SUITE_USER = SuiteUser.SUITE_USER;
 
     /**
+     * The table <code>public.user_role</code>.
+     */
+    public final UserRole USER_ROLE = UserRole.USER_ROLE;
+
+    /**
      * No further instances allowed
      */
     private Public() {
@@ -62,7 +68,8 @@ public class Public extends SchemaImpl {
         return Arrays.asList(
             Conversation.CONVERSATION,
             Message.MESSAGE,
-            SuiteUser.SUITE_USER
+            SuiteUser.SUITE_USER,
+            UserRole.USER_ROLE
         );
     }
 }

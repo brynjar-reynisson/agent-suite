@@ -7,9 +7,11 @@ package com.example.agentsuite.jooq.generated;
 import com.example.agentsuite.jooq.generated.tables.Conversation;
 import com.example.agentsuite.jooq.generated.tables.Message;
 import com.example.agentsuite.jooq.generated.tables.SuiteUser;
+import com.example.agentsuite.jooq.generated.tables.UserRole;
 import com.example.agentsuite.jooq.generated.tables.records.ConversationRecord;
 import com.example.agentsuite.jooq.generated.tables.records.MessageRecord;
 import com.example.agentsuite.jooq.generated.tables.records.SuiteUserRecord;
+import com.example.agentsuite.jooq.generated.tables.records.UserRoleRecord;
 
 import org.jooq.ForeignKey;
 import org.jooq.TableField;
@@ -34,6 +36,7 @@ public class Keys {
     public static final UniqueKey<MessageRecord> PK_MESSAGE = Internal.createUniqueKey(Message.MESSAGE, DSL.name("pk_message"), new TableField[] { Message.MESSAGE.MESSAGE_ID }, true);
     public static final UniqueKey<SuiteUserRecord> PK_SUITE_USER = Internal.createUniqueKey(SuiteUser.SUITE_USER, DSL.name("pk_suite_user"), new TableField[] { SuiteUser.SUITE_USER.USER_ID }, true);
     public static final UniqueKey<SuiteUserRecord> SUITE_USER_UUID_UNIQUE = Internal.createUniqueKey(SuiteUser.SUITE_USER, DSL.name("suite_user_uuid_unique"), new TableField[] { SuiteUser.SUITE_USER.UUID }, true);
+    public static final UniqueKey<UserRoleRecord> PK_USER_ROLE = Internal.createUniqueKey(UserRole.USER_ROLE, DSL.name("pk_user_role"), new TableField[] { UserRole.USER_ROLE.USER_ID, UserRole.USER_ROLE.ROLE }, true);
 
     // -------------------------------------------------------------------------
     // FOREIGN KEY definitions
@@ -42,4 +45,5 @@ public class Keys {
     public static final ForeignKey<ConversationRecord, SuiteUserRecord> CONVERSATION__FK_CONVERSATION_USER = Internal.createForeignKey(Conversation.CONVERSATION, DSL.name("fk_conversation_user"), new TableField[] { Conversation.CONVERSATION.USER_ID }, Keys.PK_SUITE_USER, new TableField[] { SuiteUser.SUITE_USER.USER_ID }, true);
     public static final ForeignKey<MessageRecord, ConversationRecord> MESSAGE__FK_MESSAGE_CONVERSATION = Internal.createForeignKey(Message.MESSAGE, DSL.name("fk_message_conversation"), new TableField[] { Message.MESSAGE.CONVERSATION_ID }, Keys.PK_CONVERSATION, new TableField[] { Conversation.CONVERSATION.CONVERSATION_ID }, true);
     public static final ForeignKey<MessageRecord, SuiteUserRecord> MESSAGE__FK_MESSAGE_USER = Internal.createForeignKey(Message.MESSAGE, DSL.name("fk_message_user"), new TableField[] { Message.MESSAGE.USER_ID }, Keys.PK_SUITE_USER, new TableField[] { SuiteUser.SUITE_USER.USER_ID }, true);
+    public static final ForeignKey<UserRoleRecord, SuiteUserRecord> USER_ROLE__USER_ROLE_USER_ID_FKEY = Internal.createForeignKey(UserRole.USER_ROLE, DSL.name("user_role_user_id_fkey"), new TableField[] { UserRole.USER_ROLE.USER_ID }, Keys.PK_SUITE_USER, new TableField[] { SuiteUser.SUITE_USER.USER_ID }, true);
 }

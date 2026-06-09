@@ -135,7 +135,7 @@
                         <database>
                             <name>org.jooq.meta.postgres.PostgresDatabase</name>
                             <inputSchema>public</inputSchema>
-                            <includes>suite_user|conversation|message</includes>
+                            <includes>suite_user|conversation|message|user_role</includes>
                         </database>
                         <target>
                             <packageName>com.example.agentsuite.jooq.generated</packageName>
