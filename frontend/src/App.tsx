@@ -204,6 +204,17 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!user) {
+      conversationId.current = crypto.randomUUID();
+      lastSentModel.current = null;
+      lastSentPrompt.current = null;
+      setMessages([]);
+      setModel('deepseek-v4-pro');
+      setPrompt('');
+      setRootDirectory('');
+      setIsAdmin(false);
+      return;
+    }
     const fetchUserConfig = async () => {
       try {
         const token = await getAccessToken();
