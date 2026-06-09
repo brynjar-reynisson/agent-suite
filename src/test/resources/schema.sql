@@ -34,3 +34,11 @@ CREATE TABLE IF NOT EXISTS "message" (
     CONSTRAINT "fk_message_user" FOREIGN KEY ("user_id") REFERENCES "suite_user" ("user_id"),
     CONSTRAINT "fk_message_conversation" FOREIGN KEY ("conversation_id") REFERENCES "conversation" ("conversation_id")
 );
+
+CREATE TABLE IF NOT EXISTS user_role (
+    user_id    BIGINT NOT NULL,
+    role       TEXT   NOT NULL,
+    granted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    CONSTRAINT pk_user_role PRIMARY KEY (user_id, role),
+    CONSTRAINT fk_user_role_user FOREIGN KEY (user_id) REFERENCES "suite_user" ("user_id") ON DELETE CASCADE
+);
