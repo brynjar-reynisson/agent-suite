@@ -225,7 +225,7 @@ function App() {
         setGrantedToolGroups(config.grantedToolGroups);
       } catch {
         setIsAdmin(false);
-        setGrantedToolGroups([]);
+        setGrantedToolGroups(['web']);
       }
     };
     fetchUserConfig();

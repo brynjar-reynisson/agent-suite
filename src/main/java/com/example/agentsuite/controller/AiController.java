@@ -250,6 +250,7 @@ public class AiController {
                     if (!rootDirectory.isEmpty()) instances.add(new UnixTools(rootDirectory));
                 }
                 case "md-writer" -> {
+                    // MarkDownWriter requires a rootDirectory anchor; entitlement is still granted, tool just can't be instantiated without it
                     if (!rootDirectory.isEmpty()) instances.add(new MarkDownWriter(rootDirectory));
                 }
                 case "web" -> instances.add(new WebTools(braveApiKey));
