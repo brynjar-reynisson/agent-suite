@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 import { useAuth, getAccessToken } from './auth';
 import { UserAvatar } from './UserAvatar';
 import { ToolStrip } from './ToolStrip';
+import { ToolInfoModal } from './ToolInfoModal';
 
 function formatToolArgs(args: string): string {
   try {
@@ -153,6 +154,7 @@ function App() {
   const [model, setModel] = useState('deepseek-v4-pro');
   const [loading, setLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isToolInfoOpen, setIsToolInfoOpen] = useState(false);
   const [grantedToolGroups, setGrantedToolGroups] = useState<string[]>([]);
   const conversationId = useRef<string>(crypto.randomUUID());
   const lastSentModel = useRef<string | null>(null);
@@ -467,7 +469,15 @@ function App() {
         availableTools={availableTools}
         disabledTools={disabledTools}
         onToggle={toggleTool}
+        onInfo={() => setIsToolInfoOpen(true)}
       />
+      {isToolInfoOpen && (
+        <ToolInfoModal
+          availableTools={availableTools}
+          disabledTools={disabledTools}
+          onClose={() => setIsToolInfoOpen(false)}
+        />
+      )}
 
       {/* Input Area */}
       <footer className="bg-white border-t p-4 flex gap-2">
