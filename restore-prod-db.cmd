@@ -25,6 +25,7 @@ goto parse
 :parsed
 
 if "%FILE%"=="" (
+    rem dir /o:n sorts by name; prod-data-<yyyyMMdd-HHmmss>.sql naming makes name order = chronological order
     for /f "delims=" %%f in ('dir /b /o:n backups\prod-data-*.sql 2^>nul') do set FILE=backups\%%f
 )
 if "%FILE%"=="" (
@@ -63,7 +64,7 @@ if errorlevel 1 (
 echo About to WIPE prod app data (suite_user, conversation, message, user_role)
 echo and restore from: %FILE%
 if "%YES%"=="1" goto confirmed
-set /p ANSWER=Type 'yes' to continue:
+set /p ANSWER=Type 'yes' to continue: 
 if /i not "%ANSWER%"=="yes" (
     echo Aborted.
     exit /b 1
@@ -73,7 +74,7 @@ if /i not "%ANSWER%"=="yes" (
 set PGPASSWORD=%SUPABASE_PROD_DB_PASSWORD%
 
 (
-    echo TRUNCATE suite_user, conversation, message, user_role RESTART IDENTITY CASCADE;
+    echo TRUNCATE public.suite_user, public.conversation, public.message, public.user_role RESTART IDENTITY CASCADE;
     type "%FILE%"
 ) | docker run --rm -i -e PGPASSWORD postgres:17 psql -h "%SUPABASE_PROD_DB_HOST%" -U "%SUPABASE_PROD_DB_USERNAME%" -d postgres --single-transaction -v ON_ERROR_STOP=1 -q
 if errorlevel 1 (

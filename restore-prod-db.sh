@@ -56,17 +56,15 @@ if [ "$yes" -ne 1 ]; then
   fi
 fi
 
-export PGPASSWORD="$SUPABASE_PROD_DB_PASSWORD"
-
 {
-  echo "TRUNCATE suite_user, conversation, message, user_role RESTART IDENTITY CASCADE;"
+  echo "TRUNCATE public.suite_user, public.conversation, public.message, public.user_role RESTART IDENTITY CASCADE;"
   cat "$file"
-} | docker run --rm -i -e PGPASSWORD postgres:17 \
+} | PGPASSWORD="$SUPABASE_PROD_DB_PASSWORD" docker run --rm -i -e PGPASSWORD postgres:17 \
       psql -h "$SUPABASE_PROD_DB_HOST" -U "$SUPABASE_PROD_DB_USERNAME" -d postgres \
            --single-transaction -v ON_ERROR_STOP=1 -q
 
 echo "Restore complete. Row counts:"
-docker run --rm -e PGPASSWORD postgres:17 \
+PGPASSWORD="$SUPABASE_PROD_DB_PASSWORD" docker run --rm -e PGPASSWORD postgres:17 \
   psql -h "$SUPABASE_PROD_DB_HOST" -U "$SUPABASE_PROD_DB_USERNAME" -d postgres -t -A -c \
   "SELECT 'suite_user:   ' || count(*) FROM suite_user
    UNION ALL SELECT 'conversation: ' || count(*) FROM conversation
