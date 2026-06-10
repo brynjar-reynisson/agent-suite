@@ -428,6 +428,27 @@ class AiControllerTest {
     }
 
     @Test
+    void chat_guestUserRequestsUnixOnly_noRootDirectory_emptyToolArray() throws Exception {
+        doAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            Consumer<ChatEvent> consumer = inv.getArgument(6);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(),
+                any(Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
+                        .param("tools", "unix"))
+                .andExpect(request().asyncStarted()).andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
+
+        verify(orchestrationService).chatStream(
+                isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
+                argThat(arr -> arr instanceof Object[] t && t.length == 0));
+    }
+
+    @Test
     void chat_adminUserWithRootDirectory_allThreeToolsPassedToOrchestration() throws Exception {
         when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
         when(authorizationService.isAdmin(42L)).thenReturn(true);
@@ -447,6 +468,7 @@ class AiControllerTest {
 
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
 
+        // order is a deliberate contract: grantedToolGroups order (web, md-writer) then unix last
         verify(orchestrationService).chatStream(
                 isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
                 argThat(arr -> arr instanceof Object[] t && t.length == 3

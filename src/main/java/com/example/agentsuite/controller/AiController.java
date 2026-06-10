@@ -175,6 +175,7 @@ public class AiController {
 
         boolean isAdmin = Boolean.TRUE.equals(request.getAttribute(UserResolverFilter.ATTR_IS_ADMIN));
         Set<String> authorized = new LinkedHashSet<>(authorizationService.grantedToolGroups(isAdmin));
+        // unix is context-dependent (requires rootDirectory), never in grantedToolGroups
         if (!rootDirectory.isEmpty()) authorized.add("unix");
         if (!tools.isBlank()) {
             Set<String> requested = Arrays.stream(tools.split(","))
