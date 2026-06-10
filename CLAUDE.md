@@ -49,7 +49,7 @@ Spring Boot 3.5 + LangChain4j 0.36.2 agent application. Java 21.
 **Request flow:** `AiController` → `ChatOrchestrationService` → provider `ChatService` → LLM API → `UnixTools` (tool calls) → repeat until no tool calls remain → stream SSE events to client. If `conversationId` is provided, `ChatOrchestrationService` persists all messages to the database and replays conversation history to the LLM on subsequent turns.
 
 **Key layers:**
-- `AiController` — `/ai/chat` (GET/POST, streaming SSE) and `/ai/tools` (GET, returns allowed root directories). Validates `rootDirectory` against a hardcoded allowlist. Filters requested tool groups through `AuthorizationService.canUseToolGroup()` before building tool instances. Accepts optional `conversationId` param (UUID); blank = stateless mode.
+- `AiController` — `/ai/chat` (GET/POST, streaming SSE) and `/ai/tools` (GET, returns allowed root directories). Validates `rootDirectory` against a hardcoded allowlist. Builds an authoritative tool set from `AuthorizationService.grantedToolGroups()` plus context (`unix`/`md-writer` require a non-empty `rootDirectory`), then intersects with the frontend's `tools` param as an opt-out hint. Accepts optional `conversationId` param (UUID); blank = stateless mode.
 - `ChatOrchestrationService` — sits between `AiController` and `ChatService`. Owns conversation lifecycle: creates conversation on first turn, loads history from DB, persists messages (system_prompt, user, assistant, tool_call, tool_result, model_change).
 - `ChatService` — interface defining `chat()`, `chatStream()`, and `chatStreamWithHistory()` for all providers.
 - `HistoryMessage` — sealed DTO interface bridging DB message rows to LLM message types (SystemPrompt, User, Assistant, ToolCall, ToolResult).
@@ -62,7 +62,7 @@ Spring Boot 3.5 + LangChain4j 0.36.2 agent application. Java 21.
 - `GoogleChatService` — extends `AbstractLangChain4jChatService` for Gemini models.
 - `UserResolverFilter` — extracts Supabase JWT, resolves to `user_id`, loads admin flag via `AuthorizationService` (skipped for guest), sets both as request attributes (`ATTR_USER_ID`, `ATTR_IS_ADMIN`). Falls back to guest `user_id = 1` and `isAdmin = false` on invalid/missing JWT.
 - `UserRoleRepository` — checks `user_role` table for admin membership. Manual jOOQ DSL (no codegen). Single method: `isAdmin(userId)`.
-- `AuthorizationService` — wraps `UserRoleRepository`. `isAdmin(userId)` delegates to repo. `canUseToolGroup(group, isAdmin)` gates tool access by role: `md-writer` requires admin; all other groups are open to everyone.
+- `AuthorizationService` — wraps `UserRoleRepository`. `isAdmin(userId)` delegates to repo. `grantedToolGroups(isAdmin)` returns the role-based tool entitlement set: `["web"]` for all users, plus `["md-writer"]` for admins. `unix` and `md-writer` are additionally gated on a non-empty `rootDirectory` in `AiController`.
 - `UnixTools` — exposes `ls`, `cat`, and `grep` as AI-callable tools. Blocks `..` path traversal; gitignore-aware (filters git-ignored paths).
 - `MarkDownWriter` — exposes `newMarkDownFile` as an AI-callable tool; writes spec/plan markdown files under `docs/specs/` or `docs/plans/`. Registered as the `"md-writer"` tool group.
 - `WebTools` — exposes `webSearch` and `webFetch` as AI-callable tools. Registered as the `"web"` tool group (both tools are granted together). `webSearch` requires `BRAVE_SEARCH_API_KEY`; `webFetch` works without a key but validates URLs against SSRF (rejects private/loopback addresses and non-http(s) schemes).
@@ -79,14 +79,14 @@ GET/POST /ai/chat
   ?prompt=<system prompt>          (default: empty)
   ?rootDirectory=<path>            (default: empty; must be in allowlist)
   ?model=<model alias>             (default: "deepseek-v4-pro")
-  ?tools=<comma-separated groups>  (default: empty; filtered by AuthorizationService before use)
+  ?tools=<comma-separated groups>  (default: empty; opt-out hint only — backend computes authoritative set from role + context)
   ?conversationId=<UUID>           (default: empty; blank = stateless mode)
 
 GET /ai/config/directories
   Returns JSON array of allowed rootDirectory values
 
 GET /ai/config/user
-  Returns { "isAdmin": boolean } for the authenticated user (guest → false)
+  Returns { "isAdmin": boolean, "grantedToolGroups": string[] } for the authenticated user (guest → false, ["web"])
 ```
 
 **Message types** stored in the `message` table:
@@ -130,8 +130,8 @@ npm run build  # output to frontend/dist/
 ```
 
 Key files:
-- `App.tsx` — chat UI: model selector, SSE streaming, tool call display, system prompt and root directory inputs. Generates a UUID per session (`crypto.randomUUID()` in a `useRef`) and passes it as `conversationId` on every request. Fetches `isAdmin` via `/ai/config/user` on load and auth change; filters `PROMPT_BANK` to hide `md-writer` prompts for non-admins; resets all conversation state on sign-out.
-- `ToolStrip.tsx` — icon-only strip rendered above the input showing active tool groups (`web` always present; `unix` when a root directory is set; `md-writer` for admins only). Click-to-toggle disabled state is visual scaffolding for future wiring.
-- `api.ts` — `chatStream()`, `getDirectories()`, `getUserConfig()`, `execTool()` API client. `ChatRequest` includes optional `conversationId` and `tools`.
+- `App.tsx` — chat UI: model selector, SSE streaming, tool call display, system prompt and root directory inputs. Generates a UUID per session (`crypto.randomUUID()` in a `useRef`) and passes it as `conversationId` on every request. Fetches `UserConfig` (isAdmin + grantedToolGroups) via `/ai/config/user` on load and auth change; derives `availableTools` from `grantedToolGroups` plus `unix`/`md-writer` context gates; filters `PROMPT_BANK` to hide `md-writer` prompts for non-admins; resets all conversation state on sign-out.
+- `ToolStrip.tsx` — icon-only strip rendered above the input showing active tool groups driven by `availableTools` from the server. Click-to-toggle disabled state; disabled tools are excluded from the `tools` param sent to the backend (opt-out).
+- `api.ts` — `chatStream()`, `getDirectories()`, `getUserConfig()` (returns `UserConfig`), `execTool()` API client. `ChatRequest` includes optional `conversationId` and `tools`.
 
 Production deployment: `https://agent.breynisson.org`
