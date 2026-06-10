@@ -8,9 +8,10 @@ interface ToolStripProps {
   availableTools: string[];
   disabledTools: Set<string>;
   onToggle: (tool: string) => void;
+  onInfo: () => void;
 }
 
-export function ToolStrip({ availableTools, disabledTools, onToggle }: ToolStripProps) {
+export function ToolStrip({ availableTools, disabledTools, onToggle, onInfo }: ToolStripProps) {
   if (availableTools.length === 0) return null;
 
   return (
@@ -39,6 +40,15 @@ export function ToolStrip({ availableTools, disabledTools, onToggle }: ToolStrip
           </button>
         );
       })}
+      <button
+        type="button"
+        onClick={onInfo}
+        aria-label="Show tool info"
+        title="Tool info"
+        className="p-1.5 rounded-md text-base leading-none cursor-pointer bg-blue-50"
+      >
+        ℹ️
+      </button>
     </div>
   );
 }
