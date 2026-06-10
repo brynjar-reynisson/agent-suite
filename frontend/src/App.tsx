@@ -160,7 +160,11 @@ function App() {
 
   const availableTools = useMemo(() => {
     const toolSet = new Set(grantedToolGroups);
-    if (rootDirectory) toolSet.add('unix');
+    if (rootDirectory) {
+      toolSet.add('unix');
+    } else {
+      toolSet.delete('md-writer'); // md-writer requires a project root, same as unix
+    }
     return [...toolSet];
   }, [grantedToolGroups, rootDirectory]);
 
