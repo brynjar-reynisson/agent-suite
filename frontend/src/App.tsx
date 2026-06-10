@@ -221,6 +221,7 @@ function App() {
       setRootDirectory('');
       setIsAdmin(false);
       setGrantedToolGroups([]);
+      setIsToolInfoOpen(false);
       // No return — always fetch config so guests also receive grantedToolGroups (web is always granted)
     }
     const fetchUserConfig = async () => {
