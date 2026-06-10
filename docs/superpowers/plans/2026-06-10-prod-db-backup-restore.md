@@ -148,6 +148,8 @@ git commit -m "feat: add prod DB backup scripts (cmd + sh)"
 - Create: `restore-prod-db.sh`
 - Create: `restore-prod-db.cmd`
 
+> **Post-review hardening (commit 2e8c08e):** the committed scripts differ from the listings below in two ways — the `TRUNCATE` table names are schema-qualified (`public.suite_user`, …) and the `.sh` passes `PGPASSWORD` inline per `docker run` instead of `export`. The committed files are authoritative.
+
 - [ ] **Step 1: Write `restore-prod-db.sh`**
 
 ```sh
