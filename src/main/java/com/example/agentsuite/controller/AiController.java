@@ -125,7 +125,10 @@ public class AiController {
     @GetMapping("/ai/config/user")
     public Map<String, Object> getUserConfig(HttpServletRequest request) {
         boolean isAdmin = Boolean.TRUE.equals(request.getAttribute(UserResolverFilter.ATTR_IS_ADMIN));
-        return Map.of("isAdmin", isAdmin);
+        return Map.of(
+                "isAdmin", isAdmin,
+                "grantedToolGroups", authorizationService.grantedToolGroups(isAdmin)
+        );
     }
 
     @GetMapping("/ai/conversations")

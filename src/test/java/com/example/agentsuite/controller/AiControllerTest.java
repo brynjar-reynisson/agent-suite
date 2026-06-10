@@ -478,6 +478,16 @@ class AiControllerTest {
     }
 
     @Test
+    void userConfig_guestUser_returnsIsAdminFalseWithWebTool() throws Exception {
+        mockMvc.perform(get("/ai/config/user"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isAdmin").value(false))
+                .andExpect(jsonPath("$.grantedToolGroups").isArray())
+                .andExpect(jsonPath("$.grantedToolGroups[0]").value("web"))
+                .andExpect(jsonPath("$.grantedToolGroups.length()").value(1));
+    }
+
+    @Test
     void chat_adminOptOutMdWriter_onlyWebAndUnixPassedToOrchestration() throws Exception {
         when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
         when(authorizationService.isAdmin(42L)).thenReturn(true);
