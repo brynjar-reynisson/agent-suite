@@ -68,7 +68,7 @@ ts=$(date +%Y%m%d-%H%M%S)
 out="backups/prod-data-$ts.sql"
 
 echo "Dumping prod data to $out ..."
-if ! npx --yes supabase db dump --linked --data-only --use-copy -f "$out"; then
+if ! npx --yes supabase db dump --linked --data-only --use-copy --schema public -f "$out"; then
   echo "ERROR: supabase db dump failed" >&2
   rm -f "$out"
   exit 1
@@ -102,7 +102,7 @@ for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss
 set OUT=backups\prod-data-%TS%.sql
 
 echo Dumping prod data to %OUT% ...
-call npx --yes supabase db dump --linked --data-only --use-copy -f "%OUT%"
+call npx --yes supabase db dump --linked --data-only --use-copy --schema public -f "%OUT%"
 if errorlevel 1 (
     echo ERROR: supabase db dump failed
     if exist "%OUT%" del /q "%OUT%"

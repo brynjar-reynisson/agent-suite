@@ -16,7 +16,7 @@ Scriptable backup and restore of the prod database (supabase.co project `grgspbz
 
 ## Tooling
 
-- **Backup:** `npx supabase db dump --linked --data-only --use-copy`. The project is already linked; the CLI runs a version-matched `pg_dump` in Docker and emits Supabase-aware data dumps: the header disables FK trigger enforcement via `session_replication_role = replica`, so table load order cannot break the restore, and sequence `setval`s are included.
+- **Backup:** `npx supabase db dump --linked --data-only --use-copy --schema public`. The project is already linked; the CLI runs a version-matched `pg_dump` in Docker and emits Supabase-aware data dumps: the header disables FK trigger enforcement via `session_replication_role = replica`, so table load order cannot break the restore, and sequence `setval`s are included. The explicit `--schema public` is required — without it the CLI also dumps `auth` schema data, which collides with existing `auth.users` rows on restore (discovered during live testing).
 - **Restore:** `psql` from a `postgres:17` Docker container (no local PostgreSQL client tools exist on this machine; Docker Desktop is required and already used by local Supabase). Password is passed via `PGPASSWORD` into the container environment, never on the command line.
 
 Alternatives considered: hand-rolled Docker `pg_dump` for backup (rejected: data-only dumps don't guarantee FK-safe ordering and `--disable-triggers` needs superuser, which Supabase doesn't grant); Supabase platform backups/PITR (rejected: not file-granular or scriptable as requested).
@@ -52,7 +52,7 @@ if "%_DOTENV_WRAPPED%"=="" (
 ## Backup script behavior
 
 1. `cd` to repo root; create `backups/` if missing.
-2. Run `npx supabase db dump --linked --data-only --use-copy -f backups/prod-data-<yyyyMMdd-HHmmss>.sql`.
+2. Run `npx supabase db dump --linked --data-only --use-copy --schema public -f backups/prod-data-<yyyyMMdd-HHmmss>.sql`.
 3. Fail (non-zero exit, clear message) if the dump command fails or the output file is missing/empty.
 4. Print the resulting file path and size.
 
