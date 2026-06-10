@@ -30,6 +30,8 @@ const MODELS = [
   'mistral-small',
 ];
 
+// tools field is used only for prompt-visibility filtering (hide md-writer prompts for non-admins)
+// tool availability for chat requests is driven by the server (grantedToolGroups)
 const PROMPT_BANK = [
   {
     name: 'Code-request classifier',
@@ -211,6 +213,8 @@ function App() {
       setModel('deepseek-v4-pro');
       setPrompt('');
       setRootDirectory('');
+      setIsAdmin(false);
+      setGrantedToolGroups([]);
       // No return — always fetch config so guests also receive grantedToolGroups (web is always granted)
     }
     const fetchUserConfig = async () => {
