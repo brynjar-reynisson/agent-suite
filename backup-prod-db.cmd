@@ -14,7 +14,7 @@ for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss
 set OUT=backups\prod-data-%TS%.sql
 
 echo Dumping prod data to %OUT% ...
-call npx --yes supabase db dump --linked --data-only --use-copy -f "%OUT%"
+call npx --yes supabase db dump --linked --data-only --use-copy --schema public -f "%OUT%"
 if errorlevel 1 (
     echo ERROR: supabase db dump failed
     if exist "%OUT%" del /q "%OUT%"

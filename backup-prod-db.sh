@@ -12,7 +12,7 @@ ts=$(date +%Y%m%d-%H%M%S)
 out="backups/prod-data-$ts.sql"
 
 echo "Dumping prod data to $out ..."
-if ! npx --yes supabase db dump --linked --data-only --use-copy -f "$out"; then
+if ! npx --yes supabase db dump --linked --data-only --use-copy --schema public -f "$out"; then
   echo "ERROR: supabase db dump failed" >&2
   rm -f "$out"
   exit 1
