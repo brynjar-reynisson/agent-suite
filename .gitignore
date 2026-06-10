@@ -6,6 +6,9 @@
 # Production release artifacts
 release/
 
+# Prod database backups (contain user conversation data)
+backups/
+
 # IntelliJ Idea
 .idea/
 target/
