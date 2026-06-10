@@ -151,17 +151,16 @@ function App() {
   const [model, setModel] = useState('deepseek-v4-pro');
   const [loading, setLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [grantedToolGroups, setGrantedToolGroups] = useState<string[]>([]);
   const conversationId = useRef<string>(crypto.randomUUID());
   const lastSentModel = useRef<string | null>(null);
   const lastSentPrompt = useRef<string | null>(null);
 
   const availableTools = useMemo(() => {
-    const matched = PROMPT_BANK.find(p => p.name === prompt);
-    const toolSet = new Set(matched?.tools ?? []);
+    const toolSet = new Set(grantedToolGroups);
     if (rootDirectory) toolSet.add('unix');
-    toolSet.add('web');
     return [...toolSet];
-  }, [prompt, rootDirectory]);
+  }, [grantedToolGroups, rootDirectory]);
 
   const [disabledTools, setDisabledTools] = useState<Set<string>>(new Set());
 
@@ -212,16 +211,17 @@ function App() {
       setModel('deepseek-v4-pro');
       setPrompt('');
       setRootDirectory('');
-      setIsAdmin(false);
-      return;
+      // No return — always fetch config so guests also receive grantedToolGroups (web is always granted)
     }
     const fetchUserConfig = async () => {
       try {
         const token = await getAccessToken();
         const config = await getUserConfig(token);
         setIsAdmin(config.isAdmin);
+        setGrantedToolGroups(config.grantedToolGroups);
       } catch {
         setIsAdmin(false);
+        setGrantedToolGroups([]);
       }
     };
     fetchUserConfig();
@@ -284,10 +284,7 @@ function App() {
 
     const matched = PROMPT_BANK.find(p => p.name === prompt);
     const resolvedPrompt = matched?.text ?? prompt;
-    const toolSet = new Set(matched?.tools ?? []);
-    if (rootDirectory) toolSet.add('unix');
-    toolSet.add('web');
-    const resolvedTools = [...toolSet].join(',');
+    const enabledTools = availableTools.filter(t => !disabledTools.has(t)).join(',');
     try {
       const token = await getAccessToken();
       await chatStream(
@@ -296,7 +293,7 @@ function App() {
           prompt: resolvedPrompt,
           rootDirectory: rootDirectory,
           model: model,
-          tools: resolvedTools,
+          tools: enabledTools,
           conversationId: conversationId.current,
         },
         {

@@ -77,7 +77,7 @@ export const getDirectories = async (): Promise<string[]> => {
   return response.json();
 };
 
-export const getUserConfig = async (token?: string | null): Promise<{ isAdmin: boolean }> => {
+export const getUserConfig = async (token?: string | null): Promise<{ isAdmin: boolean; grantedToolGroups: string[] }> => {
   const response = await fetch(`${API_BASE_URL}/ai/config/user`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
