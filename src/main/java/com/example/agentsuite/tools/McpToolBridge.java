@@ -48,8 +48,8 @@ public class McpToolBridge implements DynamicToolProvider {
     @Autowired
     public McpToolBridge(
             @Value("${mcp.config.path:.mcp.json}") String configPath,
-            @Value("${mcp.call-timeout-seconds:30}") int callTimeoutSeconds) {
-        this(configPath, callTimeoutSeconds, McpToolBridge::defaultCreateClient);
+            @Value("${mcp.call-timeout-seconds:90}") int callTimeoutSeconds) {
+        this(configPath, callTimeoutSeconds, (name, cfg) -> defaultCreateClient(name, cfg, callTimeoutSeconds));
     }
 
     McpToolBridge(String configPath, int callTimeoutSeconds,
@@ -165,7 +165,7 @@ public class McpToolBridge implements DynamicToolProvider {
         }
     }
 
-    private static McpSyncClient defaultCreateClient(String serverName, McpServerConfig config) {
+    private static McpSyncClient defaultCreateClient(String serverName, McpServerConfig config, int requestTimeoutSeconds) {
         McpSyncClient client;
         if (config.command() != null) {
             String command = config.command();
@@ -188,13 +188,13 @@ public class McpToolBridge implements DynamicToolProvider {
                     .env(env)
                     .build();
             client = McpClient.sync(new StdioClientTransport(params, McpJsonDefaults.getMapper()))
-                    .requestTimeout(Duration.ofSeconds(30))
-                    .initializationTimeout(Duration.ofSeconds(60))
+                    .requestTimeout(Duration.ofSeconds(requestTimeoutSeconds))
+                    .initializationTimeout(Duration.ofSeconds(requestTimeoutSeconds * 2L))
                     .build();
         } else if (config.url() != null) {
             client = McpClient.sync(HttpClientStreamableHttpTransport.builder(config.url()).build())
-                    .requestTimeout(Duration.ofSeconds(30))
-                    .initializationTimeout(Duration.ofSeconds(60))
+                    .requestTimeout(Duration.ofSeconds(requestTimeoutSeconds))
+                    .initializationTimeout(Duration.ofSeconds(requestTimeoutSeconds * 2L))
                     .build();
         } else {
             throw new IllegalArgumentException("MCP server config must have either 'command' or 'url'");
