@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -165,9 +166,24 @@ public class McpToolBridge implements DynamicToolProvider {
     private static McpSyncClient defaultCreateClient(String serverName, McpServerConfig config) {
         McpSyncClient client;
         if (config.command() != null) {
-            ServerParameters params = ServerParameters.builder(config.command())
-                    .args(config.args() != null ? config.args() : List.of())
-                    .env(config.env() != null ? config.env() : Map.of())
+            String command = config.command();
+            List<String> args = config.args() != null ? new ArrayList<>(config.args()) : new ArrayList<>();
+
+            // On Windows, ProcessBuilder cannot execute .cmd scripts (e.g. npx.cmd) directly.
+            // Wrapping with cmd.exe /c lets the shell resolve the script and inherit PATH.
+            if (System.getProperty("os.name", "").toLowerCase().contains("win")) {
+                args.add(0, command);
+                args.add(0, "/c");
+                command = "cmd.exe";
+            }
+
+            // Inherit parent-process env (PATH etc.) then overlay any server-specific overrides.
+            Map<String, String> env = new HashMap<>(System.getenv());
+            if (config.env() != null) env.putAll(config.env());
+
+            ServerParameters params = ServerParameters.builder(command)
+                    .args(args)
+                    .env(env)
                     .build();
             client = McpClient.sync(new StdioClientTransport(params, McpJsonDefaults.getMapper()))
                     .requestTimeout(Duration.ofSeconds(30))
