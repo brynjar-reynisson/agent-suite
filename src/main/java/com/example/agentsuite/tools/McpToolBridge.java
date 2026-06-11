@@ -64,6 +64,13 @@ public class McpToolBridge implements DynamicToolProvider {
         return toolEntries;
     }
 
+    public List<String> toolNames() {
+        return toolEntries.keySet().stream()
+                .map(ToolSpecification::name)
+                .sorted()
+                .collect(Collectors.toList());
+    }
+
     @PreDestroy
     void close() {
         for (McpSyncClient client : clients) {

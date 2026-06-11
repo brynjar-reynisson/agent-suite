@@ -135,6 +135,11 @@ public class AiController {
         );
     }
 
+    @GetMapping("/ai/config/mcp-tools")
+    public List<String> getMcpTools() {
+        return mcpToolBridge.toolNames();
+    }
+
     @GetMapping("/ai/conversations")
     public List<ConversationSummaryDto> getConversations(HttpServletRequest request) {
         long userId = currentUserId(request);
