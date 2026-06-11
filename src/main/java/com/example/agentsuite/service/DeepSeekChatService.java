@@ -21,7 +21,7 @@ public class DeepSeekChatService extends AbstractLangChain4jChatService {
             @Value("${langchain4j.open-ai.chat-model.model-name}") String modelName,
             @Value("${langchain4j.open-ai.chat-model.temperature}") double temperature,
             @Value("${langchain4j.open-ai.chat-model.max-tokens}") int maxTokens) {
-        super(buildModel(apiKey, baseUrl, modelName, maxTokens));
+        super(buildModel(apiKey, baseUrl, modelName, temperature, maxTokens));
         this.apiKey = apiKey;
         this.baseUrl = baseUrl;
         this.temperature = temperature;
@@ -39,17 +39,18 @@ public class DeepSeekChatService extends AbstractLangChain4jChatService {
 
     public DeepSeekChatService withModel(String newModelName) {
         return new DeepSeekChatService(
-            buildModel(apiKey, baseUrl, newModelName, maxTokens),
+            buildModel(apiKey, baseUrl, newModelName, temperature, maxTokens),
             apiKey, baseUrl, temperature, maxTokens
         );
     }
 
     private static ChatModel buildModel(String apiKey, String baseUrl,
-                                         String modelName, int maxTokens) {
+                                         String modelName, double temperature, int maxTokens) {
         return OpenAiChatModel.builder()
                 .apiKey(apiKey)
                 .baseUrl(baseUrl)
                 .modelName(modelName)
+                .temperature(temperature)
                 .maxTokens(maxTokens)
                 .build();
     }
