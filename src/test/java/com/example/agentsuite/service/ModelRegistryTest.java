@@ -12,16 +12,16 @@ class ModelRegistryTest {
 
     @BeforeEach
     void setUp() {
-        DeepSeekService deepSeekService = mock(DeepSeekService.class);
+        DeepSeekChatService deepSeekService = mock(DeepSeekChatService.class);
         org.mockito.Mockito.when(deepSeekService.withModel(org.mockito.ArgumentMatchers.anyString()))
-                .thenReturn(mock(DeepSeekService.class));
+                .thenReturn(mock(DeepSeekChatService.class));
         registry = new ModelRegistry(deepSeekService, "test-anthropic-key", "test-google-key", "test-mistral-key");
     }
 
     @Test
     void get_deepseekAlias_returnsDeepSeekService() {
-        assertThat(registry.get("deepseek-v4-pro")).isInstanceOf(DeepSeekService.class);
-        assertThat(registry.get("deepseek-v4-flash")).isInstanceOf(DeepSeekService.class);
+        assertThat(registry.get("deepseek-v4-pro")).isInstanceOf(DeepSeekChatService.class);
+        assertThat(registry.get("deepseek-v4-flash")).isInstanceOf(DeepSeekChatService.class);
     }
 
     @Test
