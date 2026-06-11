@@ -6,11 +6,19 @@ import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.agent.tool.ToolSpecifications;
-import dev.langchain4j.data.message.*;
-import dev.langchain4j.model.chat.ChatLanguageModel;
-import dev.langchain4j.model.output.Response;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.memory.ChatMemory;
+import dev.langchain4j.memory.chat.MessageWindowChatMemory;
+import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.tool.DefaultToolExecutor;
 import dev.langchain4j.service.tool.ToolExecutor;
+import dev.langchain4j.service.tool.ToolProvider;
+import dev.langchain4j.service.tool.ToolProviderResult;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -18,50 +26,88 @@ import java.util.function.Consumer;
 
 abstract class AbstractLangChain4jChatService implements ChatService {
 
-    private static final int MAX_TOOL_ITERATIONS = 20;
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    protected final ChatLanguageModel model;
+    protected final ChatModel model;
 
-    protected AbstractLangChain4jChatService(ChatLanguageModel model) {
+    protected AbstractLangChain4jChatService(ChatModel model) {
         this.model = model;
+    }
+
+    private interface AssistantService {
+        String chat(@dev.langchain4j.service.UserMessage String userMessage);
+    }
+
+    private AssistantService buildAiService(String systemPrompt, List<ChatMessage> historyMessages,
+                                            Consumer<ChatEvent> emitter, Object[] tools) {
+        ChatMemory memory = MessageWindowChatMemory.withMaxMessages(1000);
+        for (ChatMessage m : historyMessages) memory.add(m);
+
+        AiServices<AssistantService> builder = AiServices.builder(AssistantService.class)
+                .chatModel(model)
+                .chatMemory(memory)
+                .maxSequentialToolsInvocations(20);
+
+        if (!systemPrompt.isBlank()) {
+            builder.systemMessageProvider(id -> systemPrompt);
+        }
+
+        if (tools.length > 0) {
+            builder.toolProvider(buildToolProvider(tools, emitter));
+        }
+
+        return builder.build();
+    }
+
+    private ToolProvider buildToolProvider(Object[] tools, Consumer<ChatEvent> emitter) {
+        return request -> {
+            ToolProviderResult.Builder result = ToolProviderResult.builder();
+            for (Object tool : tools) {
+                for (ToolSpecification spec : ToolSpecifications.toolSpecificationsFrom(tool)) {
+                    Method method = findMethod(tool, spec.name());
+                    ToolExecutor real = new DefaultToolExecutor(tool, method);
+                    result.add(spec, (req, memId) -> {
+                        String out = real.execute(req, memId);
+                        emitter.accept(new ChatEvent.ToolBatch(List.of(
+                                new ChatEvent.ToolBatch.ToolExecution(req.name(), req.arguments(), out)
+                        )));
+                        return out;
+                    });
+                }
+            }
+            return result.build();
+        };
+    }
+
+    private Method findMethod(Object tool, String toolName) {
+        for (Method method : tool.getClass().getMethods()) {
+            if (method.isAnnotationPresent(Tool.class)) {
+                Tool ann = method.getAnnotation(Tool.class);
+                String name = ann.name().isEmpty() ? method.getName() : ann.name();
+                if (name.equals(toolName)) return method;
+            }
+        }
+        throw new IllegalStateException("Method not found for tool: " + toolName);
     }
 
     @Override
     public ChatResponse chat(String systemPrompt, String userMessage, Object... tools) {
-        List<ChatMessage> messages = new ArrayList<>();
-        if (systemPrompt != null && !systemPrompt.isEmpty()) {
-            messages.add(SystemMessage.from(systemPrompt));
-        }
-        messages.add(UserMessage.from(userMessage));
-
-        List<ToolSpecification> toolSpecs = buildToolSpecs(tools);
-        Map<String, ToolExecutor> executors = buildExecutors(tools);
-
-        List<ChatResponse.ToolCall> allToolCalls = new ArrayList<>();
-        int iterations = 0;
-        while (true) {
-            if (iterations >= MAX_TOOL_ITERATIONS) {
-                throw new IllegalStateException("Exceeded maximum tool iterations: " + MAX_TOOL_ITERATIONS);
+        List<ChatResponse.ToolCall> collectedCalls = new ArrayList<>();
+        Consumer<ChatEvent> collector = event -> {
+            if (event instanceof ChatEvent.ToolBatch tb) {
+                for (var ex : tb.executions()) {
+                    collectedCalls.add(new ChatResponse.ToolCall(ex.name(), ex.arguments()));
+                }
             }
-            Response<AiMessage> response = toolSpecs.isEmpty()
-                    ? model.generate(messages)
-                    : model.generate(messages, toolSpecs);
-
-            AiMessage aiMessage = response.content();
-            if (!aiMessage.hasToolExecutionRequests()) {
-                String text = aiMessage.text() != null ? aiMessage.text() : "";
-                return new ChatResponse(allToolCalls, text);
-            }
-            messages.add(aiMessage);
-            for (ToolExecutionRequest req : aiMessage.toolExecutionRequests()) {
-                allToolCalls.add(new ChatResponse.ToolCall(req.name(), req.arguments()));
-                ToolExecutor executor = executors.get(req.name());
-                if (executor == null) throw new IllegalStateException("No executor for tool: " + req.name());
-                messages.add(ToolExecutionResultMessage.from(req, executor.execute(req, "default")));
-            }
-            iterations++;
-        }
+        };
+        AssistantService svc = buildAiService(
+                systemPrompt != null ? systemPrompt : "",
+                List.of(),
+                collector,
+                tools
+        );
+        String content = svc.chat(userMessage);
+        return new ChatResponse(collectedCalls, content);
     }
 
     @Override
@@ -76,39 +122,25 @@ abstract class AbstractLangChain4jChatService implements ChatService {
     @Override
     public void chatStreamWithHistory(List<HistoryMessage> history, String userMessage,
                                       Consumer<ChatEvent> emitter, Object... tools) {
-        List<ChatMessage> messages = buildMessageList(history);
-        messages.add(UserMessage.from(userMessage));
-
-        List<ToolSpecification> toolSpecs = buildToolSpecs(tools);
-        Map<String, ToolExecutor> executors = buildExecutors(tools);
-
-        int iterations = 0;
-        while (true) {
-            if (iterations >= MAX_TOOL_ITERATIONS) {
-                throw new IllegalStateException("Exceeded maximum tool iterations: " + MAX_TOOL_ITERATIONS);
+        String systemPrompt = "";
+        List<HistoryMessage> nonSystemHistory = new ArrayList<>();
+        for (HistoryMessage h : history) {
+            if (h instanceof HistoryMessage.SystemPrompt sp) {
+                systemPrompt = sp.content();
+            } else {
+                nonSystemHistory.add(h);
             }
-            Response<AiMessage> response = toolSpecs.isEmpty()
-                    ? model.generate(messages)
-                    : model.generate(messages, toolSpecs);
+        }
 
-            AiMessage aiMessage = response.content();
-            if (!aiMessage.hasToolExecutionRequests()) {
-                String text = aiMessage.text() != null ? aiMessage.text() : "";
-                emitter.accept(new ChatEvent.Content(text));
-                emitter.accept(new ChatEvent.Done());
-                return;
-            }
-            messages.add(aiMessage);
-            List<ChatEvent.ToolBatch.ToolExecution> executions = new ArrayList<>();
-            for (ToolExecutionRequest req : aiMessage.toolExecutionRequests()) {
-                ToolExecutor executor = executors.get(req.name());
-                if (executor == null) throw new IllegalStateException("No executor for tool: " + req.name());
-                String result = executor.execute(req, "default");
-                executions.add(new ChatEvent.ToolBatch.ToolExecution(req.name(), req.arguments(), result));
-                messages.add(ToolExecutionResultMessage.from(req, result));
-            }
-            emitter.accept(new ChatEvent.ToolBatch(executions));
-            iterations++;
+        List<ChatMessage> seedMessages = buildMessageList(nonSystemHistory);
+        AssistantService svc = buildAiService(systemPrompt, seedMessages, emitter, tools);
+        try {
+            String response = svc.chat(userMessage);
+            emitter.accept(new ChatEvent.Content(response));
+            emitter.accept(new ChatEvent.Done());
+        } catch (Exception e) {
+            emitter.accept(new ChatEvent.Error(e.getMessage()));
+            emitter.accept(new ChatEvent.Done());
         }
     }
 
@@ -167,25 +199,5 @@ abstract class AbstractLangChain4jChatService implements ChatService {
         } catch (Exception e) {
             return List.of();
         }
-    }
-
-    private List<ToolSpecification> buildToolSpecs(Object[] tools) {
-        List<ToolSpecification> specs = new ArrayList<>();
-        for (Object tool : tools) specs.addAll(ToolSpecifications.toolSpecificationsFrom(tool));
-        return specs;
-    }
-
-    private Map<String, ToolExecutor> buildExecutors(Object[] tools) {
-        Map<String, ToolExecutor> executors = new HashMap<>();
-        for (Object tool : tools) {
-            for (Method method : tool.getClass().getMethods()) {
-                if (method.isAnnotationPresent(Tool.class)) {
-                    Tool annotation = method.getAnnotation(Tool.class);
-                    String toolName = annotation.name().isEmpty() ? method.getName() : annotation.name();
-                    executors.put(toolName, new DefaultToolExecutor(tool, method));
-                }
-            }
-        }
-        return executors;
     }
 }

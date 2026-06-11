@@ -11,7 +11,7 @@ public class ModelRegistry {
 
     private final Map<String, ChatService> registry;
 
-    public ModelRegistry(DeepSeekService deepSeekService,
+    public ModelRegistry(DeepSeekChatService deepSeekService,
                          @Value("${anthropic.api-key}") String anthropicApiKey,
                          @Value("${google.api-key}") String googleApiKey,
                          @Value("${mistral.api-key}") String mistralApiKey) {

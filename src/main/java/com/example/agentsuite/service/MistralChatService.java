@@ -1,6 +1,6 @@
 package com.example.agentsuite.service;
 
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.mistralai.MistralAiChatModel;
 
 public class MistralChatService extends AbstractLangChain4jChatService {
@@ -9,7 +9,7 @@ public class MistralChatService extends AbstractLangChain4jChatService {
         this(buildModel(apiKey, modelName));
     }
 
-    private static ChatLanguageModel buildModel(String apiKey, String modelName) {
+    private static ChatModel buildModel(String apiKey, String modelName) {
         return MistralAiChatModel.builder()
                 .apiKey(apiKey)
                 .modelName(modelName)
@@ -18,7 +18,7 @@ public class MistralChatService extends AbstractLangChain4jChatService {
                 .build();
     }
 
-    MistralChatService(ChatLanguageModel model) {
+    MistralChatService(ChatModel model) {
         super(model);
     }
 }

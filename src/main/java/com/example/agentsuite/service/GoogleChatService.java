@@ -1,6 +1,6 @@
 package com.example.agentsuite.service;
 
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 
 public class GoogleChatService extends AbstractLangChain4jChatService {
@@ -14,7 +14,7 @@ public class GoogleChatService extends AbstractLangChain4jChatService {
                 .build());
     }
 
-    GoogleChatService(ChatLanguageModel model) {
+    GoogleChatService(ChatModel model) {
         super(model);
     }
 }
