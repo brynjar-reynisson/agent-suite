@@ -203,12 +203,15 @@ public class AiController {
         }
         Object[] toolArray = buildToolInstances(String.join(",", authorized), rootDirectory, braveApiKey, mcpToolBridge);
 
+        String effectivePrompt = rootDirectory.isEmpty() ? prompt
+                : (prompt.isEmpty() ? "" : prompt + "\n") + "Working directory: " + rootDirectory;
+
         CompletableFuture.runAsync(() -> {
             try {
                 orchestrationService.chatStream(
                         conversationId.isEmpty() ? null : conversationId,
                         userId,
-                        model, prompt, message, rootDirectory,
+                        model, effectivePrompt, message, rootDirectory,
                         event -> {
                             switch (event) {
                                 case ChatEvent.ToolBatch tb -> {
