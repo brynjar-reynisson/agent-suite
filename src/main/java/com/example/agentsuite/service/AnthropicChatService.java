@@ -1,7 +1,7 @@
 package com.example.agentsuite.service;
 
 import dev.langchain4j.model.anthropic.AnthropicChatModel;
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.ChatModel;
 
 public class AnthropicChatService extends AbstractLangChain4jChatService {
 
@@ -9,7 +9,7 @@ public class AnthropicChatService extends AbstractLangChain4jChatService {
         this(buildModel(apiKey, modelName));
     }
 
-    private static ChatLanguageModel buildModel(String apiKey, String modelName) {
+    private static ChatModel buildModel(String apiKey, String modelName) {
         var builder = AnthropicChatModel.builder()
                 .apiKey(apiKey)
                 .modelName(modelName)
@@ -21,7 +21,7 @@ public class AnthropicChatService extends AbstractLangChain4jChatService {
         return builder.build();
     }
 
-    AnthropicChatService(ChatLanguageModel model) {
+    AnthropicChatService(ChatModel model) {
         super(model);
     }
 }
