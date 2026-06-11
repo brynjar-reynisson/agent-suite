@@ -43,9 +43,10 @@ abstract class AbstractLangChain4jChatService implements ChatService {
         ChatMemory memory = MessageWindowChatMemory.withMaxMessages(1000);
         for (ChatMessage m : historyMessages) memory.add(m);
 
-        AiServices.Builder<AssistantService> builder = AiServices.builder(AssistantService.class)
+        AiServices<AssistantService> builder = AiServices.builder(AssistantService.class)
                 .chatModel(model)
-                .chatMemory(memory);
+                .chatMemory(memory)
+                .maxSequentialToolsInvocations(20);
 
         if (!systemPrompt.isBlank()) {
             builder.systemMessageProvider(id -> systemPrompt);

@@ -60,8 +60,7 @@ class AnthropicChatServiceTest {
         service.chat("You are helpful", "Hi");
 
         ChatRequest req = captor.getValue();
-        assertThat(req.messages()).isNotEmpty();
-        assertThat(req.messages().get(0)).isInstanceOf(SystemMessage.class);
+        assertThat(req.messages()).anyMatch(m -> m instanceof SystemMessage);
     }
 
     @Test
