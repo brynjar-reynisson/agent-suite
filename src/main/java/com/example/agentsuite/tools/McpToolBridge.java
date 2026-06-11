@@ -104,7 +104,9 @@ public class McpToolBridge implements DynamicToolProvider {
                 client = clientFactory.apply(serverName, serverConfig);
                 clients.add(client);
             } catch (Exception e) {
-                log.error("Failed to connect to MCP server '{}': {}", serverName, e.getMessage());
+                Throwable root = e;
+                while (root.getCause() != null) root = root.getCause();
+                log.error("Failed to connect to MCP server '{}': {} (root: {})", serverName, e.getMessage(), root.getMessage(), e);
                 continue;
             }
 
@@ -187,10 +189,12 @@ public class McpToolBridge implements DynamicToolProvider {
                     .build();
             client = McpClient.sync(new StdioClientTransport(params, McpJsonDefaults.getMapper()))
                     .requestTimeout(Duration.ofSeconds(30))
+                    .initializationTimeout(Duration.ofSeconds(60))
                     .build();
         } else if (config.url() != null) {
             client = McpClient.sync(HttpClientStreamableHttpTransport.builder(config.url()).build())
                     .requestTimeout(Duration.ofSeconds(30))
+                    .initializationTimeout(Duration.ofSeconds(60))
                     .build();
         } else {
             throw new IllegalArgumentException("MCP server config must have either 'command' or 'url'");
