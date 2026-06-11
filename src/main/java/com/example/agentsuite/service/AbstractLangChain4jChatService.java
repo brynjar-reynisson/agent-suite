@@ -6,7 +6,11 @@ import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.agent.tool.ToolSpecifications;
-import dev.langchain4j.data.message.*;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
@@ -30,7 +34,7 @@ abstract class AbstractLangChain4jChatService implements ChatService {
         this.model = model;
     }
 
-    interface AssistantService {
+    private interface AssistantService {
         String chat(@dev.langchain4j.service.UserMessage String userMessage);
     }
 
@@ -135,6 +139,7 @@ abstract class AbstractLangChain4jChatService implements ChatService {
             emitter.accept(new ChatEvent.Done());
         } catch (Exception e) {
             emitter.accept(new ChatEvent.Error(e.getMessage()));
+            emitter.accept(new ChatEvent.Done());
         }
     }
 
