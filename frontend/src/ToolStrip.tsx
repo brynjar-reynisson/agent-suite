@@ -2,6 +2,7 @@ const TOOL_META: Record<string, { icon: string; tooltip: string }> = {
   'unix':      { icon: '📁', tooltip: 'unix: ls · cat · grep' },
   'md-writer': { icon: '✏️', tooltip: 'md-writer: write markdown files' },
   'web':       { icon: '🌐', tooltip: 'web: search · fetch' },
+  'mcp':       { icon: '🔌', tooltip: 'mcp: external MCP servers' },
 };
 
 interface ToolStripProps {

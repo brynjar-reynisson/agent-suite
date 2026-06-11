@@ -90,6 +90,12 @@ export const getUserConfig = async (token?: string | null): Promise<UserConfig> 
   return response.json();
 };
 
+export const getMcpTools = async (): Promise<string[]> => {
+  const response = await fetch(`${API_BASE_URL}/ai/config/mcp-tools`);
+  if (!response.ok) return [];
+  return response.json();
+};
+
 export const execTool = async (command: string, rootDirectory: string): Promise<string> => {
   const urlParams = new URLSearchParams({ command, rootDirectory });
   const response = await fetch(`${API_BASE_URL}/ai/tools?${urlParams.toString()}`);

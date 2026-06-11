@@ -8,6 +8,7 @@ import com.example.agentsuite.service.ChatOrchestrationService;
 import com.example.agentsuite.service.ModelRegistry;
 import com.example.agentsuite.tools.Git;
 import com.example.agentsuite.tools.MarkDownWriter;
+import com.example.agentsuite.tools.McpToolBridge;
 import com.example.agentsuite.tools.UnixTools;
 import com.example.agentsuite.tools.WebTools;
 import jakarta.servlet.http.HttpServletRequest;
@@ -50,18 +51,21 @@ public class AiController {
     private final ConversationService conversationService;
     private final AuthorizationService authorizationService;
     private final String braveApiKey;
+    private final McpToolBridge mcpToolBridge;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     public AiController(ChatOrchestrationService orchestrationService,
                         ModelRegistry modelRegistry,
                         ConversationService conversationService,
                         AuthorizationService authorizationService,
-                        @Value("${brave.api-key}") String braveApiKey) {
+                        @Value("${brave.api-key}") String braveApiKey,
+                        McpToolBridge mcpToolBridge) {
         this.orchestrationService = orchestrationService;
         this.modelRegistry = modelRegistry;
         this.conversationService = conversationService;
         this.authorizationService = authorizationService;
         this.braveApiKey = braveApiKey;
+        this.mcpToolBridge = mcpToolBridge;
     }
 
     @GetMapping("/ai/tools")
@@ -131,6 +135,11 @@ public class AiController {
         );
     }
 
+    @GetMapping("/ai/config/mcp-tools")
+    public List<String> getMcpTools() {
+        return mcpToolBridge.toolNames();
+    }
+
     @GetMapping("/ai/conversations")
     public List<ConversationSummaryDto> getConversations(HttpServletRequest request) {
         long userId = currentUserId(request);
@@ -192,7 +201,7 @@ public class AiController {
                     .collect(Collectors.toSet());
             authorized.retainAll(requested);
         }
-        Object[] toolArray = buildToolInstances(String.join(",", authorized), rootDirectory, braveApiKey);
+        Object[] toolArray = buildToolInstances(String.join(",", authorized), rootDirectory, braveApiKey, mcpToolBridge);
 
         CompletableFuture.runAsync(() -> {
             try {
@@ -239,7 +248,8 @@ public class AiController {
         }
     }
 
-    static Object[] buildToolInstances(String tools, String rootDirectory, String braveApiKey) {
+    static Object[] buildToolInstances(String tools, String rootDirectory, String braveApiKey,
+                                        McpToolBridge mcpToolBridge) {
         if (tools.isBlank()) return new Object[0];
         if (tools.length() > 512) {
             log.warn("Rejected tools param: length {} exceeds 512 char limit", tools.length());
@@ -259,6 +269,9 @@ public class AiController {
                     if (!rootDirectory.isEmpty()) instances.add(new MarkDownWriter(rootDirectory));
                 }
                 case "web" -> instances.add(new WebTools(braveApiKey));
+                case "mcp" -> {
+                    if (mcpToolBridge != null) instances.add(mcpToolBridge);
+                }
             }
         }
         return instances.toArray(new Object[0]);

@@ -56,7 +56,7 @@ Both scripts load `SUPABASE_PROD_DB_HOST/USERNAME/PASSWORD` from the gitignored 
 
 ## Architecture
 
-Spring Boot 3.5 + LangChain4j 0.36.2 agent application. Java 21.
+Spring Boot 3.5 + LangChain4j 1.16.2 agent application. Java 21.
 
 **Request flow:** `AiController` → `ChatOrchestrationService` → provider `ChatService` → LLM API → `UnixTools` (tool calls) → repeat until no tool calls remain → stream SSE events to client. If `conversationId` is provided, `ChatOrchestrationService` persists all messages to the database and replays conversation history to the LLM on subsequent turns.
 
@@ -69,15 +69,18 @@ Spring Boot 3.5 + LangChain4j 0.36.2 agent application. Java 21.
 - `ChatResponse` — data class holding tool call list and response text.
 - `ModelRegistry` — maps model aliases to `ChatService` instances; lazily creates Anthropic/Google services only if API keys are present.
 - `DeepSeekService` — hand-rolled OpenAI-compatible REST client for DeepSeek. Drives the agentic loop manually; caches reasoning content between turns via fingerprinting.
-- `AbstractLangChain4jChatService` — base class for LangChain4j-backed providers. Builds tool specs from `@Tool` annotations and runs the agentic loop (max 20 iterations).
+- `DynamicToolProvider` — interface for objects that supply `Map<ToolSpecification, ToolExecutor>` pairs at runtime, bypassing `@Tool` annotation reflection. Implemented by `McpToolBridge`.
+- `AbstractLangChain4jChatService` — base class for LangChain4j-backed providers. Builds tool specs from `@Tool` annotations (and from `DynamicToolProvider` instances) and runs the agentic loop (max 20 iterations).
 - `AnthropicChatService` — extends `AbstractLangChain4jChatService` for Claude models.
 - `GoogleChatService` — extends `AbstractLangChain4jChatService` for Gemini models.
 - `UserResolverFilter` — extracts Supabase JWT, resolves to `user_id`, loads admin flag via `AuthorizationService` (skipped for guest), sets both as request attributes (`ATTR_USER_ID`, `ATTR_IS_ADMIN`). Falls back to guest `user_id = 1` and `isAdmin = false` on invalid/missing JWT.
 - `UserRoleRepository` — checks `user_role` table for admin membership. Manual jOOQ DSL (no codegen). Single method: `isAdmin(userId)`.
-- `AuthorizationService` — wraps `UserRoleRepository`. `isAdmin(userId)` delegates to repo. `grantedToolGroups(isAdmin)` returns the role-based tool entitlement set: `["web"]` for all users, plus `["md-writer"]` for admins. `unix` and `md-writer` are additionally gated on a non-empty `rootDirectory` in `AiController`.
+- `AuthorizationService` — wraps `UserRoleRepository`. `isAdmin(userId)` delegates to repo. `grantedToolGroups(isAdmin)` returns the role-based tool entitlement set: `["web"]` for all users, plus `["md-writer", "mcp"]` for admins. `unix` and `md-writer` are additionally gated on a non-empty `rootDirectory` in `AiController`.
 - `UnixTools` — exposes `ls`, `cat`, and `grep` as AI-callable tools. Blocks `..` path traversal; gitignore-aware (filters git-ignored paths).
 - `MarkDownWriter` — exposes `newMarkDownFile` as an AI-callable tool; writes spec/plan markdown files under `docs/specs/` or `docs/plans/`. Registered as the `"md-writer"` tool group.
 - `WebTools` — exposes `webSearch` and `webFetch` as AI-callable tools. Registered as the `"web"` tool group (both tools are granted together). `webSearch` requires `BRAVE_SEARCH_API_KEY`; `webFetch` works without a key but validates URLs against SSRF (rejects private/loopback addresses and non-http(s) schemes).
+- `McpToolBridge` — Spring singleton; parses `.mcp.json` at startup, connects MCP servers (stdio + Streamable HTTP via MCP SDK 2.0.0), discovers tools via `tools/list`, builds namespaced `ToolSpecification+ToolExecutor` pairs (`mcp__<serverName>__<toolName>`). `@PreDestroy` closes all connections. Implements `DynamicToolProvider`. Registered as the `"mcp"` tool group (admin-only). Gracefully no-ops when `.mcp.json` is absent.
+- `McpJsonSchemaConverter` — converts MCP tool input schemas (`Map<String,Object>` from SDK 2.0.0 `tool.inputSchema()`) to LangChain4j `JsonObjectSchema`. Used by `McpToolBridge` when building `ToolSpecification` per tool.
 - `WebConfig` — CORS config allowing `localhost:5176/5177`, `127.0.0.1:5176/5177`, `https://agent.breynisson.org`, and `https://dev.agent.breynisson.org`.
 - `LangChain4jConfig` — placeholder for advanced LangChain4j wiring (currently empty).
 

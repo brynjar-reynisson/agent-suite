@@ -9,6 +9,7 @@ import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatOrchestrationService;
 import com.example.agentsuite.service.ModelRegistry;
 import com.example.agentsuite.tools.MarkDownWriter;
+import com.example.agentsuite.tools.McpToolBridge;
 import com.example.agentsuite.tools.UnixTools;
 import com.example.agentsuite.tools.WebTools;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,10 +67,13 @@ class AiControllerTest {
     @MockBean
     private AuthorizationService authorizationService;
 
+    @MockBean
+    private McpToolBridge mcpToolBridge;
+
     @BeforeEach
     void setUpAuth() {
         when(authorizationService.grantedToolGroups(false)).thenReturn(List.of("web"));
-        when(authorizationService.grantedToolGroups(true)).thenReturn(List.of("web", "md-writer"));
+        when(authorizationService.grantedToolGroups(true)).thenReturn(List.of("web", "md-writer", "mcp"));
     }
 
     @Test
@@ -224,58 +228,58 @@ class AiControllerTest {
 
     @Test
     void buildToolInstances_emptyTools_returnsEmptyArray() {
-        Object[] result = AiController.buildToolInstances("", tempDir.toString(), "");
+        Object[] result = AiController.buildToolInstances("", tempDir.toString(), "", null);
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildToolInstances_unixGroup_noRootDirectory_returnsEmptyArray() {
-        Object[] result = AiController.buildToolInstances("unix", "", "");
+        Object[] result = AiController.buildToolInstances("unix", "", "", null);
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildToolInstances_unixGroup_withRootDirectory_returnsUnixTools() {
-        Object[] result = AiController.buildToolInstances("unix", tempDir.toString(), "");
+        Object[] result = AiController.buildToolInstances("unix", tempDir.toString(), "", null);
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
     }
 
     @Test
     void buildToolInstances_unknownGroup_silentlyIgnored() {
-        Object[] result = AiController.buildToolInstances("unknown", tempDir.toString(), "");
+        Object[] result = AiController.buildToolInstances("unknown", tempDir.toString(), "", null);
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildToolInstances_blankTools_returnsEmptyArray() {
-        Object[] result = AiController.buildToolInstances("  ", tempDir.toString(), "");
+        Object[] result = AiController.buildToolInstances("  ", tempDir.toString(), "", null);
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildToolInstances_multipleGroups_onlyKnownGroupsAdded() {
-        Object[] result = AiController.buildToolInstances("unix,unknown", tempDir.toString(), "");
+        Object[] result = AiController.buildToolInstances("unix,unknown", tempDir.toString(), "", null);
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
     }
 
     @Test
     void buildToolInstances_mdWriterGroup_withRootDirectory_returnsMarkDownWriter() {
-        Object[] result = AiController.buildToolInstances("md-writer", tempDir.toString(), "");
+        Object[] result = AiController.buildToolInstances("md-writer", tempDir.toString(), "", null);
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(MarkDownWriter.class);
     }
 
     @Test
     void buildToolInstances_mdWriterGroup_noRootDirectory_returnsEmptyArray() {
-        Object[] result = AiController.buildToolInstances("md-writer", "", "");
+        Object[] result = AiController.buildToolInstances("md-writer", "", "", null);
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildToolInstances_unixAndMdWriter_withRootDirectory_returnsBothInstances() {
-        Object[] result = AiController.buildToolInstances("unix,md-writer", tempDir.toString(), "");
+        Object[] result = AiController.buildToolInstances("unix,md-writer", tempDir.toString(), "", null);
         assertThat(result).hasSize(2);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
         assertThat(result[1]).isInstanceOf(MarkDownWriter.class);
@@ -283,16 +287,29 @@ class AiControllerTest {
 
     @Test
     void buildToolInstances_mdWriterAndUnknown_onlyMarkDownWriterAdded() {
-        Object[] result = AiController.buildToolInstances("md-writer,unknown", tempDir.toString(), "");
+        Object[] result = AiController.buildToolInstances("md-writer,unknown", tempDir.toString(), "", null);
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(MarkDownWriter.class);
     }
 
     @Test
     void buildToolInstances_webGroup_returnsWebTools() {
-        Object[] result = AiController.buildToolInstances("web", "", "");
+        Object[] result = AiController.buildToolInstances("web", "", "", null);
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(WebTools.class);
+    }
+
+    @Test
+    void buildToolInstances_mcpGroup_noBridge_returnsEmpty() {
+        Object[] result = AiController.buildToolInstances("mcp", "", "", null);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void buildToolInstances_mcpGroup_withBridge_returnsBridge() {
+        Object[] result = AiController.buildToolInstances("mcp", "", "", mcpToolBridge);
+        assertThat(result).hasSize(1);
+        assertThat(result[0]).isSameAs(mcpToolBridge);
     }
 
     @Test
@@ -469,7 +486,8 @@ class AiControllerTest {
 
         verify(orchestrationService).chatStream(
                 isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
-                argThat(arr -> arr instanceof Object[] t && t.length == 1 && t[0] instanceof WebTools));
+                argThat(arr -> arr instanceof Object[] t && t.length == 2
+                        && t[0] instanceof WebTools && t[1] instanceof McpToolBridge));
     }
 
     @Test
@@ -492,13 +510,14 @@ class AiControllerTest {
 
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
 
-        // order is a deliberate contract: grantedToolGroups order (web, md-writer) then unix last
+        // order is a deliberate contract: grantedToolGroups order (web, md-writer, mcp) then unix last
         verify(orchestrationService).chatStream(
                 isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
-                argThat(arr -> arr instanceof Object[] t && t.length == 3
+                argThat(arr -> arr instanceof Object[] t && t.length == 4
                         && t[0] instanceof WebTools
                         && t[1] instanceof MarkDownWriter
-                        && t[2] instanceof UnixTools));
+                        && t[2] instanceof McpToolBridge
+                        && t[3] instanceof UnixTools));
     }
 
     @Test

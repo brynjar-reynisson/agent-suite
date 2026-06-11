@@ -1,0 +1,256 @@
+package com.example.agentsuite.tools;
+
+import com.example.agentsuite.service.DynamicToolProvider;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.service.tool.ToolExecutor;
+import io.modelcontextprotocol.client.McpClient;
+import io.modelcontextprotocol.client.McpSyncClient;
+import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
+import io.modelcontextprotocol.client.transport.ServerParameters;
+import io.modelcontextprotocol.client.transport.StdioClientTransport;
+import io.modelcontextprotocol.json.McpJsonDefaults;
+import io.modelcontextprotocol.spec.McpSchema;
+import jakarta.annotation.PreDestroy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.io.File;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiFunction;
+import java.util.stream.Collectors;
+
+@Service
+public class McpToolBridge implements DynamicToolProvider {
+
+    private static final Logger log = LoggerFactory.getLogger(McpToolBridge.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record McpServerConfig(String command, List<String> args, Map<String, String> env,
+                           String url, String transport) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record McpConfig(Map<String, McpServerConfig> mcpServers) {}
+
+    private final Map<ToolSpecification, ToolExecutor> toolEntries;
+    private final List<McpSyncClient> clients;
+
+    @Autowired
+    public McpToolBridge(
+            @Value("${mcp.config.path:.mcp.json}") String configPath,
+            @Value("${mcp.call-timeout-seconds:90}") int callTimeoutSeconds) {
+        this(configPath, callTimeoutSeconds, (name, cfg) -> defaultCreateClient(name, cfg, callTimeoutSeconds));
+    }
+
+    McpToolBridge(String configPath, int callTimeoutSeconds,
+                  BiFunction<String, McpServerConfig, McpSyncClient> clientFactory) {
+        this.clients = new ArrayList<>();
+        this.toolEntries = buildToolEntries(configPath, callTimeoutSeconds, clientFactory);
+    }
+
+    @Override
+    public Map<ToolSpecification, ToolExecutor> toolEntries() {
+        return toolEntries;
+    }
+
+    public List<String> toolNames() {
+        return toolEntries.keySet().stream()
+                .map(ToolSpecification::name)
+                .sorted()
+                .collect(Collectors.toList());
+    }
+
+    @PreDestroy
+    void close() {
+        for (McpSyncClient client : clients) {
+            try { client.closeGracefully(); } catch (Exception e) {
+                log.warn("Error closing MCP client", e);
+            }
+        }
+    }
+
+    private Map<ToolSpecification, ToolExecutor> buildToolEntries(
+            String configPath, int callTimeoutSeconds,
+            BiFunction<String, McpServerConfig, McpSyncClient> clientFactory) {
+
+        McpConfig config;
+        try {
+            File configFile = new File(configPath);
+            if (!configFile.exists()) {
+                log.info("No .mcp.json found at {} — mcp tool group will have no tools", configPath);
+                return Map.of();
+            }
+            config = MAPPER.readValue(configFile, McpConfig.class);
+        } catch (Exception e) {
+            log.warn("Failed to parse MCP config at {}: {}", configPath, e.getMessage());
+            return Map.of();
+        }
+
+        if (config.mcpServers() == null || config.mcpServers().isEmpty()) {
+            return Map.of();
+        }
+
+        Map<ToolSpecification, ToolExecutor> entries = new LinkedHashMap<>();
+
+        for (Map.Entry<String, McpServerConfig> serverEntry : config.mcpServers().entrySet()) {
+            String serverName = serverEntry.getKey();
+            McpServerConfig serverConfig = serverEntry.getValue();
+
+            McpSyncClient client;
+            try {
+                client = clientFactory.apply(serverName, serverConfig);
+                clients.add(client);
+            } catch (Exception e) {
+                Throwable root = e;
+                while (root.getCause() != null) root = root.getCause();
+                log.error("Failed to connect to MCP server '{}': {} (root: {})", serverName, e.getMessage(), root.getMessage(), e);
+                continue;
+            }
+
+            McpSchema.ListToolsResult listResult;
+            try {
+                listResult = client.listTools();
+            } catch (Exception e) {
+                log.error("Failed to list tools from MCP server '{}': {}", serverName, e.getMessage());
+                continue;
+            }
+
+            for (McpSchema.Tool tool : listResult.tools()) {
+                String namespacedName = "mcp__" + serverName + "__" + tool.name();
+                String originalName = tool.name();
+
+                ToolSpecification spec = ToolSpecification.builder()
+                        .name(namespacedName)
+                        .description(tool.description() != null ? tool.description() : "")
+                        .parameters(McpJsonSchemaConverter.convertMap(tool.inputSchema()))
+                        .build();
+
+                ToolExecutor executor = (req, memId) -> callMcpTool(
+                        client, serverName, originalName, req.arguments(), callTimeoutSeconds);
+
+                entries.put(spec, executor);
+                log.info("Registered MCP tool: {}", namespacedName);
+            }
+        }
+
+        return entries;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String callMcpTool(McpSyncClient client, String serverName,
+                                String toolName, String argumentsJson, int timeoutSeconds) {
+        try {
+            Map<String, Object> args = argumentsJson != null && !argumentsJson.isBlank()
+                    ? MAPPER.readValue(argumentsJson, Map.class)
+                    : Map.of();
+
+            McpSchema.CallToolResult result = client.callTool(
+                    new McpSchema.CallToolRequest(toolName, args));
+
+            String output = result.content().stream()
+                    .filter(c -> c instanceof McpSchema.TextContent)
+                    .map(c -> ((McpSchema.TextContent) c).text())
+                    .collect(Collectors.joining("\n"));
+
+            if (Boolean.TRUE.equals(result.isError())) {
+                return "Error from MCP server '" + serverName + "': " + output;
+            }
+            return output;
+        } catch (Exception e) {
+            log.error("MCP tool call failed: server={}, tool={}", serverName, toolName, e);
+            return "Error calling MCP tool '" + toolName + "' on server '" + serverName + "': " + e.getMessage();
+        }
+    }
+
+    private static McpSyncClient defaultCreateClient(String serverName, McpServerConfig config, int requestTimeoutSeconds) {
+        McpSyncClient client;
+        if (config.command() != null) {
+            String command = config.command();
+            List<String> args = config.args() != null ? new ArrayList<>(config.args()) : new ArrayList<>();
+
+            // On Windows, ProcessBuilder cannot execute .cmd scripts directly.
+            // For npx/npm: resolve node.exe + *-cli.js directly — cmd.exe /c breaks the
+            // stdin pipe so the MCP server never receives the initialize request.
+            // For other commands: fall back to cmd.exe /c.
+            if (System.getProperty("os.name", "").toLowerCase().contains("win")) {
+                if ("npx".equalsIgnoreCase(command) || "npm".equalsIgnoreCase(command)) {
+                    String[] resolved = resolveNodeCliOnWindows(command, args);
+                    if (resolved != null) {
+                        command = resolved[0];
+                        args = new ArrayList<>(Arrays.asList(Arrays.copyOfRange(resolved, 1, resolved.length)));
+                    } else {
+                        args.add(0, command);
+                        args.add(0, "/c");
+                        command = "cmd.exe";
+                    }
+                } else {
+                    args.add(0, command);
+                    args.add(0, "/c");
+                    command = "cmd.exe";
+                }
+            }
+
+            // Inherit parent-process env (PATH etc.) then overlay any server-specific overrides.
+            Map<String, String> env = new HashMap<>(System.getenv());
+            if (config.env() != null) env.putAll(config.env());
+
+            ServerParameters params = ServerParameters.builder(command)
+                    .args(args)
+                    .env(env)
+                    .build();
+            client = McpClient.sync(new StdioClientTransport(params, McpJsonDefaults.getMapper()))
+                    .requestTimeout(Duration.ofSeconds(requestTimeoutSeconds))
+                    .initializationTimeout(Duration.ofSeconds(requestTimeoutSeconds * 2L))
+                    .build();
+        } else if (config.url() != null) {
+            client = McpClient.sync(HttpClientStreamableHttpTransport.builder(config.url()).build())
+                    .requestTimeout(Duration.ofSeconds(requestTimeoutSeconds))
+                    .initializationTimeout(Duration.ofSeconds(requestTimeoutSeconds * 2L))
+                    .build();
+        } else {
+            throw new IllegalArgumentException("MCP server config must have either 'command' or 'url'");
+        }
+        client.initialize();
+        return client;
+    }
+
+    /**
+     * Resolves {@code npx} or {@code npm} to {@code [node.exe, <cmd>-cli.js, ...originalArgs]}
+     * on Windows, bypassing cmd.exe so the stdio pipe reaches node directly.
+     * Looks for {@code npx.cmd} in each PATH directory; node.exe and npx-cli.js are co-located.
+     */
+    private static String[] resolveNodeCliOnWindows(String npmCommand, List<String> originalArgs) {
+        String pathEnv = System.getenv("PATH");
+        if (pathEnv == null) return null;
+        for (String dir : pathEnv.split(";")) {
+            String trimmed = dir.trim();
+            if (trimmed.isEmpty()) continue;
+            File cmdScript = new File(trimmed, npmCommand + ".cmd");
+            File nodeExe = new File(trimmed, "node.exe");
+            File cliJs = new File(trimmed + File.separator + "node_modules"
+                    + File.separator + "npm" + File.separator + "bin"
+                    + File.separator + npmCommand + "-cli.js");
+            if (cmdScript.exists() && nodeExe.exists() && cliJs.exists()) {
+                log.debug("Resolved {} → {} {} on Windows (bypassing cmd.exe)", npmCommand, nodeExe, cliJs);
+                List<String> result = new ArrayList<>();
+                result.add(nodeExe.getAbsolutePath());
+                result.add(cliJs.getAbsolutePath());
+                result.addAll(originalArgs);
+                return result.toArray(new String[0]);
+            }
+        }
+        log.warn("Could not resolve node.exe+{}-cli.js in PATH; falling back to cmd.exe /c", npmCommand);
+        return null;
+    }
+}
