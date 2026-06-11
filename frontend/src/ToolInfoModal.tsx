@@ -78,21 +78,14 @@ export function ToolInfoModal({ availableTools, disabledTools, onClose }: ToolIn
                     <p className="text-xs text-gray-500 m-0 mb-1">{meta.description}</p>
                   )}
                   {tool === 'mcp' && Object.keys(mcpTools).length > 0 && (
-                    <div className="mt-2 flex flex-col gap-2">
-                      {Object.entries(mcpTools).map(([server, tools]) => (
-                        <div key={server}>
-                          <p className="text-xs font-semibold text-gray-700 m-0 mb-1">{server}</p>
-                          <div className="flex flex-wrap gap-1">
-                            {tools.map((t) => (
-                              <span
-                                key={t}
-                                className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-mono"
-                              >
-                                {t}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {Object.keys(mcpTools).map((server) => (
+                        <span
+                          key={server}
+                          className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-mono"
+                        >
+                          {server}
+                        </span>
                       ))}
                     </div>
                   )}
