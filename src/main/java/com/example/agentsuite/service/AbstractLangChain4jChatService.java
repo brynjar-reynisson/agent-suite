@@ -11,7 +11,6 @@ import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.AiServices;
-import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.tool.DefaultToolExecutor;
 import dev.langchain4j.service.tool.ToolExecutor;
 import dev.langchain4j.service.tool.ToolProvider;
@@ -32,7 +31,7 @@ abstract class AbstractLangChain4jChatService implements ChatService {
     }
 
     interface AssistantService {
-        String chat(@UserMessage String userMessage);
+        String chat(@dev.langchain4j.service.UserMessage String userMessage);
     }
 
     private AssistantService buildAiService(String systemPrompt, List<ChatMessage> historyMessages,
