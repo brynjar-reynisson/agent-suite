@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -171,12 +172,26 @@ public class McpToolBridge implements DynamicToolProvider {
             String command = config.command();
             List<String> args = config.args() != null ? new ArrayList<>(config.args()) : new ArrayList<>();
 
-            // On Windows, ProcessBuilder cannot execute .cmd scripts (e.g. npx.cmd) directly.
-            // Wrapping with cmd.exe /c lets the shell resolve the script and inherit PATH.
+            // On Windows, ProcessBuilder cannot execute .cmd scripts directly.
+            // For npx/npm: resolve node.exe + *-cli.js directly — cmd.exe /c breaks the
+            // stdin pipe so the MCP server never receives the initialize request.
+            // For other commands: fall back to cmd.exe /c.
             if (System.getProperty("os.name", "").toLowerCase().contains("win")) {
-                args.add(0, command);
-                args.add(0, "/c");
-                command = "cmd.exe";
+                if ("npx".equalsIgnoreCase(command) || "npm".equalsIgnoreCase(command)) {
+                    String[] resolved = resolveNodeCliOnWindows(command, args);
+                    if (resolved != null) {
+                        command = resolved[0];
+                        args = new ArrayList<>(Arrays.asList(Arrays.copyOfRange(resolved, 1, resolved.length)));
+                    } else {
+                        args.add(0, command);
+                        args.add(0, "/c");
+                        command = "cmd.exe";
+                    }
+                } else {
+                    args.add(0, command);
+                    args.add(0, "/c");
+                    command = "cmd.exe";
+                }
             }
 
             // Inherit parent-process env (PATH etc.) then overlay any server-specific overrides.
@@ -201,5 +216,34 @@ public class McpToolBridge implements DynamicToolProvider {
         }
         client.initialize();
         return client;
+    }
+
+    /**
+     * Resolves {@code npx} or {@code npm} to {@code [node.exe, <cmd>-cli.js, ...originalArgs]}
+     * on Windows, bypassing cmd.exe so the stdio pipe reaches node directly.
+     * Looks for {@code npx.cmd} in each PATH directory; node.exe and npx-cli.js are co-located.
+     */
+    private static String[] resolveNodeCliOnWindows(String npmCommand, List<String> originalArgs) {
+        String pathEnv = System.getenv("PATH");
+        if (pathEnv == null) return null;
+        for (String dir : pathEnv.split(";")) {
+            String trimmed = dir.trim();
+            if (trimmed.isEmpty()) continue;
+            File cmdScript = new File(trimmed, npmCommand + ".cmd");
+            File nodeExe = new File(trimmed, "node.exe");
+            File cliJs = new File(trimmed + File.separator + "node_modules"
+                    + File.separator + "npm" + File.separator + "bin"
+                    + File.separator + npmCommand + "-cli.js");
+            if (cmdScript.exists() && nodeExe.exists() && cliJs.exists()) {
+                log.debug("Resolved {} → {} {} on Windows (bypassing cmd.exe)", npmCommand, nodeExe, cliJs);
+                List<String> result = new ArrayList<>();
+                result.add(nodeExe.getAbsolutePath());
+                result.add(cliJs.getAbsolutePath());
+                result.addAll(originalArgs);
+                return result.toArray(new String[0]);
+            }
+        }
+        log.warn("Could not resolve node.exe+{}-cli.js in PATH; falling back to cmd.exe /c", npmCommand);
+        return null;
     }
 }
