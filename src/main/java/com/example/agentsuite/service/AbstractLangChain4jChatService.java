@@ -63,16 +63,30 @@ abstract class AbstractLangChain4jChatService implements ChatService {
         return request -> {
             ToolProviderResult.Builder result = ToolProviderResult.builder();
             for (Object tool : tools) {
-                for (ToolSpecification spec : ToolSpecifications.toolSpecificationsFrom(tool)) {
-                    Method method = findMethod(tool, spec.name());
-                    ToolExecutor real = new DefaultToolExecutor(tool, method);
-                    result.add(spec, (req, memId) -> {
-                        String out = real.execute(req, memId);
-                        emitter.accept(new ChatEvent.ToolBatch(List.of(
-                                new ChatEvent.ToolBatch.ToolExecution(req.name(), req.arguments(), out)
-                        )));
-                        return out;
-                    });
+                if (tool instanceof DynamicToolProvider dtp) {
+                    for (Map.Entry<ToolSpecification, ToolExecutor> entry : dtp.toolEntries().entrySet()) {
+                        ToolSpecification spec = entry.getKey();
+                        ToolExecutor real = entry.getValue();
+                        result.add(spec, (req, memId) -> {
+                            String out = real.execute(req, memId);
+                            emitter.accept(new ChatEvent.ToolBatch(List.of(
+                                    new ChatEvent.ToolBatch.ToolExecution(req.name(), req.arguments(), out)
+                            )));
+                            return out;
+                        });
+                    }
+                } else {
+                    for (ToolSpecification spec : ToolSpecifications.toolSpecificationsFrom(tool)) {
+                        Method method = findMethod(tool, spec.name());
+                        ToolExecutor real = new DefaultToolExecutor(tool, method);
+                        result.add(spec, (req, memId) -> {
+                            String out = real.execute(req, memId);
+                            emitter.accept(new ChatEvent.ToolBatch(List.of(
+                                    new ChatEvent.ToolBatch.ToolExecution(req.name(), req.arguments(), out)
+                            )));
+                            return out;
+                        });
+                    }
                 }
             }
             return result.build();
