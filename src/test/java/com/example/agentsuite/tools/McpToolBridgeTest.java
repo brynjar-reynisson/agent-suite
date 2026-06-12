@@ -228,4 +228,20 @@ class McpToolBridgeTest {
 
         assertThat(bridge.scopedProvider(root.toString()).toolEntries()).isEmpty();
     }
+
+    @Test
+    void rootConfig_nullEnvValue_doesNotThrow() throws IOException {
+        Path root = writeRootConfig("vault", """
+                {"mcpServers": {"obsidian": {
+                    "command": "npx",
+                    "args": [],
+                    "env": {"FOO": null}
+                }}}""");
+
+        McpToolBridge bridge = new McpToolBridge(tempDir.resolve("no-global.json").toString(),
+                List.of(root.toString()), 30,
+                (name, cfg) -> mockClientWithTool("t", "d"));
+
+        assertThat(bridge.scopedProvider(root.toString()).toolEntries()).hasSize(1);
+    }
 }

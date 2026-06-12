@@ -122,7 +122,7 @@ public class McpToolBridge implements DynamicToolProvider {
                 ? Map.of()
                 : rootToolEntries.getOrDefault(rootDirectory, Map.of());
         if (rootEntries.isEmpty()) {
-            return new ScopedTools(toolEntries);
+            return new ScopedTools(Collections.unmodifiableMap(toolEntries));
         }
         Set<String> rootNames = rootEntries.keySet().stream()
                 .map(ToolSpecification::name)
@@ -221,9 +221,13 @@ public class McpToolBridge implements DynamicToolProvider {
         UnaryOperator<String> ex = s -> s == null ? null : s.replace("${root}", r);
         List<String> args = cfg.args() == null ? null
                 : cfg.args().stream().map(ex).collect(Collectors.toList());
-        Map<String, String> env = cfg.env() == null ? null
-                : cfg.env().entrySet().stream()
-                        .collect(Collectors.toMap(Map.Entry::getKey, e -> ex.apply(e.getValue())));
+        Map<String, String> env = null;
+        if (cfg.env() != null) {
+            env = new HashMap<>();
+            for (Map.Entry<String, String> e : cfg.env().entrySet()) {
+                env.put(e.getKey(), ex.apply(e.getValue()));
+            }
+        }
         return new McpServerConfig(ex.apply(cfg.command()), args, env, ex.apply(cfg.url()), cfg.transport());
     }
 
