@@ -12,6 +12,7 @@ const TOOL_META: Record<string, { icon: string; description: string }> = {
 interface ToolInfoModalProps {
   availableTools: string[];
   disabledTools: Set<string>;
+  rootDirectory: string;
   onClose: () => void;
 }
 
@@ -21,7 +22,7 @@ function parseMcpTool(name: string): { server: string; tool: string } | null {
   return { server: parts[1], tool: parts.slice(2).join('__') };
 }
 
-export function ToolInfoModal({ availableTools, disabledTools, onClose }: ToolInfoModalProps) {
+export function ToolInfoModal({ availableTools, disabledTools, rootDirectory, onClose }: ToolInfoModalProps) {
   const [mcpTools, setMcpTools] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export function ToolInfoModal({ availableTools, disabledTools, onClose }: ToolIn
   useEffect(() => {
     if (!availableTools.includes('mcp')) return;
     getAccessToken()
-      .then((token) => getMcpTools(token))
+      .then((token) => getMcpTools(token, rootDirectory))
       .then((names) => {
         const grouped: Record<string, string[]> = {};
         for (const name of names) {
@@ -43,7 +44,7 @@ export function ToolInfoModal({ availableTools, disabledTools, onClose }: ToolIn
         }
         setMcpTools(grouped);
       });
-  }, [availableTools]);
+  }, [availableTools, rootDirectory]);
 
   return (
     <div
