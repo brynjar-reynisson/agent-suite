@@ -122,6 +122,14 @@ class AiControllerTest {
     }
 
     @Test
+    void directories_includesObsidianVault() throws Exception {
+        mockMvc.perform(get("/ai/config/directories"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString(
+                        "C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian")));
+    }
+
+    @Test
     void tools_emptyRootDirectory_returnsError() throws Exception {
         mockMvc.perform(get("/ai/tools")
                         .param("command", "ls src")

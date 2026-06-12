@@ -44,7 +44,8 @@ public class AiController {
             "",
             "C:/Users/Lenovo/misc_projects/dragon",
             "C:/Users/Lenovo/misc_projects/gexplorer",
-            "C:/Users/Lenovo/IdeaProjects/agent-suite"
+            "C:/Users/Lenovo/IdeaProjects/agent-suite",
+            "C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian"
     );
 
     private final ChatOrchestrationService orchestrationService;
