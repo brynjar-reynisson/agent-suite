@@ -79,9 +79,10 @@ Spring Boot 3.5 + LangChain4j 1.16.2 agent application. Java 21.
 - `UnixTools` — exposes `ls`, `cat`, and `grep` as AI-callable tools. `ls`/`cat` confine access to the root directory by canonicalizing the resolved path and asserting it stays under root (`escapesRoot`) — this blocks both `..` traversal and absolute paths regardless of whether the root is a git repo. Additionally gitignore-aware (filters git-ignored paths when a `.git` is present).
 - `MarkDownWriter` — exposes `newMarkDownFile` as an AI-callable tool; writes spec/plan markdown files under `docs/specs/` or `docs/plans/`. Registered as the `"md-writer"` tool group.
 - `WebTools` — exposes `webSearch` and `webFetch` as AI-callable tools. Registered as the `"web"` tool group (both tools are granted together). `webSearch` requires `BRAVE_SEARCH_API_KEY`; `webFetch` works without a key but validates URLs against SSRF: non-http(s) schemes are rejected, redirects are disabled, and **every** resolved address is checked against an internal-range denylist (loopback, any-local, link-local incl. cloud metadata, site-local/private, multicast, `0.0.0.0/8`, CGNAT `100.64.0.0/10`, IPv6 ULA `fc00::/7`) via `WebTools.isDisallowedAddress`. DNS rebinding is not fully prevented (HttpClient re-resolves on connect), but the check runs immediately before the request and validates all records.
-- `McpToolBridge` — Spring singleton; parses `.mcp.json` at startup, connects MCP servers (stdio + Streamable HTTP via MCP SDK 2.0.0), discovers tools via `tools/list`, builds namespaced `ToolSpecification+ToolExecutor` pairs (`mcp__<serverName>__<toolName>`). `@PreDestroy` closes all connections. Implements `DynamicToolProvider`. Registered as the `"mcp"` tool group (admin-only). Gracefully no-ops when `.mcp.json` is absent.
+- `McpToolBridge` — Spring singleton; parses `.mcp.json` at startup, connects MCP servers (stdio + Streamable HTTP via MCP SDK 2.0.0), discovers tools via `tools/list`, builds namespaced `ToolSpecification+ToolExecutor` pairs (`mcp__<serverName>__<toolName>`). Additionally scans each allowed root directory for `<root>/.agent-suite-mcp.json` (same schema; the literal `${root}` in command/args/env/url expands to that directory, forward-slash form) and connects those servers per root — e.g. the Obsidian vault's config runs `npx -y obsidian-mcp ${root}` (filesystem-based, no Obsidian app needed). `scopedProvider(rootDirectory)` returns a `DynamicToolProvider` merging global + that root's tools (per-root wins on name collision, warning logged at startup); `AiController` passes it to the chat services for the `mcp` group, so per-root tools appear only when that root is selected. Per-root scanning is disabled in tests via `mcp.root-config.enabled=false`. `@PreDestroy` closes all connections. Registered as the `"mcp"` tool group (admin-only). Gracefully no-ops when configs are absent or malformed.
 - `McpJsonSchemaConverter` — converts MCP tool input schemas (`Map<String,Object>` from SDK 2.0.0 `tool.inputSchema()`) to LangChain4j `JsonObjectSchema`. Used by `McpToolBridge` when building `ToolSpecification` per tool.
 - `WebConfig` — CORS config allowing `localhost:5176/5177`, `127.0.0.1:5176/5177`, `https://agent.breynisson.org`, and `https://dev.agent.breynisson.org`.
+- `RootDirectories` — shared allowlist of root directories (previously hardcoded in `AiController`). `ALLOWED` includes `""` (no root selected); `nonEmpty()` is used by `McpToolBridge` for per-root config scanning.
 - `LangChain4jConfig` — placeholder for advanced LangChain4j wiring (currently empty).
 - `JwtSecretValidator` — startup guard (`@PostConstruct`) that fails the application fast if `supabase.jwt-secret` is blank, or if it equals the well-known local Supabase default while the `prod` profile is active. The secret is supplied by the environment (`SUPABASE_JWT_SECRET` / `SUPABASE_PROD_JWT_SECRET`); no usable default is committed to the repo.
 
@@ -107,7 +108,9 @@ GET /ai/config/user
   Returns { "isAdmin": boolean, "grantedToolGroups": string[] } for the authenticated user (guest → false, ["web"])
 
 GET /ai/config/mcp-tools
-  Admin-only. Returns JSON array of connected MCP tool names (mcp__<server>__<tool>). Non-admins get 403.
+  ?rootDirectory=<path>            (optional; must be in allowlist, 400 otherwise)
+  Admin-only. Returns JSON array of connected MCP tool names (mcp__<server>__<tool>),
+  merged global + per-root for the given rootDirectory. Non-admins get 403.
 ```
 
 **Message types** stored in the `message` table:

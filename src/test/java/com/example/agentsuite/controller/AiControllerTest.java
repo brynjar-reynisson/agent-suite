@@ -28,6 +28,7 @@ import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -78,6 +79,8 @@ class AiControllerTest {
         // Admin JWT (sub=admin-sub) resolves to an admin user; used by git-tool tests below.
         lenient().when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
         lenient().when(authorizationService.isAdmin(42L)).thenReturn(true);
+        lenient().when(mcpToolBridge.scopedProvider(org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(new McpToolBridge.ScopedTools(Map.of()));
     }
 
     private static final String ADMIN_BEARER = "Bearer " + makeAdminJwt("admin-sub", "admin@test.com");
@@ -265,11 +268,30 @@ class AiControllerTest {
 
     @Test
     void mcpTools_adminUser_returnsToolNames() throws Exception {
-        when(mcpToolBridge.toolNames()).thenReturn(List.of("mcp__server__tool"));
+        when(mcpToolBridge.toolNames("")).thenReturn(List.of("mcp__server__tool"));
         mockMvc.perform(get("/ai/config/mcp-tools")
                         .header("Authorization", ADMIN_BEARER))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0]").value("mcp__server__tool"));
+    }
+
+    @Test
+    void mcpTools_adminUser_withRootDirectory_returnsRootScopedNames() throws Exception {
+        when(mcpToolBridge.toolNames("C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian"))
+                .thenReturn(List.of("mcp__obsidian__read_note"));
+        mockMvc.perform(get("/ai/config/mcp-tools")
+                        .header("Authorization", ADMIN_BEARER)
+                        .param("rootDirectory", "C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value("mcp__obsidian__read_note"));
+    }
+
+    @Test
+    void mcpTools_adminUser_disallowedRootDirectory_returnsBadRequest() throws Exception {
+        mockMvc.perform(get("/ai/config/mcp-tools")
+                        .header("Authorization", ADMIN_BEARER)
+                        .param("rootDirectory", "C:/not/allowed"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -352,10 +374,13 @@ class AiControllerTest {
     }
 
     @Test
-    void buildToolInstances_mcpGroup_withBridge_returnsBridge() {
-        Object[] result = AiController.buildToolInstances("mcp", "", "", mcpToolBridge);
+    void buildToolInstances_mcpGroup_withBridge_returnsRootScopedProvider() {
+        when(mcpToolBridge.scopedProvider("C:/some/root"))
+                .thenReturn(new McpToolBridge.ScopedTools(Map.of()));
+        Object[] result = AiController.buildToolInstances("mcp", "C:/some/root", "", mcpToolBridge);
         assertThat(result).hasSize(1);
-        assertThat(result[0]).isSameAs(mcpToolBridge);
+        assertThat(result[0]).isInstanceOf(McpToolBridge.ScopedTools.class);
+        verify(mcpToolBridge).scopedProvider("C:/some/root");
     }
 
     @Test
@@ -533,7 +558,7 @@ class AiControllerTest {
         verify(orchestrationService).chatStream(
                 isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
                 argThat(arr -> arr instanceof Object[] t && t.length == 2
-                        && t[0] instanceof WebTools && t[1] instanceof McpToolBridge));
+                        && t[0] instanceof WebTools && t[1] instanceof McpToolBridge.ScopedTools));
     }
 
     @Test
@@ -562,7 +587,7 @@ class AiControllerTest {
                 argThat(arr -> arr instanceof Object[] t && t.length == 4
                         && t[0] instanceof WebTools
                         && t[1] instanceof MarkDownWriter
-                        && t[2] instanceof McpToolBridge
+                        && t[2] instanceof McpToolBridge.ScopedTools
                         && t[3] instanceof UnixTools));
     }
 

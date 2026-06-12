@@ -477,6 +477,7 @@ function App() {
         <ToolInfoModal
           availableTools={availableTools}
           disabledTools={disabledTools}
+          rootDirectory={rootDirectory}
           onClose={() => setIsToolInfoOpen(false)}
         />
       )}
