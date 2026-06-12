@@ -23,7 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Prod artifacts:** JAR is frozen in `release/` (copied from `target/` by `promote.*`); frontend is a static build in `frontend/dist/` served by `vite preview`. Neither updates unless you explicitly promote.
 
-**Required env vars (dev):** `DEEPSEEK_API_KEY`, `SUPABASE_JWT_SECRET` (fallback to local Supabase default if unset).  
+**Required env vars (dev):** `DEEPSEEK_API_KEY`, `SUPABASE_JWT_SECRET` (no baked-in fallback — startup fails fast if unset; set it to the local Supabase JWT secret, which the dev startup script provides).  
 **Required env vars (prod):** `DEEPSEEK_API_KEY`, `SUPABASE_PROD_DB_HOST`, `SUPABASE_PROD_DB_PASSWORD`, `SUPABASE_PROD_JWT_SECRET`, `SUPABASE_PROD_URL`, `SPRING_PROFILES_ACTIVE=prod`.  
 **Optional:** `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `MISTRAL_AI_API_KEY`, `BRAVE_SEARCH_API_KEY`.
 
@@ -83,8 +83,11 @@ Spring Boot 3.5 + LangChain4j 1.16.2 agent application. Java 21.
 - `McpJsonSchemaConverter` — converts MCP tool input schemas (`Map<String,Object>` from SDK 2.0.0 `tool.inputSchema()`) to LangChain4j `JsonObjectSchema`. Used by `McpToolBridge` when building `ToolSpecification` per tool.
 - `WebConfig` — CORS config allowing `localhost:5176/5177`, `127.0.0.1:5176/5177`, `https://agent.breynisson.org`, and `https://dev.agent.breynisson.org`.
 - `LangChain4jConfig` — placeholder for advanced LangChain4j wiring (currently empty).
+- `JwtSecretValidator` — startup guard (`@PostConstruct`) that fails the application fast if `supabase.jwt-secret` is blank, or if it equals the well-known local Supabase default while the `prod` profile is active. The secret is supplied by the environment (`SUPABASE_JWT_SECRET` / `SUPABASE_PROD_JWT_SECRET`); no usable default is committed to the repo.
 
 **AI model config** (`application.properties`): default model `deepseek-v4-pro`, temperature `0.1`, max tokens `8192`, request/response logging enabled, LangChain4j debug logging on.
+
+**Logging:** each profile writes to its own app-log file so the concurrently-running dev and prod backends don't interleave: dev → `./logs/agent-suite-dev.log`, prod → `./logs/agent-suite-prod.log` (base `application.properties` keeps `./logs/agent-suite.log` as a no-profile fallback). All are under the backend working directory (`logs/` is gitignored).
 
 ## API
 
