@@ -87,6 +87,8 @@ Spring Boot 3.5 + LangChain4j 1.16.2 agent application. Java 21.
 
 **AI model config** (`application.properties`): default model `deepseek-v4-pro`, temperature `0.1`, max tokens `8192`, request/response logging enabled, LangChain4j debug logging on.
 
+**Logging:** each profile writes to its own app-log file so the concurrently-running dev and prod backends don't interleave: dev → `./logs/agent-suite-dev.log`, prod → `./logs/agent-suite-prod.log` (base `application.properties` keeps `./logs/agent-suite.log` as a no-profile fallback). All are under the backend working directory (`logs/` is gitignored).
+
 ## API
 
 ```
