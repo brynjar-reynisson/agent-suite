@@ -90,8 +90,10 @@ export const getUserConfig = async (token?: string | null): Promise<UserConfig> 
   return response.json();
 };
 
-export const getMcpTools = async (): Promise<string[]> => {
-  const response = await fetch(`${API_BASE_URL}/ai/config/mcp-tools`);
+export const getMcpTools = async (token?: string | null): Promise<string[]> => {
+  const response = await fetch(`${API_BASE_URL}/ai/config/mcp-tools`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!response.ok) return [];
   return response.json();
 };

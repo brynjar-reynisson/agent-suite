@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getMcpTools } from './api';
+import { getAccessToken } from './auth';
 
 const TOOL_META: Record<string, { icon: string; description: string }> = {
   web:         { icon: '🌐', description: 'Search the web and fetch URLs.' },
@@ -31,15 +32,17 @@ export function ToolInfoModal({ availableTools, disabledTools, onClose }: ToolIn
 
   useEffect(() => {
     if (!availableTools.includes('mcp')) return;
-    getMcpTools().then((names) => {
-      const grouped: Record<string, string[]> = {};
-      for (const name of names) {
-        const parsed = parseMcpTool(name);
-        if (!parsed) continue;
-        (grouped[parsed.server] ??= []).push(parsed.tool);
-      }
-      setMcpTools(grouped);
-    });
+    getAccessToken()
+      .then((token) => getMcpTools(token))
+      .then((names) => {
+        const grouped: Record<string, string[]> = {};
+        for (const name of names) {
+          const parsed = parseMcpTool(name);
+          if (!parsed) continue;
+          (grouped[parsed.server] ??= []).push(parsed.tool);
+        }
+        setMcpTools(grouped);
+      });
   }, [availableTools]);
 
   return (
