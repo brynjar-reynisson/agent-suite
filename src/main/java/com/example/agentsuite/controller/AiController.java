@@ -1,5 +1,6 @@
 package com.example.agentsuite.controller;
 
+import com.example.agentsuite.config.RootDirectories;
 import com.example.agentsuite.filter.UserResolverFilter;
 import com.example.agentsuite.jooq.service.ConversationService;
 import com.example.agentsuite.service.AuthorizationService;
@@ -40,14 +41,6 @@ public class AiController {
 
     private static final Logger log = LoggerFactory.getLogger(AiController.class);
 
-    private static final Set<String> ALLOWED_ROOT_DIRECTORIES = Set.of(
-            "",
-            "C:/Users/Lenovo/misc_projects/dragon",
-            "C:/Users/Lenovo/misc_projects/gexplorer",
-            "C:/Users/Lenovo/IdeaProjects/agent-suite",
-            "C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian"
-    );
-
     private final ChatOrchestrationService orchestrationService;
     private final ModelRegistry modelRegistry;
     private final ConversationService conversationService;
@@ -74,7 +67,7 @@ public class AiController {
     public String executeTool(@RequestParam String command,
                               @RequestParam(defaultValue = "") String rootDirectory,
                               HttpServletRequest request) {
-        if (!ALLOWED_ROOT_DIRECTORIES.contains(rootDirectory)) {
+        if (!RootDirectories.ALLOWED.contains(rootDirectory)) {
             return "Error: Access to the specified root directory is not allowed.";
         }
         if (rootDirectory.isEmpty()) {
@@ -130,7 +123,7 @@ public class AiController {
 
     @GetMapping("/ai/config/directories")
     public Set<String> getAllowedDirectories() {
-        return ALLOWED_ROOT_DIRECTORIES;
+        return RootDirectories.ALLOWED;
     }
 
     @GetMapping("/ai/config/user")
@@ -182,7 +175,7 @@ public class AiController {
         SseEmitter emitter = new SseEmitter(300000L);
         long userId = currentUserId(request);
 
-        if (!ALLOWED_ROOT_DIRECTORIES.contains(rootDirectory)) {
+        if (!RootDirectories.ALLOWED.contains(rootDirectory)) {
             sendEvent(emitter, "error", "Error: Access to the specified root directory is not allowed.");
             emitter.complete();
             return emitter;
