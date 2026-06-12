@@ -33,8 +33,8 @@ public class UnixTools {
     @Tool("List directories and files in the specified path relative to the root directory")
     public String ls(@P("Relative path to list, use \".\" for current directory") String relativePath) {
         log.info("ls {}", relativePath);
-        if (relativePath.contains("..")) {
-            return "Error: Access to parent directories is not allowed.";
+        if (escapesRoot(relativePath)) {
+            return "Error: Access to paths outside the root directory is not allowed.";
         }
 
         String raw = Unix4j.cd(root.toString()).ls(relativePath).toStringResult();
@@ -71,8 +71,8 @@ public class UnixTools {
     @Tool("Concatenate and display the content of the specified file relative to the root directory")
     public String cat(@P("Relative path to the file") String relativePath) {
         log.info("cat {}", relativePath);
-        if (relativePath.contains("..")) {
-            return "Error: Access to parent directories is not allowed.";
+        if (escapesRoot(relativePath)) {
+            return "Error: Access to paths outside the root directory is not allowed.";
         }
         if (Files.exists(root.resolve(".git")) && !isPathAllowed(normalize(relativePath))) {
             return "Error: File is git-ignored: " + relativePath;
@@ -178,6 +178,17 @@ public class UnixTools {
             log.warn("git check-ignore failed, skipping filtering", e);
         }
         return ignored;
+    }
+
+    /**
+     * True if {@code relativePath} resolves outside the root directory. Catches both parent-directory
+     * traversal ("../..") and absolute paths (which {@code Path.resolve} would otherwise honor verbatim),
+     * independent of whether the root is a git repository.
+     */
+    private boolean escapesRoot(String relativePath) {
+        Path base = root.toAbsolutePath().normalize();
+        Path resolved = base.resolve(relativePath).normalize();
+        return !resolved.startsWith(base);
     }
 
     private static String normalize(String path) {
