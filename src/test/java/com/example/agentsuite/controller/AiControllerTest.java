@@ -250,6 +250,21 @@ class AiControllerTest {
     }
 
     @Test
+    void mcpTools_guestUser_returnsForbidden() throws Exception {
+        mockMvc.perform(get("/ai/config/mcp-tools"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void mcpTools_adminUser_returnsToolNames() throws Exception {
+        when(mcpToolBridge.toolNames()).thenReturn(List.of("mcp__server__tool"));
+        mockMvc.perform(get("/ai/config/mcp-tools")
+                        .header("Authorization", ADMIN_BEARER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value("mcp__server__tool"));
+    }
+
+    @Test
     void buildToolInstances_emptyTools_returnsEmptyArray() {
         Object[] result = AiController.buildToolInstances("", tempDir.toString(), "", null);
         assertThat(result).isEmpty();

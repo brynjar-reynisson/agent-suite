@@ -105,6 +105,9 @@ GET /ai/config/directories
 
 GET /ai/config/user
   Returns { "isAdmin": boolean, "grantedToolGroups": string[] } for the authenticated user (guest → false, ["web"])
+
+GET /ai/config/mcp-tools
+  Admin-only. Returns JSON array of connected MCP tool names (mcp__<server>__<tool>). Non-admins get 403.
 ```
 
 **Message types** stored in the `message` table:

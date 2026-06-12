@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -141,8 +142,13 @@ public class AiController {
     }
 
     @GetMapping("/ai/config/mcp-tools")
-    public List<String> getMcpTools() {
-        return mcpToolBridge.toolNames();
+    public ResponseEntity<List<String>> getMcpTools(HttpServletRequest request) {
+        boolean isAdmin = Boolean.TRUE.equals(request.getAttribute(UserResolverFilter.ATTR_IS_ADMIN));
+        if (!isAdmin) {
+            // mcp is an admin-only tool group; don't disclose the connected tool inventory to others.
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(mcpToolBridge.toolNames());
     }
 
     @GetMapping("/ai/conversations")
