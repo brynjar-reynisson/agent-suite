@@ -36,12 +36,15 @@ public class UserResolverFilter extends OncePerRequestFilter {
     // The isAdmin DB lookup is skipped for this id — if the row is ever deleted and re-inserted
     // it would receive a new id and this guard would need updating.
     private static final long GUEST_USER_ID = 1L;
+    // Supabase user tokens carry aud="authenticated"; reject anything else (anon/service/foreign tokens).
+    private static final String EXPECTED_AUDIENCE = "authenticated";
     private static final Logger log = LoggerFactory.getLogger(UserResolverFilter.class);
 
     private final SuiteUserService suiteUserService;
     private final AuthorizationService authorizationService;
     private final String jwtSecret;
     private final String supabaseUrl;
+    private final String expectedIssuer;
     private final ObjectMapper objectMapper;
 
     private volatile PublicKey cachedPublicKey;
@@ -50,11 +53,16 @@ public class UserResolverFilter extends OncePerRequestFilter {
                                AuthorizationService authorizationService,
                                @Value("${supabase.jwt-secret}") String jwtSecret,
                                @Value("${supabase.url}") String supabaseUrl,
+                               @Value("${supabase.jwt-issuer:}") String issuerOverride,
                                ObjectMapper objectMapper) {
         this.suiteUserService = suiteUserService;
         this.authorizationService = authorizationService;
         this.jwtSecret = jwtSecret;
         this.supabaseUrl = supabaseUrl;
+        // Default to the Supabase convention <supabase.url>/auth/v1; overridable if the issuer string differs.
+        this.expectedIssuer = (issuerOverride != null && !issuerOverride.isBlank())
+                ? issuerOverride
+                : supabaseUrl + "/auth/v1";
         this.objectMapper = objectMapper;
     }
 
@@ -82,13 +90,17 @@ public class UserResolverFilter extends OncePerRequestFilter {
         String token = header.substring(7);
         try {
             Claims claims = Jwts.parserBuilder()
+                    .requireIssuer(expectedIssuer)
+                    .requireAudience(EXPECTED_AUDIENCE)
                     .setSigningKeyResolver(new SigningKeyResolverAdapter() {
                         @Override
                         @SuppressWarnings("rawtypes")
                         public Key resolveSigningKey(JwsHeader header, Claims claims) {
+                            // Pin to the two algorithms Supabase actually issues. HS256 uses the shared
+                            // project secret; ES256 uses the asymmetric public key from JWKS. No other
+                            // algorithm (incl. HS384/512 and "none") is accepted.
                             return switch (header.getAlgorithm()) {
-                                case "HS256", "HS384", "HS512" ->
-                                        Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+                                case "HS256" -> Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
                                 case "ES256" -> getOrFetchPublicKey();
                                 default -> throw new UnsupportedJwtException(
                                         "Unsupported algorithm: " + header.getAlgorithm());
