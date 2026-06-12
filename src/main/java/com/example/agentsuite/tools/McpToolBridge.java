@@ -1,5 +1,6 @@
 package com.example.agentsuite.tools;
 
+import com.example.agentsuite.config.RootDirectories;
 import com.example.agentsuite.service.DynamicToolProvider;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,11 +24,15 @@ import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiFunction;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,6 +40,8 @@ public class McpToolBridge implements DynamicToolProvider {
 
     private static final Logger log = LoggerFactory.getLogger(McpToolBridge.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    static final String ROOT_CONFIG_FILENAME = ".agent-suite-mcp.json";
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record McpServerConfig(String command, List<String> args, Map<String, String> env,
@@ -44,19 +51,50 @@ public class McpToolBridge implements DynamicToolProvider {
     record McpConfig(Map<String, McpServerConfig> mcpServers) {}
 
     private final Map<ToolSpecification, ToolExecutor> toolEntries;
+    private final Map<String, Map<ToolSpecification, ToolExecutor>> rootToolEntries;
     private final List<McpSyncClient> clients;
 
     @Autowired
     public McpToolBridge(
             @Value("${mcp.config.path:.mcp.json}") String configPath,
-            @Value("${mcp.call-timeout-seconds:90}") int callTimeoutSeconds) {
-        this(configPath, callTimeoutSeconds, (name, cfg) -> defaultCreateClient(name, cfg, callTimeoutSeconds));
+            @Value("${mcp.call-timeout-seconds:90}") int callTimeoutSeconds,
+            @Value("${mcp.root-config.enabled:true}") boolean rootConfigEnabled) {
+        this(configPath,
+                rootConfigEnabled ? RootDirectories.nonEmpty() : Set.of(),
+                callTimeoutSeconds,
+                (name, cfg) -> defaultCreateClient(name, cfg, callTimeoutSeconds));
     }
 
-    McpToolBridge(String configPath, int callTimeoutSeconds,
+    McpToolBridge(String configPath, Collection<String> rootDirectories, int callTimeoutSeconds,
                   BiFunction<String, McpServerConfig, McpSyncClient> clientFactory) {
         this.clients = new ArrayList<>();
-        this.toolEntries = buildToolEntries(configPath, callTimeoutSeconds, clientFactory);
+        this.toolEntries = loadEntries(new File(configPath), null, callTimeoutSeconds, clientFactory);
+
+        Map<String, Map<ToolSpecification, ToolExecutor>> scoped = new LinkedHashMap<>();
+        for (String root : rootDirectories) {
+            File rootConfig = new File(root, ROOT_CONFIG_FILENAME);
+            if (!rootConfig.exists()) {
+                continue;
+            }
+            Map<ToolSpecification, ToolExecutor> entries =
+                    loadEntries(rootConfig, root, callTimeoutSeconds, clientFactory);
+            if (!entries.isEmpty()) {
+                scoped.put(root, entries);
+                warnOnCollisions(root, entries);
+            }
+        }
+        this.rootToolEntries = scoped;
+    }
+
+    private void warnOnCollisions(String root, Map<ToolSpecification, ToolExecutor> rootEntries) {
+        Set<String> globalNames = toolEntries.keySet().stream()
+                .map(ToolSpecification::name)
+                .collect(Collectors.toSet());
+        rootEntries.keySet().stream()
+                .map(ToolSpecification::name)
+                .filter(globalNames::contains)
+                .forEach(name -> log.warn(
+                        "MCP tool name collision: '{}' defined globally and in root '{}' — root-scoped wins", name, root));
     }
 
     @Override
@@ -71,6 +109,34 @@ public class McpToolBridge implements DynamicToolProvider {
                 .collect(Collectors.toList());
     }
 
+    /** Root-scoped view over the bridge's tools: global entries plus the root's entries (root wins on name collision). */
+    public record ScopedTools(Map<ToolSpecification, ToolExecutor> entries) implements DynamicToolProvider {
+        @Override
+        public Map<ToolSpecification, ToolExecutor> toolEntries() {
+            return entries;
+        }
+    }
+
+    public DynamicToolProvider scopedProvider(String rootDirectory) {
+        Map<ToolSpecification, ToolExecutor> rootEntries = rootDirectory == null
+                ? Map.of()
+                : rootToolEntries.getOrDefault(rootDirectory, Map.of());
+        if (rootEntries.isEmpty()) {
+            return new ScopedTools(toolEntries);
+        }
+        Set<String> rootNames = rootEntries.keySet().stream()
+                .map(ToolSpecification::name)
+                .collect(Collectors.toSet());
+        Map<ToolSpecification, ToolExecutor> merged = new LinkedHashMap<>();
+        toolEntries.forEach((spec, exec) -> {
+            if (!rootNames.contains(spec.name())) {
+                merged.put(spec, exec);
+            }
+        });
+        merged.putAll(rootEntries);
+        return new ScopedTools(Collections.unmodifiableMap(merged));
+    }
+
     @PreDestroy
     void close() {
         for (McpSyncClient client : clients) {
@@ -80,20 +146,19 @@ public class McpToolBridge implements DynamicToolProvider {
         }
     }
 
-    private Map<ToolSpecification, ToolExecutor> buildToolEntries(
-            String configPath, int callTimeoutSeconds,
+    private Map<ToolSpecification, ToolExecutor> loadEntries(
+            File configFile, String rootOrNull, int callTimeoutSeconds,
             BiFunction<String, McpServerConfig, McpSyncClient> clientFactory) {
 
         McpConfig config;
         try {
-            File configFile = new File(configPath);
             if (!configFile.exists()) {
-                log.info("No .mcp.json found at {} — mcp tool group will have no tools", configPath);
+                log.info("No MCP config found at {} — skipping", configFile);
                 return Map.of();
             }
             config = MAPPER.readValue(configFile, McpConfig.class);
         } catch (Exception e) {
-            log.warn("Failed to parse MCP config at {}: {}", configPath, e.getMessage());
+            log.warn("Failed to parse MCP config at {}: {}", configFile, e.getMessage());
             return Map.of();
         }
 
@@ -105,7 +170,9 @@ public class McpToolBridge implements DynamicToolProvider {
 
         for (Map.Entry<String, McpServerConfig> serverEntry : config.mcpServers().entrySet()) {
             String serverName = serverEntry.getKey();
-            McpServerConfig serverConfig = serverEntry.getValue();
+            McpServerConfig serverConfig = rootOrNull != null
+                    ? expandRoot(serverEntry.getValue(), rootOrNull)
+                    : serverEntry.getValue();
 
             McpSyncClient client;
             try {
@@ -140,11 +207,24 @@ public class McpToolBridge implements DynamicToolProvider {
                         client, serverName, originalName, req.arguments(), callTimeoutSeconds);
 
                 entries.put(spec, executor);
-                log.info("Registered MCP tool: {}", namespacedName);
+                log.info("Registered MCP tool: {}{}", namespacedName,
+                        rootOrNull != null ? " (root: " + rootOrNull + ")" : "");
             }
         }
 
         return entries;
+    }
+
+    /** Expands the literal {@code ${root}} in command, args, env values, and url to the root directory (forward-slash form). */
+    private static McpServerConfig expandRoot(McpServerConfig cfg, String root) {
+        String r = root.replace('\\', '/');
+        UnaryOperator<String> ex = s -> s == null ? null : s.replace("${root}", r);
+        List<String> args = cfg.args() == null ? null
+                : cfg.args().stream().map(ex).collect(Collectors.toList());
+        Map<String, String> env = cfg.env() == null ? null
+                : cfg.env().entrySet().stream()
+                        .collect(Collectors.toMap(Map.Entry::getKey, e -> ex.apply(e.getValue())));
+        return new McpServerConfig(ex.apply(cfg.command()), args, env, ex.apply(cfg.url()), cfg.transport());
     }
 
     @SuppressWarnings("unchecked")
