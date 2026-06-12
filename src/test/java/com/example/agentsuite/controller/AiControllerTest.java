@@ -36,6 +36,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import java.util.function.Consumer;
@@ -74,7 +75,12 @@ class AiControllerTest {
     void setUpAuth() {
         when(authorizationService.grantedToolGroups(false)).thenReturn(List.of("web"));
         when(authorizationService.grantedToolGroups(true)).thenReturn(List.of("web", "md-writer", "mcp"));
+        // Admin JWT (sub=admin-sub) resolves to an admin user; used by git-tool tests below.
+        lenient().when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
+        lenient().when(authorizationService.isAdmin(42L)).thenReturn(true);
     }
+
+    private static final String ADMIN_BEARER = "Bearer " + makeAdminJwt("admin-sub", "admin@test.com");
 
     @Test
     void chat_unknownModel_returnsError() throws Exception {
@@ -154,6 +160,7 @@ class AiControllerTest {
     @Test
     void tools_gitStatus_returnsGitOutput() throws Exception {
         mockMvc.perform(get("/ai/tools")
+                        .header("Authorization", ADMIN_BEARER)
                         .param("command", "git status")
                         .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
                 .andExpect(status().isOk())
@@ -165,6 +172,7 @@ class AiControllerTest {
     @Test
     void tools_gitNoSubcommand_returnsError() throws Exception {
         mockMvc.perform(get("/ai/tools")
+                        .header("Authorization", ADMIN_BEARER)
                         .param("command", "git")
                         .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
                 .andExpect(status().isOk())
@@ -174,6 +182,7 @@ class AiControllerTest {
     @Test
     void tools_gitUnknownSubcommand_returnsError() throws Exception {
         mockMvc.perform(get("/ai/tools")
+                        .header("Authorization", ADMIN_BEARER)
                         .param("command", "git rebase")
                         .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
                 .andExpect(status().isOk())
@@ -183,6 +192,7 @@ class AiControllerTest {
     @Test
     void tools_gitAddMissingArg_returnsError() throws Exception {
         mockMvc.perform(get("/ai/tools")
+                        .header("Authorization", ADMIN_BEARER)
                         .param("command", "git add")
                         .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
                 .andExpect(status().isOk())
@@ -192,6 +202,7 @@ class AiControllerTest {
     @Test
     void tools_gitCommitMissingMessage_returnsError() throws Exception {
         mockMvc.perform(get("/ai/tools")
+                        .header("Authorization", ADMIN_BEARER)
                         .param("command", "git commit")
                         .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
                 .andExpect(status().isOk())
@@ -201,6 +212,7 @@ class AiControllerTest {
     @Test
     void tools_gitNewBranchMissingArg_returnsError() throws Exception {
         mockMvc.perform(get("/ai/tools")
+                        .header("Authorization", ADMIN_BEARER)
                         .param("command", "git newBranch")
                         .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
                 .andExpect(status().isOk())
@@ -210,6 +222,7 @@ class AiControllerTest {
     @Test
     void tools_gitCheckoutBranchMissingArg_returnsError() throws Exception {
         mockMvc.perform(get("/ai/tools")
+                        .header("Authorization", ADMIN_BEARER)
                         .param("command", "git checkoutBranch")
                         .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
                 .andExpect(status().isOk())
@@ -219,11 +232,21 @@ class AiControllerTest {
     @Test
     void tools_gitPull_doesNotReturnUnknownSubcommand() throws Exception {
         mockMvc.perform(get("/ai/tools")
+                        .header("Authorization", ADMIN_BEARER)
                         .param("command", "git pull")
                         .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.CoreMatchers.not(
                         org.hamcrest.CoreMatchers.containsString("Unknown git subcommand"))));
+    }
+
+    @Test
+    void tools_gitCommand_guestUser_returnsAuthorizationError() throws Exception {
+        mockMvc.perform(get("/ai/tools")
+                        .param("command", "git push")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("Admin role required")));
     }
 
     @Test

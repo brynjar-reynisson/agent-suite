@@ -282,7 +282,8 @@ function App() {
     if (message.startsWith('!')) {
       try {
         const command = message.slice(1).trim();
-        const result = await execTool(command, rootDirectory);
+        const token = await getAccessToken();
+        const result = await execTool(command, rootDirectory, token);
         const toolOutput = '```\n' + result + '\n```';
         setMessages((prev) => [...prev, { role: 'ai', content: toolOutput }]);
       } catch (error: any) {

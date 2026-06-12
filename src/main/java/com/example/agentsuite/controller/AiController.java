@@ -70,7 +70,8 @@ public class AiController {
 
     @GetMapping("/ai/tools")
     public String executeTool(@RequestParam String command,
-                              @RequestParam(defaultValue = "") String rootDirectory) {
+                              @RequestParam(defaultValue = "") String rootDirectory,
+                              HttpServletRequest request) {
         if (!ALLOWED_ROOT_DIRECTORIES.contains(rootDirectory)) {
             return "Error: Access to the specified root directory is not allowed.";
         }
@@ -93,6 +94,10 @@ public class AiController {
                     ? unixTools.grep(tokens.get(1), tokens.get(2))
                     : "Error: grep requires search text and file filter";
             case "git" -> {
+                boolean isAdmin = Boolean.TRUE.equals(request.getAttribute(UserResolverFilter.ATTR_IS_ADMIN));
+                if (!isAdmin) {
+                    yield "Error: Admin role required for git commands.";
+                }
                 if (tokens.size() < 2) {
                     yield "Error: git requires a subcommand: status, add, commit, pull, push, newBranch, checkoutBranch";
                 }
