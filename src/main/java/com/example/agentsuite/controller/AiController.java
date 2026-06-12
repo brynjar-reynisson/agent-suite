@@ -2,6 +2,7 @@ package com.example.agentsuite.controller;
 
 import com.example.agentsuite.config.RootDirectories;
 import com.example.agentsuite.filter.UserResolverFilter;
+import com.example.agentsuite.service.DynamicToolProvider;
 import com.example.agentsuite.jooq.service.ConversationService;
 import com.example.agentsuite.service.AuthorizationService;
 import com.example.agentsuite.service.ChatEvent;
@@ -136,13 +137,18 @@ public class AiController {
     }
 
     @GetMapping("/ai/config/mcp-tools")
-    public ResponseEntity<List<String>> getMcpTools(HttpServletRequest request) {
+    public ResponseEntity<List<String>> getMcpTools(
+            @RequestParam(defaultValue = "") String rootDirectory,
+            HttpServletRequest request) {
         boolean isAdmin = Boolean.TRUE.equals(request.getAttribute(UserResolverFilter.ATTR_IS_ADMIN));
         if (!isAdmin) {
             // mcp is an admin-only tool group; don't disclose the connected tool inventory to others.
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        return ResponseEntity.ok(mcpToolBridge.toolNames());
+        if (!RootDirectories.ALLOWED.contains(rootDirectory)) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(mcpToolBridge.toolNames(rootDirectory));
     }
 
     @GetMapping("/ai/conversations")
@@ -278,7 +284,10 @@ public class AiController {
                 }
                 case "web" -> instances.add(new WebTools(braveApiKey));
                 case "mcp" -> {
-                    if (mcpToolBridge != null) instances.add(mcpToolBridge);
+                    if (mcpToolBridge != null) {
+                        DynamicToolProvider scoped = mcpToolBridge.scopedProvider(rootDirectory);
+                        if (scoped != null) instances.add(scoped);
+                    }
                 }
             }
         }
