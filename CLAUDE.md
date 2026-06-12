@@ -85,7 +85,7 @@ Spring Boot 3.5 + LangChain4j 1.16.2 agent application. Java 21.
 - `LangChain4jConfig` — placeholder for advanced LangChain4j wiring (currently empty).
 - `JwtSecretValidator` — startup guard (`@PostConstruct`) that fails the application fast if `supabase.jwt-secret` is blank, or if it equals the well-known local Supabase default while the `prod` profile is active. The secret is supplied by the environment (`SUPABASE_JWT_SECRET` / `SUPABASE_PROD_JWT_SECRET`); no usable default is committed to the repo.
 
-**AI model config** (`application.properties`): default model `deepseek-v4-pro`, temperature `0.1`, max tokens `8192`, request/response logging enabled, LangChain4j debug logging on.
+**AI model config** (`application.properties`): default model `deepseek-v4-pro`, temperature `0.1`, max tokens `8192`. LangChain4j request/response logging is **off** and the `dev.langchain4j` log level is `INFO` — request logging would include the outbound `Authorization: Bearer <provider-key>` header, so it stays disabled (defense in depth; the models are also built without `logRequests`).
 
 **Logging:** each profile writes to its own app-log file so the concurrently-running dev and prod backends don't interleave: dev → `./logs/agent-suite-dev.log`, prod → `./logs/agent-suite-prod.log` (base `application.properties` keeps `./logs/agent-suite.log` as a no-profile fallback). All are under the backend working directory (`logs/` is gitignored).
 
