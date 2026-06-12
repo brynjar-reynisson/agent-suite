@@ -9,6 +9,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -122,14 +124,37 @@ public class WebTools {
             throw new IllegalArgumentException("URL has no host");
         }
         try {
-            // Note: DNS rebinding is not prevented — host is resolved once here but HttpClient re-resolves on connect.
-            InetAddress addr = InetAddress.getByName(host);
-            if (addr.isLoopbackAddress() || addr.isLinkLocalAddress() || addr.isSiteLocalAddress()) {
-                throw new IllegalArgumentException("URL resolves to a private or internal address");
+            // Validate every resolved address (not just the first) to defeat multi-record DNS tricks.
+            // Caveat: this does not fully prevent DNS rebinding — HttpClient re-resolves on connect — but
+            // the check runs immediately before the request and follows no redirects.
+            for (InetAddress addr : InetAddress.getAllByName(host)) {
+                if (isDisallowedAddress(addr)) {
+                    throw new IllegalArgumentException("URL resolves to a private or internal address");
+                }
             }
         } catch (UnknownHostException e) {
             throw new IllegalArgumentException("Cannot resolve host: " + host);
         }
+    }
+
+    static boolean isDisallowedAddress(InetAddress addr) {
+        if (addr.isLoopbackAddress()      // 127.0.0.0/8, ::1
+                || addr.isAnyLocalAddress()   // 0.0.0.0, ::
+                || addr.isLinkLocalAddress()  // 169.254.0.0/16 (incl. cloud metadata), fe80::/10
+                || addr.isSiteLocalAddress()  // 10/8, 172.16/12, 192.168/16, fec0::/10
+                || addr.isMulticastAddress()) {
+            return true;
+        }
+        byte[] b = addr.getAddress();
+        if (addr instanceof Inet4Address) {
+            int first = b[0] & 0xFF;
+            int second = b[1] & 0xFF;
+            if (first == 0) return true;                          // 0.0.0.0/8 "this network"
+            if (first == 100 && second >= 64 && second <= 127) return true; // 100.64.0.0/10 CGNAT
+        } else if (addr instanceof Inet6Address) {
+            if ((b[0] & 0xFE) == 0xFC) return true;               // fc00::/7 unique local addresses
+        }
+        return false;
     }
 
     static String processBody(String html) {
