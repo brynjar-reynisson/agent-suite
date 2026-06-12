@@ -96,9 +96,15 @@ export const getMcpTools = async (): Promise<string[]> => {
   return response.json();
 };
 
-export const execTool = async (command: string, rootDirectory: string): Promise<string> => {
+export const execTool = async (
+  command: string,
+  rootDirectory: string,
+  token?: string | null,
+): Promise<string> => {
   const urlParams = new URLSearchParams({ command, rootDirectory });
-  const response = await fetch(`${API_BASE_URL}/ai/tools?${urlParams.toString()}`);
+  const response = await fetch(`${API_BASE_URL}/ai/tools?${urlParams.toString()}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   return response.text();
 };
 
