@@ -584,6 +584,8 @@ class AiControllerTest {
         return Jwts.builder()
                 .setSubject(sub)
                 .claim("email", email)
+                .setIssuer("http://127.0.0.1:54321/auth/v1")
+                .setAudience("authenticated")
                 .setExpiration(new Date(System.currentTimeMillis() + 3_600_000))
                 .signWith(Keys.hmacShaKeyFor(
                         "test-secret-padded-to-at-least-32-characters".getBytes(StandardCharsets.UTF_8)),
