@@ -103,7 +103,11 @@ public class McpToolBridge implements DynamicToolProvider {
     }
 
     public List<String> toolNames() {
-        return toolEntries.keySet().stream()
+        return toolNames("");
+    }
+
+    public List<String> toolNames(String rootDirectory) {
+        return scopedProvider(rootDirectory).toolEntries().keySet().stream()
                 .map(ToolSpecification::name)
                 .sorted()
                 .collect(Collectors.toList());

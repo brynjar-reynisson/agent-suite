@@ -244,4 +244,45 @@ class McpToolBridgeTest {
 
         assertThat(bridge.scopedProvider(root.toString()).toolEntries()).hasSize(1);
     }
+
+    @Test
+    void scopedProvider_toolNameCollision_rootWins() throws IOException {
+        Path globalConfig = tempDir.resolve(".mcp.json");
+        Files.writeString(globalConfig, """
+                {"mcpServers": {"fs": {"command": "g", "args": []}}}""");
+        Path root = writeRootConfig("vault", """
+                {"mcpServers": {"fs": {"command": "r", "args": []}}}""");
+
+        // both servers are named "fs" and expose a tool named "search" -> same namespaced name
+        McpToolBridge bridge = new McpToolBridge(globalConfig.toString(),
+                List.of(root.toString()), 30,
+                (name, cfg) -> "g".equals(cfg.command())
+                        ? mockClientWithTool("search", "global search")
+                        : mockClientWithTool("search", "root search"));
+
+        Map<ToolSpecification, ToolExecutor> merged = bridge.scopedProvider(root.toString()).toolEntries();
+        assertThat(merged).hasSize(1);
+        ToolSpecification spec = merged.keySet().iterator().next();
+        assertThat(spec.name()).isEqualTo("mcp__fs__search");
+        assertThat(spec.description()).isEqualTo("root search");
+    }
+
+    @Test
+    void toolNames_withRoot_returnsMergedSortedNames() throws IOException {
+        Path globalConfig = tempDir.resolve(".mcp.json");
+        Files.writeString(globalConfig, """
+                {"mcpServers": {"zeta": {"command": "g", "args": []}}}""");
+        Path root = writeRootConfig("vault", """
+                {"mcpServers": {"alpha": {"command": "r", "args": []}}}""");
+
+        Map<String, McpSyncClient> clients = Map.of(
+                "zeta", mockClientWithTool("z_tool", "Z"),
+                "alpha", mockClientWithTool("a_tool", "A"));
+        McpToolBridge bridge = new McpToolBridge(globalConfig.toString(),
+                List.of(root.toString()), 30, (name, cfg) -> clients.get(name));
+
+        assertThat(bridge.toolNames(root.toString()))
+                .containsExactly("mcp__alpha__a_tool", "mcp__zeta__z_tool");
+        assertThat(bridge.toolNames()).containsExactly("mcp__zeta__z_tool");
+    }
 }
