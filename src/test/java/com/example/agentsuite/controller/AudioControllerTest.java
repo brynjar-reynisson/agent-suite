@@ -3,12 +3,14 @@ package com.example.agentsuite.controller;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -52,10 +54,16 @@ class AudioControllerTest {
 
     @Test
     void getAudio_badExtension_returns400() throws Exception {
-        Files.writeString(audioDir.resolve("script.ogg"), "ogg data");
-
         mockMvc.perform(get("/audio/script.ogg"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getAudio_dotDotTraversal_returns404() {
+        // Directly call controller to bypass MockMvc URL normalization
+        AudioController controller = new AudioController(audioDir.toString());
+        ResponseEntity<byte[]> response = controller.serveAudio("../secret.wav");
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
     }
 
     @Test

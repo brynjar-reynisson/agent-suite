@@ -37,6 +37,8 @@ public class AudioController {
         log.info("Audio serve directory: {}", audioDir);
     }
 
+    // Intentionally unauthenticated: access is path-confined to tmp_audio_files/ and
+    // extension-locked to .wav/.mp3. Per-user auth can be added later if needed.
     @GetMapping("/audio/{filename}")
     public ResponseEntity<byte[]> serveAudio(@PathVariable String filename) {
         if (filename.contains("/") || filename.contains("\\") || filename.contains("..")) {
@@ -62,7 +64,10 @@ public class AudioController {
 
         try {
             byte[] bytes = Files.readAllBytes(file);
-            return ResponseEntity.ok().contentType(mediaType).body(bytes);
+            return ResponseEntity.ok()
+                    .contentType(mediaType)
+                    .header("X-Content-Type-Options", "nosniff")
+                    .body(bytes);
         } catch (IOException e) {
             log.error("Failed to read audio file {}", filename, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
