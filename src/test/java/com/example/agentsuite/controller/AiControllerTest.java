@@ -75,7 +75,7 @@ class AiControllerTest {
     @BeforeEach
     void setUpAuth() {
         when(authorizationService.grantedToolGroups(false)).thenReturn(List.of("web"));
-        when(authorizationService.grantedToolGroups(true)).thenReturn(List.of("web", "md-writer", "mcp"));
+        when(authorizationService.grantedToolGroups(true)).thenReturn(List.of("web", "md-writer", "mcp", "audio"));
         // Admin JWT (sub=admin-sub) resolves to an admin user; used by git-tool tests below.
         lenient().when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
         lenient().when(authorizationService.isAdmin(42L)).thenReturn(true);
@@ -571,8 +571,9 @@ class AiControllerTest {
 
         verify(orchestrationService).chatStream(
                 isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
-                argThat(arr -> arr instanceof Object[] t && t.length == 2
-                        && t[0] instanceof WebTools && t[1] instanceof McpToolBridge.ScopedTools));
+                argThat(arr -> arr instanceof Object[] t && t.length == 3
+                        && t[0] instanceof WebTools && t[1] instanceof McpToolBridge.ScopedTools
+                        && t[2] instanceof com.example.agentsuite.tools.AudioTools));
     }
 
     @Test
@@ -595,14 +596,15 @@ class AiControllerTest {
 
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
 
-        // order is a deliberate contract: grantedToolGroups order (web, md-writer, mcp) then unix last
+        // order is a deliberate contract: grantedToolGroups order (web, md-writer, mcp, audio) then unix last
         verify(orchestrationService).chatStream(
                 isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
-                argThat(arr -> arr instanceof Object[] t && t.length == 4
+                argThat(arr -> arr instanceof Object[] t && t.length == 5
                         && t[0] instanceof WebTools
                         && t[1] instanceof MarkDownWriter
                         && t[2] instanceof McpToolBridge.ScopedTools
-                        && t[3] instanceof UnixTools));
+                        && t[3] instanceof com.example.agentsuite.tools.AudioTools
+                        && t[4] instanceof UnixTools));
     }
 
     @Test
