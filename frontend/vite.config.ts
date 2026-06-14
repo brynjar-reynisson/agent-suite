@@ -13,6 +13,10 @@ export default defineConfig(() => {
           target: 'http://localhost:8090',
           changeOrigin: true,
         },
+        '/audio': {
+          target: 'http://localhost:8090',
+          changeOrigin: true,
+        },
       },
     },
     preview: {
@@ -21,6 +25,10 @@ export default defineConfig(() => {
       allowedHosts: ['agent.breynisson.org'],
       proxy: {
         '/ai': {
+          target: 'http://localhost:8091',
+          changeOrigin: true,
+        },
+        '/audio': {
           target: 'http://localhost:8091',
           changeOrigin: true,
         },

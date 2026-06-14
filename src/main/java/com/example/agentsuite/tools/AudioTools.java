@@ -26,9 +26,10 @@ public class AudioTools {
         }
     }
 
-    @Tool("Serve a rendered audio file (WAV or MP3) from the tmp_audio_files directory and return " +
-          "a playable URL. The file must already exist at the given absolute path inside tmp_audio_files/. " +
-          "Always render audio to the tmp_audio_files/ directory before calling this tool.")
+    @Tool("Serve a rendered audio file (WAV or MP3) from the tmp_audio_files directory. " +
+          "The file must already exist at the given absolute path inside tmp_audio_files/. " +
+          "Always render audio to the tmp_audio_files/ directory before calling this tool. " +
+          "Returns a markdown link — include it verbatim in your response to show an inline audio player.")
     public String serveAudioFile(
             @P("Absolute path to the rendered audio file inside tmp_audio_files/") String absolutePath) {
         log.info("serveAudioFile {}", absolutePath);
@@ -53,6 +54,6 @@ public class AudioTools {
 
         String encoded = java.net.URLEncoder.encode(filename, java.nio.charset.StandardCharsets.UTF_8)
                 .replace("+", "%20");
-        return baseUrl + "/audio/" + encoded;
+        return "[" + filename + "](" + baseUrl + "/audio/" + encoded + ")";
     }
 }

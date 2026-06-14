@@ -22,7 +22,7 @@ class AudioToolsTest {
         Path file = audioDir.resolve("mix.wav");
         Files.writeString(file, "fake-wav");
         String result = tools().serveAudioFile(file.toString());
-        assertThat(result).isEqualTo("http://localhost:8090/audio/mix.wav");
+        assertThat(result).isEqualTo("[mix.wav](http://localhost:8090/audio/mix.wav)");
     }
 
     @Test
@@ -30,7 +30,7 @@ class AudioToolsTest {
         Path file = audioDir.resolve("track.mp3");
         Files.writeString(file, "fake-mp3");
         String result = tools().serveAudioFile(file.toString());
-        assertThat(result).isEqualTo("http://localhost:8090/audio/track.mp3");
+        assertThat(result).isEqualTo("[track.mp3](http://localhost:8090/audio/track.mp3)");
     }
 
     @Test
@@ -38,7 +38,7 @@ class AudioToolsTest {
         Path file = audioDir.resolve("bounce.WAV");
         Files.writeString(file, "fake-wav");
         String result = tools().serveAudioFile(file.toString());
-        assertThat(result).isEqualTo("http://localhost:8090/audio/bounce.WAV");
+        assertThat(result).isEqualTo("[bounce.WAV](http://localhost:8090/audio/bounce.WAV)");
     }
 
     @Test
