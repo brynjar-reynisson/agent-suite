@@ -38,6 +38,16 @@ class AuthorizationServiceTest {
 
     @Test
     void grantedToolGroups_admin_returnsWebMdWriterAndMcp() {
-        assertThat(authorizationService.grantedToolGroups(true)).containsExactly("web", "md-writer", "mcp");
+        assertThat(authorizationService.grantedToolGroups(true)).containsExactly("web", "md-writer", "mcp", "audio");
+    }
+
+    @Test
+    void grantedToolGroups_admin_includesAudio() {
+        assertThat(authorizationService.grantedToolGroups(true)).contains("audio");
+    }
+
+    @Test
+    void grantedToolGroups_nonAdmin_doesNotIncludeAudio() {
+        assertThat(authorizationService.grantedToolGroups(false)).doesNotContain("audio");
     }
 }

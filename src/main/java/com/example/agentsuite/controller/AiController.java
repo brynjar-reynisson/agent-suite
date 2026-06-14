@@ -12,6 +12,7 @@ import com.example.agentsuite.tools.Git;
 import com.example.agentsuite.tools.MarkDownWriter;
 import com.example.agentsuite.tools.McpToolBridge;
 import com.example.agentsuite.tools.UnixTools;
+import com.example.agentsuite.tools.AudioTools;
 import com.example.agentsuite.tools.WebTools;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -48,6 +50,8 @@ public class AiController {
     private final AuthorizationService authorizationService;
     private final String braveApiKey;
     private final McpToolBridge mcpToolBridge;
+    private final String baseUrl;
+    private final Path audioDir;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     public AiController(ChatOrchestrationService orchestrationService,
@@ -55,13 +59,17 @@ public class AiController {
                         ConversationService conversationService,
                         AuthorizationService authorizationService,
                         @Value("${brave.api-key}") String braveApiKey,
-                        McpToolBridge mcpToolBridge) {
+                        McpToolBridge mcpToolBridge,
+                        @Value("${agent.base-url}") String baseUrl,
+                        @Value("${agent.audio.dir}") String audioDir) {
         this.orchestrationService = orchestrationService;
         this.modelRegistry = modelRegistry;
         this.conversationService = conversationService;
         this.authorizationService = authorizationService;
         this.braveApiKey = braveApiKey;
         this.mcpToolBridge = mcpToolBridge;
+        this.baseUrl = baseUrl;
+        this.audioDir = Path.of(audioDir).toAbsolutePath().normalize();
     }
 
     @GetMapping("/ai/tools")
@@ -212,7 +220,7 @@ public class AiController {
                     .collect(Collectors.toSet());
             authorized.retainAll(requested);
         }
-        Object[] toolArray = buildToolInstances(String.join(",", authorized), rootDirectory, braveApiKey, mcpToolBridge);
+        Object[] toolArray = buildToolInstances(String.join(",", authorized), rootDirectory, braveApiKey, mcpToolBridge, baseUrl, audioDir);
 
         String effectivePrompt = rootDirectory.isEmpty() ? prompt
                 : (prompt.isEmpty() ? "" : prompt + "\n") + "Working directory: " + rootDirectory;
@@ -263,7 +271,7 @@ public class AiController {
     }
 
     static Object[] buildToolInstances(String tools, String rootDirectory, String braveApiKey,
-                                        McpToolBridge mcpToolBridge) {
+                                        McpToolBridge mcpToolBridge, String baseUrl, Path audioDir) {
         if (tools.isBlank()) return new Object[0];
         if (tools.length() > 512) {
             log.warn("Rejected tools param: length {} exceeds 512 char limit", tools.length());
@@ -288,6 +296,9 @@ public class AiController {
                         DynamicToolProvider scoped = mcpToolBridge.scopedProvider(rootDirectory);
                         if (scoped != null) instances.add(scoped);
                     }
+                }
+                case "audio" -> {
+                    if (baseUrl != null && audioDir != null) instances.add(new AudioTools(baseUrl, audioDir));
                 }
             }
         }
