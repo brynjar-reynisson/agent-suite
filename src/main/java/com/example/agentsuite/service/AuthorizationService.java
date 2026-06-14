@@ -25,6 +25,6 @@ public class AuthorizationService {
      * @return list of granted tool group names
      */
     public List<String> grantedToolGroups(boolean isAdmin) {
-        return isAdmin ? List.of("web", "md-writer", "mcp") : List.of("web");
+        return isAdmin ? List.of("web", "md-writer", "mcp", "audio") : List.of("web");
     }
 }

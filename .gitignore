@@ -53,3 +53,6 @@ restart*
 frontend/.env.production
 frontend/.env.*.local
 frontend/.env.local
+
+# Temporary rendered audio files
+tmp_audio_files/

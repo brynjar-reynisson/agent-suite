@@ -425,7 +425,33 @@ function App() {
               )}
               {msg.content && (
                 <div className={`prose max-w-none ${msg.role === 'user' ? 'prose-invert' : ''}`}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+                        if (href && /\.(wav|mp3)$/i.test(href)) {
+                          return (
+                            <span className="block mt-1">
+                              <audio controls src={href} className="w-full" />
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-gray-400 hover:underline"
+                              >
+                                {children}
+                              </a>
+                            </span>
+                          );
+                        }
+                        return (
+                          <a href={href} target="_blank" rel="noopener noreferrer">
+                            {children}
+                          </a>
+                        );
+                      },
+                    }}
+                  >
                     {msg.content}
                   </ReactMarkdown>
                 </div>

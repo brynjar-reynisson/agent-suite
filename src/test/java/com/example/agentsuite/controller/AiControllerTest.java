@@ -75,7 +75,7 @@ class AiControllerTest {
     @BeforeEach
     void setUpAuth() {
         when(authorizationService.grantedToolGroups(false)).thenReturn(List.of("web"));
-        when(authorizationService.grantedToolGroups(true)).thenReturn(List.of("web", "md-writer", "mcp"));
+        when(authorizationService.grantedToolGroups(true)).thenReturn(List.of("web", "md-writer", "mcp", "audio"));
         // Admin JWT (sub=admin-sub) resolves to an admin user; used by git-tool tests below.
         lenient().when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
         lenient().when(authorizationService.isAdmin(42L)).thenReturn(true);
@@ -296,58 +296,58 @@ class AiControllerTest {
 
     @Test
     void buildToolInstances_emptyTools_returnsEmptyArray() {
-        Object[] result = AiController.buildToolInstances("", tempDir.toString(), "", null);
+        Object[] result = AiController.buildToolInstances("", tempDir.toString(), "", null, null, null);
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildToolInstances_unixGroup_noRootDirectory_returnsEmptyArray() {
-        Object[] result = AiController.buildToolInstances("unix", "", "", null);
+        Object[] result = AiController.buildToolInstances("unix", "", "", null, null, null);
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildToolInstances_unixGroup_withRootDirectory_returnsUnixTools() {
-        Object[] result = AiController.buildToolInstances("unix", tempDir.toString(), "", null);
+        Object[] result = AiController.buildToolInstances("unix", tempDir.toString(), "", null, null, null);
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
     }
 
     @Test
     void buildToolInstances_unknownGroup_silentlyIgnored() {
-        Object[] result = AiController.buildToolInstances("unknown", tempDir.toString(), "", null);
+        Object[] result = AiController.buildToolInstances("unknown", tempDir.toString(), "", null, null, null);
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildToolInstances_blankTools_returnsEmptyArray() {
-        Object[] result = AiController.buildToolInstances("  ", tempDir.toString(), "", null);
+        Object[] result = AiController.buildToolInstances("  ", tempDir.toString(), "", null, null, null);
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildToolInstances_multipleGroups_onlyKnownGroupsAdded() {
-        Object[] result = AiController.buildToolInstances("unix,unknown", tempDir.toString(), "", null);
+        Object[] result = AiController.buildToolInstances("unix,unknown", tempDir.toString(), "", null, null, null);
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
     }
 
     @Test
     void buildToolInstances_mdWriterGroup_withRootDirectory_returnsMarkDownWriter() {
-        Object[] result = AiController.buildToolInstances("md-writer", tempDir.toString(), "", null);
+        Object[] result = AiController.buildToolInstances("md-writer", tempDir.toString(), "", null, null, null);
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(MarkDownWriter.class);
     }
 
     @Test
     void buildToolInstances_mdWriterGroup_noRootDirectory_returnsEmptyArray() {
-        Object[] result = AiController.buildToolInstances("md-writer", "", "", null);
+        Object[] result = AiController.buildToolInstances("md-writer", "", "", null, null, null);
         assertThat(result).isEmpty();
     }
 
     @Test
     void buildToolInstances_unixAndMdWriter_withRootDirectory_returnsBothInstances() {
-        Object[] result = AiController.buildToolInstances("unix,md-writer", tempDir.toString(), "", null);
+        Object[] result = AiController.buildToolInstances("unix,md-writer", tempDir.toString(), "", null, null, null);
         assertThat(result).hasSize(2);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
         assertThat(result[1]).isInstanceOf(MarkDownWriter.class);
@@ -355,21 +355,21 @@ class AiControllerTest {
 
     @Test
     void buildToolInstances_mdWriterAndUnknown_onlyMarkDownWriterAdded() {
-        Object[] result = AiController.buildToolInstances("md-writer,unknown", tempDir.toString(), "", null);
+        Object[] result = AiController.buildToolInstances("md-writer,unknown", tempDir.toString(), "", null, null, null);
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(MarkDownWriter.class);
     }
 
     @Test
     void buildToolInstances_webGroup_returnsWebTools() {
-        Object[] result = AiController.buildToolInstances("web", "", "", null);
+        Object[] result = AiController.buildToolInstances("web", "", "", null, null, null);
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(WebTools.class);
     }
 
     @Test
     void buildToolInstances_mcpGroup_noBridge_returnsEmpty() {
-        Object[] result = AiController.buildToolInstances("mcp", "", "", null);
+        Object[] result = AiController.buildToolInstances("mcp", "", "", null, null, null);
         assertThat(result).isEmpty();
     }
 
@@ -377,10 +377,24 @@ class AiControllerTest {
     void buildToolInstances_mcpGroup_withBridge_returnsRootScopedProvider() {
         when(mcpToolBridge.scopedProvider("C:/some/root"))
                 .thenReturn(new McpToolBridge.ScopedTools(Map.of()));
-        Object[] result = AiController.buildToolInstances("mcp", "C:/some/root", "", mcpToolBridge);
+        Object[] result = AiController.buildToolInstances("mcp", "C:/some/root", "", mcpToolBridge, null, null);
         assertThat(result).hasSize(1);
         assertThat(result[0]).isInstanceOf(McpToolBridge.ScopedTools.class);
         verify(mcpToolBridge).scopedProvider("C:/some/root");
+    }
+
+    @Test
+    void buildToolInstances_audioGroup_withParams_returnsAudioTools(@TempDir Path audioDir) {
+        Object[] result = AiController.buildToolInstances(
+                "audio", "", "", null, "http://localhost:8090", audioDir);
+        assertThat(result).hasSize(1);
+        assertThat(result[0]).isInstanceOf(com.example.agentsuite.tools.AudioTools.class);
+    }
+
+    @Test
+    void buildToolInstances_audioGroup_nullParams_returnsEmpty() {
+        Object[] result = AiController.buildToolInstances("audio", "", "", null, null, null);
+        assertThat(result).isEmpty();
     }
 
     @Test
@@ -557,8 +571,9 @@ class AiControllerTest {
 
         verify(orchestrationService).chatStream(
                 isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
-                argThat(arr -> arr instanceof Object[] t && t.length == 2
-                        && t[0] instanceof WebTools && t[1] instanceof McpToolBridge.ScopedTools));
+                argThat(arr -> arr instanceof Object[] t && t.length == 3
+                        && t[0] instanceof WebTools && t[1] instanceof McpToolBridge.ScopedTools
+                        && t[2] instanceof com.example.agentsuite.tools.AudioTools));
     }
 
     @Test
@@ -581,14 +596,15 @@ class AiControllerTest {
 
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
 
-        // order is a deliberate contract: grantedToolGroups order (web, md-writer, mcp) then unix last
+        // order is a deliberate contract: grantedToolGroups order (web, md-writer, mcp, audio) then unix last
         verify(orchestrationService).chatStream(
                 isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
-                argThat(arr -> arr instanceof Object[] t && t.length == 4
+                argThat(arr -> arr instanceof Object[] t && t.length == 5
                         && t[0] instanceof WebTools
                         && t[1] instanceof MarkDownWriter
                         && t[2] instanceof McpToolBridge.ScopedTools
-                        && t[3] instanceof UnixTools));
+                        && t[3] instanceof com.example.agentsuite.tools.AudioTools
+                        && t[4] instanceof UnixTools));
     }
 
     @Test
