@@ -126,7 +126,9 @@ if (msg.role === 'compact') {
 
 ### Conversation history replay
 
-`getConversationDetail` currently maps message types into `ConversationDetailDto.MessageDto`. Add a `"compact"` case that maps to `role: 'compact'` so that when a user reopens a past conversation the compact block renders correctly in the UI.
+The UI always shows the full conversation — messages before the compact are displayed normally, and the compact block renders as a visual checkpoint immediately after them. Only the LLM's history is truncated; the display history is not.
+
+`getConversationDetail` currently maps message types into `ConversationDetailDto.MessageDto`. Add a `"compact"` case that maps to `role: 'compact'` so that when a user reopens a past conversation all prior messages are visible, ending with the compact block, followed by any subsequent exchanges.
 
 ## Error Handling
 
