@@ -20,6 +20,10 @@ public class AudioTools {
     public AudioTools(String baseUrl, Path audioDir) {
         this.baseUrl = baseUrl;
         this.audioDir = audioDir.toAbsolutePath().normalize();
+        if (!this.audioDir.toFile().exists() || !this.audioDir.toFile().isDirectory()) {
+            throw new IllegalArgumentException(
+                    "Audio directory does not exist or is not a directory: " + this.audioDir);
+        }
     }
 
     @Tool("Serve a rendered audio file (WAV or MP3) from the tmp_audio_files directory and return " +
@@ -47,6 +51,8 @@ public class AudioTools {
             return "Error: file not found.";
         }
 
-        return baseUrl + "/audio/" + filename;
+        String encoded = java.net.URLEncoder.encode(filename, java.nio.charset.StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        return baseUrl + "/audio/" + encoded;
     }
 }
