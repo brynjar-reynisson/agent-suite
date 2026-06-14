@@ -37,7 +37,7 @@ class AuthorizationServiceTest {
     }
 
     @Test
-    void grantedToolGroups_admin_returnsWebMdWriterAndMcp() {
+    void grantedToolGroups_admin_returnsWebMdWriterMcpAndAudio() {
         assertThat(authorizationService.grantedToolGroups(true)).containsExactly("web", "md-writer", "mcp", "audio");
     }
 
