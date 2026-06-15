@@ -53,7 +53,7 @@ public class ImageContentHandler {
         try {
             byte[] bytes = Base64.getDecoder().decode(content.data());
             Files.write(dest, bytes);
-        } catch (IOException e) {
+        } catch (IOException | IllegalArgumentException e) {
             log.error("Failed to save screenshot {}", filename, e);
             return "Error: failed to save screenshot: " + e.getMessage();
         }

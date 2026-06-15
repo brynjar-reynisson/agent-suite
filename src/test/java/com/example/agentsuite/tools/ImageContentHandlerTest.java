@@ -72,4 +72,12 @@ class ImageContentHandlerTest {
         assertThat(url).doesNotContain(" ");
         assertThat(url).startsWith("http://localhost:8090/images/screenshot_");
     }
+
+    @Test
+    void handle_malformedBase64_returnsErrorString() {
+        // Create an ImageContent with invalid base64 data to trigger IllegalArgumentException
+        McpSchema.ImageContent content = McpSchema.ImageContent.builder("not valid base64!", "image/png").build();
+        String result = handler.handle(content);
+        assertThat(result).startsWith("Error:");
+    }
 }
