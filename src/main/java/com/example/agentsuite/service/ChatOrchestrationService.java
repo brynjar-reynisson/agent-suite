@@ -191,6 +191,7 @@ public class ChatOrchestrationService {
         long convDbId = conv.getConversationId();
         List<MessageRecord> records = conversationService.getMessages(convDbId);
 
+        // Use full history intentionally: when re-compacting, the LLM should see prior summaries plus all subsequent messages.
         String transcript = buildTranscript(records);
         if (transcript.isBlank()) {
             throw new IllegalArgumentException("Nothing to compact.");
@@ -199,6 +200,7 @@ public class ChatOrchestrationService {
         String model = conversationService.findLastModelChange(convDbId).orElse("deepseek-v4-pro");
         ChatService service = modelRegistry.get(model);
         if (service == null) service = modelRegistry.get("deepseek-v4-pro");
+        if (service == null) throw new IllegalStateException("No chat service available for compact.");
 
         String summary = service.chat(SUMMARY_SYSTEM_PROMPT, transcript).content();
         conversationService.addMessage(convDbId, userId, "compact", summary);

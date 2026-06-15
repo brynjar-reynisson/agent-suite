@@ -282,7 +282,6 @@ class ChatOrchestrationServiceTest {
             rec("model_change", "deepseek-v4-pro")
         );
         when(conversationService.getMessages(20L)).thenReturn(emptyMsgs);
-        when(conversationService.findLastModelChange(20L)).thenReturn(Optional.of("deepseek-v4-pro"));
         assertThatThrownBy(() -> orchestration.compact("abc", 1L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Nothing to compact");
