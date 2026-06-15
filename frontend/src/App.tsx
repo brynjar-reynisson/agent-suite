@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  chatStream, execTool, getDirectories, getConversationDetail, getUserConfig, type Message, type ConversationSummary,
+  chatStream, compactConversation, execTool, getDirectories, getConversationDetail, getUserConfig, type Message, type ConversationSummary,
 } from './api';
 import { ConversationPanel } from './ConversationPanel';
 import ReactMarkdown from 'react-markdown';
@@ -294,6 +294,28 @@ function App() {
       return;
     }
 
+    if (message === '/compact') {
+      if (!conversationId.current) {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'ai', content: 'Start a conversation before compacting.' },
+        ]);
+        setLoading(false);
+        return;
+      }
+      try {
+        const token = await getAccessToken();
+        const { summary } = await compactConversation(conversationId.current, token);
+        setMessages((prev) => [...prev, { role: 'compact', content: summary }]);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Compact failed.';
+        setMessages((prev) => [...prev, { role: 'ai', content: `Error: ${msg}` }]);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     const matched = PROMPT_BANK.find(p => p.name === prompt);
     const resolvedPrompt = matched?.text ?? prompt;
     const enabledTools = availableTools.filter(t => !disabledTools.has(t)).join(',');
@@ -404,6 +426,14 @@ function App() {
         )}
         {messages.map((msg, i) => {
           if (msg.role === 'meta') return <MetaMessage key={i} content={msg.content} />;
+          if (msg.role === 'compact') {
+            return (
+              <div key={i} className="self-stretch rounded border border-gray-700 bg-gray-800/50 px-4 py-3 text-sm text-gray-300">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Conversation compacted</p>
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+              </div>
+            );
+          }
           return (
             <div
               key={i}
