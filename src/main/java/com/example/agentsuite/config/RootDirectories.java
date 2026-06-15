@@ -20,7 +20,8 @@ public final class RootDirectories {
             "C:/Users/Lenovo/misc_projects/dragon",
             "C:/Users/Lenovo/misc_projects/gexplorer",
             "C:/Users/Lenovo/IdeaProjects/agent-suite",
-            "C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian"
+            "C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian",
+            "C:/REAPER/Projects"
     );
 
     private RootDirectories() {}

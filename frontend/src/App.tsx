@@ -170,6 +170,14 @@ function App() {
     return [...toolSet];
   }, [grantedToolGroups, rootDirectory]);
 
+  const historySizeBytes = useMemo(() => {
+    const lastCompactIdx = messages.reduce(
+      (acc: number, msg, i) => (msg.role === 'compact' ? i : acc), -1
+    );
+    const relevant = lastCompactIdx >= 0 ? messages.slice(lastCompactIdx) : messages;
+    return new TextEncoder().encode(JSON.stringify(relevant)).length;
+  }, [messages]);
+
   const [disabledTools, setDisabledTools] = useState<Set<string>>(new Set());
 
   const availableToolsKey = availableTools.join(',');
@@ -494,6 +502,17 @@ function App() {
         {loading && (
           <div className="self-start bg-white p-3 rounded-lg shadow-sm text-gray-400 animate-pulse">
             Thinking...
+          </div>
+        )}
+        {messages.length > 0 && (
+          <div className={`self-end sticky bottom-2 rounded-full px-2 py-0.5 text-xs font-mono bg-gray-900/60 ${
+            historySizeBytes >= 2.5 * 1_048_576
+              ? 'text-red-400'
+              : historySizeBytes >= 1.5 * 1_048_576
+              ? 'text-amber-400'
+              : 'text-gray-400'
+          }`}>
+            {(historySizeBytes / 1_048_576).toFixed(2)} MB
           </div>
         )}
         <div ref={bottomRef} />

@@ -35,7 +35,7 @@ export function ToolStrip({ availableTools, disabledTools, onToggle, onInfo }: T
             {meta.icon}
             {disabled && (
               <span className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
-                <span className="block w-4/5 bg-gray-500" style={{ height: '1.5px', transform: 'rotate(-35deg)' }} />
+                <span className="block w-4/5 h-[1.5px] bg-gray-500 -rotate-[35deg]" />
               </span>
             )}
           </button>

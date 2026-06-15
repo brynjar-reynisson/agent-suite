@@ -166,7 +166,7 @@ npm run build  # output to frontend/dist/
 ```
 
 Key files:
-- `App.tsx` — chat UI: model selector, SSE streaming, tool call display, system prompt and root directory inputs. Generates a UUID per session (`crypto.randomUUID()` in a `useRef`) and passes it as `conversationId` on every request. Fetches `UserConfig` (isAdmin + grantedToolGroups) via `/ai/config/user` on load and auth change; derives `availableTools` from `grantedToolGroups` plus `unix`/`md-writer` context gates; filters `PROMPT_BANK` to hide `md-writer` prompts for non-admins; resets all conversation state on sign-out.
+- `App.tsx` — chat UI: model selector, SSE streaming, tool call display, system prompt and root directory inputs. Generates a UUID per session (`crypto.randomUUID()` in a `useRef`) and passes it as `conversationId` on every request. Fetches `UserConfig` (isAdmin + grantedToolGroups) via `/ai/config/user` on load and auth change; derives `availableTools` from `grantedToolGroups` plus `unix`/`md-writer` context gates; filters `PROMPT_BANK` to hide `md-writer` prompts for non-admins; resets all conversation state on sign-out. Computes `historySizeBytes` (useMemo over messages since last compact) and renders a colour-coded MB pill in the bottom-right of the chat area (gray < 1.5 MB, amber 1.5–2.5 MB, red ≥ 2.5 MB).
 - `ToolStrip.tsx` — icon-only strip rendered above the input showing active tool groups driven by `availableTools` from the server. Click-to-toggle disabled state; disabled tools are excluded from the `tools` param sent to the backend (opt-out).
 - `api.ts` — `chatStream()`, `getDirectories()`, `getUserConfig()` (returns `UserConfig`), `execTool()` API client. `ChatRequest` includes optional `conversationId` and `tools`.
 
