@@ -3,6 +3,7 @@ package com.example.agentsuite.service;
 import com.example.agentsuite.jooq.generated.tables.records.ConversationRecord;
 import com.example.agentsuite.jooq.generated.tables.records.MessageRecord;
 import com.example.agentsuite.jooq.service.ConversationService;
+import com.example.agentsuite.service.ChatResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -13,6 +14,7 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -248,6 +250,82 @@ class ChatOrchestrationServiceTest {
         assertThat(((HistoryMessage.User) history.get(0)).content())
                 .startsWith("Previous conversation summary:\n\nsecond summary");
         assertThat(((HistoryMessage.User) history.get(1)).content()).isEqualTo("latest question");
+    }
+
+    // --- compact() tests ---
+
+    @Test
+    void compact_conversationNotFound_throwsNoSuchElement() {
+        when(conversationService.findByExternalId("missing")).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> orchestration.compact("missing", 1L))
+                .isInstanceOf(java.util.NoSuchElementException.class);
+    }
+
+    @Test
+    void compact_wrongOwner_throwsNoSuchElement() {
+        ConversationRecord conv = mock(ConversationRecord.class);
+        when(conv.getConversationId()).thenReturn(99L);
+        when(conv.getUserId()).thenReturn(2L); // different user
+        when(conversationService.findByExternalId("abc")).thenReturn(Optional.of(conv));
+        assertThatThrownBy(() -> orchestration.compact("abc", 1L))
+                .isInstanceOf(java.util.NoSuchElementException.class);
+    }
+
+    @Test
+    void compact_emptyHistory_throwsIllegalArgument() {
+        ConversationRecord conv = mock(ConversationRecord.class);
+        when(conv.getConversationId()).thenReturn(20L);
+        when(conv.getUserId()).thenReturn(1L);
+        when(conversationService.findByExternalId("abc")).thenReturn(Optional.of(conv));
+        List<MessageRecord> emptyMsgs = List.of(
+            rec("system_prompt", "be helpful"),
+            rec("model_change", "deepseek-v4-pro")
+        );
+        when(conversationService.getMessages(20L)).thenReturn(emptyMsgs);
+        when(conversationService.findLastModelChange(20L)).thenReturn(Optional.of("deepseek-v4-pro"));
+        assertThatThrownBy(() -> orchestration.compact("abc", 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Nothing to compact");
+    }
+
+    @Test
+    void compact_validConversation_callsLlmAndStoresSummary() {
+        ConversationRecord conv = mock(ConversationRecord.class);
+        when(conv.getConversationId()).thenReturn(21L);
+        when(conv.getUserId()).thenReturn(1L);
+        when(conversationService.findByExternalId("abc")).thenReturn(Optional.of(conv));
+        List<MessageRecord> validMsgs = List.of(
+            rec("user", "Hello"),
+            rec("assistant", "Hi there")
+        );
+        when(conversationService.getMessages(21L)).thenReturn(validMsgs);
+        when(conversationService.findLastModelChange(21L)).thenReturn(Optional.of("deepseek-v4-pro"));
+        when(chatService.chat(anyString(), anyString())).thenReturn(ChatResponse.of("Compact summary"));
+
+        String result = orchestration.compact("abc", 1L);
+
+        assertThat(result).isEqualTo("Compact summary");
+        verify(conversationService).addMessage(21L, 1L, "compact", "Compact summary");
+    }
+
+    @Test
+    void buildTranscript_includesUserAssistantAndCompactRecords() {
+        List<MessageRecord> msgs = List.of(
+            rec("system_prompt", "ignored"),
+            rec("model_change", "ignored"),
+            rec("user", "hi"),
+            rec("assistant", "hello"),
+            rec("compact", "earlier summary"),
+            rec("tool_call", "[{\"name\":\"ls\"}]"),
+            rec("tool_result", "[{\"result\":\"file\"}]")
+        );
+        String transcript = ChatOrchestrationService.buildTranscript(msgs);
+        assertThat(transcript).contains("[User]: hi");
+        assertThat(transcript).contains("[Assistant]: hello");
+        assertThat(transcript).contains("[Summary]: earlier summary");
+        assertThat(transcript).contains("[Tool call]:");
+        assertThat(transcript).contains("[Tool result]:");
+        assertThat(transcript).doesNotContain("ignored");
     }
 
     @Test

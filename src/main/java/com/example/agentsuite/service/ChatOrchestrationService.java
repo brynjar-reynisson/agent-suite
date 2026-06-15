@@ -179,6 +179,48 @@ public class ChatOrchestrationService {
         if (msg != null) history.add(msg);
     }
 
+    private static final String SUMMARY_SYSTEM_PROMPT =
+            "Summarise the conversation below concisely. Preserve the key context, decisions, " +
+            "facts, and any ongoing tasks. Write in the third person and omit pleasantries.";
+
+    public String compact(String externalId, long userId) {
+        ConversationRecord conv = conversationService.findByExternalId(externalId)
+                .filter(c -> c.getUserId().equals(userId))
+                .orElseThrow(() -> new java.util.NoSuchElementException("Conversation not found: " + externalId));
+
+        long convDbId = conv.getConversationId();
+        List<MessageRecord> records = conversationService.getMessages(convDbId);
+
+        String transcript = buildTranscript(records);
+        if (transcript.isBlank()) {
+            throw new IllegalArgumentException("Nothing to compact.");
+        }
+
+        String model = conversationService.findLastModelChange(convDbId).orElse("deepseek-v4-pro");
+        ChatService service = modelRegistry.get(model);
+        if (service == null) service = modelRegistry.get("deepseek-v4-pro");
+
+        String summary = service.chat(SUMMARY_SYSTEM_PROMPT, transcript).content();
+        conversationService.addMessage(convDbId, userId, "compact", summary);
+        return summary;
+    }
+
+    static String buildTranscript(List<MessageRecord> records) {
+        StringBuilder sb = new StringBuilder();
+        for (MessageRecord r : records) {
+            String line = switch (r.getType()) {
+                case "user"        -> "[User]: " + r.getMessage();
+                case "assistant"   -> "[Assistant]: " + r.getMessage();
+                case "tool_call"   -> "[Tool call]: " + r.getMessage();
+                case "tool_result" -> "[Tool result]: " + r.getMessage();
+                case "compact"     -> "[Summary]: " + r.getMessage();
+                default            -> null;
+            };
+            if (line != null) sb.append(line).append('\n');
+        }
+        return sb.toString().trim();
+    }
+
     private void persistTurnResult(long conversationDbId, long userId,
                                     List<ChatEvent.ToolBatch> batches,
                                     String content) {
