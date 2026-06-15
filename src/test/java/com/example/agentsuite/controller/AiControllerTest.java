@@ -43,6 +43,7 @@ import static org.mockito.Mockito.when;
 import java.util.function.Consumer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AiController.class)
@@ -642,6 +643,35 @@ class AiControllerTest {
                 isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
                 argThat(arr -> arr instanceof Object[] t && t.length == 2
                         && t[0] instanceof WebTools && t[1] instanceof UnixTools));
+    }
+
+    @Test
+    void compact_validRequest_returns200WithSummary() throws Exception {
+        when(orchestrationService.compact(eq("conv-123"), anyLong()))
+                .thenReturn("This is the summary.");
+
+        mockMvc.perform(post("/ai/conversations/conv-123/compact"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary").value("This is the summary."));
+    }
+
+    @Test
+    void compact_conversationNotFound_returns404() throws Exception {
+        when(orchestrationService.compact(eq("unknown"), anyLong()))
+                .thenThrow(new java.util.NoSuchElementException("Conversation not found"));
+
+        mockMvc.perform(post("/ai/conversations/unknown/compact"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void compact_nothingToCompact_returns400WithError() throws Exception {
+        when(orchestrationService.compact(eq("empty-conv"), anyLong()))
+                .thenThrow(new IllegalArgumentException("Nothing to compact."));
+
+        mockMvc.perform(post("/ai/conversations/empty-conv/compact"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Nothing to compact."));
     }
 
     private static String makeAdminJwt(String sub, String email) {

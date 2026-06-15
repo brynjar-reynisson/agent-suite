@@ -177,6 +177,21 @@ public class AiController {
         }
     }
 
+    @PostMapping("/ai/conversations/{externalId}/compact")
+    public ResponseEntity<Map<String, String>> compact(
+            @PathVariable String externalId,
+            HttpServletRequest request) {
+        long userId = currentUserId(request);
+        try {
+            String summary = orchestrationService.compact(externalId, userId);
+            return ResponseEntity.ok(Map.of("summary", summary));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @RequestMapping(path = "/ai/chat", method = {RequestMethod.GET, RequestMethod.POST})
     public SseEmitter chat(@RequestParam(defaultValue = "Hello, how are you?") String message,
                            @RequestParam(defaultValue = "") String prompt,
