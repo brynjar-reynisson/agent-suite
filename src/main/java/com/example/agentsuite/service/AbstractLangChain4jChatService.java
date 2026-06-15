@@ -106,6 +106,18 @@ abstract class AbstractLangChain4jChatService implements ChatService {
 
     @Override
     public ChatResponse chat(String systemPrompt, String userMessage, Object... tools) {
+        if (tools.length == 0) {
+            // Bypass AiServices template processing: the @UserMessage parameter annotation
+            // causes LangChain4j to treat the string as a PromptTemplate, so any {{...}} in
+            // user content (e.g. JSX inline styles) is misinterpreted as a template variable.
+            List<ChatMessage> messages = new ArrayList<>();
+            if (systemPrompt != null && !systemPrompt.isBlank()) {
+                messages.add(SystemMessage.from(systemPrompt));
+            }
+            messages.add(UserMessage.from(userMessage));
+            var req = dev.langchain4j.model.chat.request.ChatRequest.builder().messages(messages).build();
+            return new ChatResponse(List.of(), model.chat(req).aiMessage().text());
+        }
         List<ChatResponse.ToolCall> collectedCalls = new ArrayList<>();
         Consumer<ChatEvent> collector = event -> {
             if (event instanceof ChatEvent.ToolBatch tb) {
