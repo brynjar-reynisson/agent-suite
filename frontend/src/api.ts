@@ -8,7 +8,7 @@ export interface ToolCall {
 }
 
 export interface Message {
-  role: 'user' | 'ai' | 'meta';
+  role: 'user' | 'ai' | 'meta' | 'compact';
   content: string;
   toolCalls?: ToolCall[];
 }
@@ -129,4 +129,19 @@ export const getConversationDetail = async (
   );
   if (!response.ok) throw new Error('Conversation not found');
   return response.json();
+};
+
+export const compactConversation = async (
+  conversationId: string,
+  token?: string | null,
+): Promise<{ summary: string }> => {
+  const res = await fetch(
+    `${API_BASE_URL}/ai/conversations/${encodeURIComponent(conversationId)}/compact`,
+    { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {} },
+  );
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { error?: string }).error ?? `Compact failed (${res.status})`);
+  }
+  return res.json();
 };

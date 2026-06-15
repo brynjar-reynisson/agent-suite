@@ -140,22 +140,87 @@ public class ChatOrchestrationService {
             if ("system_prompt".equals(r.getType())) lastSystemPrompt = r.getMessage();
         }
 
+        int compactIndex = -1;
+        for (int i = records.size() - 1; i >= 0; i--) {
+            if ("compact".equals(records.get(i).getType())) {
+                compactIndex = i;
+                break;
+            }
+        }
+
         List<HistoryMessage> history = new ArrayList<>();
         if (lastSystemPrompt != null && !lastSystemPrompt.isEmpty()) {
             history.add(new HistoryMessage.SystemPrompt(lastSystemPrompt));
         }
 
+        if (compactIndex >= 0) {
+            history.add(new HistoryMessage.User(
+                    "Previous conversation summary:\n\n" + records.get(compactIndex).getMessage()));
+            for (int i = compactIndex + 1; i < records.size(); i++) {
+                addIfSubstantive(history, records.get(i));
+            }
+        } else {
+            for (MessageRecord r : records) {
+                addIfSubstantive(history, r);
+            }
+        }
+
+        return history;
+    }
+
+    private static void addIfSubstantive(List<HistoryMessage> history, MessageRecord r) {
+        HistoryMessage msg = switch (r.getType()) {
+            case "user"        -> new HistoryMessage.User(r.getMessage());
+            case "assistant"   -> new HistoryMessage.Assistant(r.getMessage());
+            case "tool_call"   -> new HistoryMessage.ToolCall(r.getMessage());
+            case "tool_result" -> new HistoryMessage.ToolResult(r.getMessage());
+            default            -> null;
+        };
+        if (msg != null) history.add(msg);
+    }
+
+    private static final String SUMMARY_SYSTEM_PROMPT =
+            "Summarise the conversation below concisely. Preserve the key context, decisions, " +
+            "facts, and any ongoing tasks. Write in the third person and omit pleasantries.";
+
+    public String compact(String externalId, long userId) {
+        ConversationRecord conv = conversationService.findByExternalId(externalId)
+                .filter(c -> c.getUserId().equals(userId))
+                .orElseThrow(() -> new java.util.NoSuchElementException("Conversation not found: " + externalId));
+
+        long convDbId = conv.getConversationId();
+        List<MessageRecord> records = conversationService.getMessages(convDbId);
+
+        // Use full history intentionally: when re-compacting, the LLM should see prior summaries plus all subsequent messages.
+        String transcript = buildTranscript(records);
+        if (transcript.isBlank()) {
+            throw new IllegalArgumentException("Nothing to compact.");
+        }
+
+        String model = conversationService.findLastModelChange(convDbId).orElse("deepseek-v4-pro");
+        ChatService service = modelRegistry.get(model);
+        if (service == null) service = modelRegistry.get("deepseek-v4-pro");
+        if (service == null) throw new IllegalStateException("No chat service available for compact.");
+
+        String summary = service.chat(SUMMARY_SYSTEM_PROMPT, transcript).content();
+        conversationService.addMessage(convDbId, userId, "compact", summary);
+        return summary;
+    }
+
+    static String buildTranscript(List<MessageRecord> records) {
+        StringBuilder sb = new StringBuilder();
         for (MessageRecord r : records) {
-            HistoryMessage msg = switch (r.getType()) {
-                case "user"        -> new HistoryMessage.User(r.getMessage());
-                case "assistant"   -> new HistoryMessage.Assistant(r.getMessage());
-                case "tool_call"   -> new HistoryMessage.ToolCall(r.getMessage());
-                case "tool_result" -> new HistoryMessage.ToolResult(r.getMessage());
+            String line = switch (r.getType()) {
+                case "user"        -> "[User]: " + r.getMessage();
+                case "assistant"   -> "[Assistant]: " + r.getMessage();
+                case "tool_call"   -> "[Tool call]: " + r.getMessage();
+                case "tool_result" -> "[Tool result]: " + r.getMessage();
+                case "compact"     -> "[Summary]: " + r.getMessage();
                 default            -> null;
             };
-            if (msg != null) history.add(msg);
+            if (line != null) sb.append(line).append('\n');
         }
-        return history;
+        return sb.toString().trim();
     }
 
     private void persistTurnResult(long conversationDbId, long userId,

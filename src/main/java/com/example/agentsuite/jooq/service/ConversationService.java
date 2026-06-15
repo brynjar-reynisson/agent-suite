@@ -131,6 +131,8 @@ public class ConversationService {
                             "ai", r.getMessage(), List.copyOf(toolCallBuffer)));
                     toolCallBuffer.clear();
                 }
+                case "compact" ->
+                    messages.add(new ConversationDetailDto.MessageDto("compact", r.getMessage(), List.of()));
                 default -> {}
             }
         }

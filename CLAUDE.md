@@ -62,7 +62,7 @@ Spring Boot 3.5 + LangChain4j 1.16.2 agent application. Java 21.
 
 **Key layers:**
 - `AiController` — `/ai/chat` (GET/POST, streaming SSE) and `/ai/tools` (GET, synchronous tool exec). Validates `rootDirectory` against a hardcoded allowlist. Builds an authoritative tool set from `AuthorizationService.grantedToolGroups()` plus context (`unix`/`md-writer` require a non-empty `rootDirectory`), then intersects with the frontend's `tools` param as an opt-out hint. Accepts optional `conversationId` param (UUID); blank = stateless mode. On `/ai/tools`, `ls`/`cat`/`grep` are available to any user (mirrors the broadly-granted `unix` group), but all `git` subcommands (read and write) require the admin role — guests/non-admins get `"Admin role required for git commands."` The frontend `execTool` forwards the Supabase bearer token so admins can run git from the `!`-command UI.
-- `ChatOrchestrationService` — sits between `AiController` and `ChatService`. Owns conversation lifecycle: creates conversation on first turn, loads history from DB, persists messages (system_prompt, user, assistant, tool_call, tool_result, model_change).
+- `ChatOrchestrationService` — sits between `AiController` and `ChatService`. Owns conversation lifecycle: creates conversation on first turn, loads history from DB, persists messages (system_prompt, user, assistant, tool_call, tool_result, model_change). `compact(externalId, userId)` summarises a conversation via the LLM and stores the result as a `compact` message. `loadHistory` uses the most recent `compact` record as a truncation point — messages before it are dropped, the compact summary is injected as a `HistoryMessage.User`, and subsequent messages accumulate normally.
 - `ChatService` — interface defining `chat()`, `chatStream()`, and `chatStreamWithHistory()` for all providers.
 - `HistoryMessage` — sealed DTO interface bridging DB message rows to LLM message types (SystemPrompt, User, Assistant, ToolCall, ToolResult).
 - `ChatEvent` — sealed interface (Java records) for SSE event types: `ToolBatch` (per-iteration tool calls+results), `Content`, `Error`, `Done`.
@@ -114,6 +114,11 @@ GET /ai/config/mcp-tools
   Admin-only. Returns JSON array of connected MCP tool names (mcp__<server>__<tool>),
   merged global + per-root for the given rootDirectory. Non-admins get 403.
 
+POST /ai/conversations/{externalId}/compact
+  Summarises conversation history via LLM and stores result as a `compact` message.
+  Auth required; caller must own the conversation (404 otherwise).
+  Returns { "summary": "..." } on success, 400 if nothing to compact, 404 if not found.
+
 GET /audio/{filename}
   Serves a WAV or MP3 file from tmp_audio_files/. Intentionally unauthenticated (path-confined + extension-locked).
   Returns 200 audio/wav or audio/mpeg, 404 if not found, 400 for unsupported extension.
@@ -129,6 +134,7 @@ GET /audio/{filename}
 | `tool_call` | Yes | JSON `[{"name":"...","arguments":"..."}]` per iteration |
 | `tool_result` | Yes | JSON `[{"name":"...","result":"..."}]` per iteration |
 | `model_change` | No | Model alias string |
+| `compact` | No | LLM-generated summary of conversation history up to this point |
 
 Streaming response: Server-Sent Events with event types `tool_call`, `content`, `error`, `done`.
 
