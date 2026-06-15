@@ -189,6 +189,8 @@ public class AiController {
             return ResponseEntity.notFound().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "No language model available."));
         }
     }
 

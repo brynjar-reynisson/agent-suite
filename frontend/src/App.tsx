@@ -274,8 +274,10 @@ function App() {
       if (prompt) metaMessages.push({ role: 'meta', content: 'system:' + prompt });
       lastSentPrompt.current = prompt;
     }
-    setMessages((prev) => [...prev, ...metaMessages, userMessage]);
     const message = input;
+    if (!message.startsWith('/')) {
+      setMessages((prev) => [...prev, ...metaMessages, userMessage]);
+    }
     setInput('');
     setLoading(true);
 
