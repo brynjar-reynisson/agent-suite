@@ -140,22 +140,43 @@ public class ChatOrchestrationService {
             if ("system_prompt".equals(r.getType())) lastSystemPrompt = r.getMessage();
         }
 
+        int compactIndex = -1;
+        for (int i = records.size() - 1; i >= 0; i--) {
+            if ("compact".equals(records.get(i).getType())) {
+                compactIndex = i;
+                break;
+            }
+        }
+
         List<HistoryMessage> history = new ArrayList<>();
         if (lastSystemPrompt != null && !lastSystemPrompt.isEmpty()) {
             history.add(new HistoryMessage.SystemPrompt(lastSystemPrompt));
         }
 
-        for (MessageRecord r : records) {
-            HistoryMessage msg = switch (r.getType()) {
-                case "user"        -> new HistoryMessage.User(r.getMessage());
-                case "assistant"   -> new HistoryMessage.Assistant(r.getMessage());
-                case "tool_call"   -> new HistoryMessage.ToolCall(r.getMessage());
-                case "tool_result" -> new HistoryMessage.ToolResult(r.getMessage());
-                default            -> null;
-            };
-            if (msg != null) history.add(msg);
+        if (compactIndex >= 0) {
+            history.add(new HistoryMessage.User(
+                    "Previous conversation summary:\n\n" + records.get(compactIndex).getMessage()));
+            for (int i = compactIndex + 1; i < records.size(); i++) {
+                addIfSubstantive(history, records.get(i));
+            }
+        } else {
+            for (MessageRecord r : records) {
+                addIfSubstantive(history, r);
+            }
         }
+
         return history;
+    }
+
+    private static void addIfSubstantive(List<HistoryMessage> history, MessageRecord r) {
+        HistoryMessage msg = switch (r.getType()) {
+            case "user"        -> new HistoryMessage.User(r.getMessage());
+            case "assistant"   -> new HistoryMessage.Assistant(r.getMessage());
+            case "tool_call"   -> new HistoryMessage.ToolCall(r.getMessage());
+            case "tool_result" -> new HistoryMessage.ToolResult(r.getMessage());
+            default            -> null;
+        };
+        if (msg != null) history.add(msg);
     }
 
     private void persistTurnResult(long conversationDbId, long userId,

@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -160,6 +161,93 @@ class ChatOrchestrationServiceTest {
                 "/projects", e -> {}, new Object[0]);
 
         verify(conversationService).addMessage(eq(convDbId), eq(1L), eq("model_change"), eq("sonnet-4.6"));
+    }
+
+    private MessageRecord rec(String type, String message) {
+        MessageRecord r = mock(MessageRecord.class);
+        when(r.getType()).thenReturn(type);
+        when(r.getMessage()).thenReturn(message);
+        return r;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<HistoryMessage> captureHistory(String externalId, long convDbId,
+                                                 List<MessageRecord> messages) {
+        ConversationRecord conv = mock(ConversationRecord.class);
+        when(conv.getConversationId()).thenReturn(convDbId);
+        when(conv.getUserId()).thenReturn(1L);
+        when(conversationService.findByExternalId(externalId)).thenReturn(Optional.of(conv));
+        when(conversationService.findLastModelChange(convDbId)).thenReturn(Optional.of("deepseek-v4-pro"));
+        when(conversationService.findLastSystemPrompt(convDbId)).thenReturn(Optional.of("sys"));
+        when(conversationService.getMessages(convDbId)).thenReturn(messages);
+
+        doAnswer(inv -> {
+            Consumer<ChatEvent> emitter = inv.getArgument(2);
+            emitter.accept(new ChatEvent.Content("ok"));
+            emitter.accept(new ChatEvent.Done());
+            return null;
+        }).when(chatService).chatStreamWithHistory(any(), any(), any());
+
+        orchestration.chatStream(externalId, 1L, "deepseek-v4-pro", "sys", "q", "", e -> {}, new Object[0]);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(chatService, atLeastOnce()).chatStreamWithHistory(captor.capture(), any(), any());
+        return captor.getValue();
+    }
+
+    @Test
+    void loadHistory_noCompact_includesAllSubstantiveMessages() {
+        String externalId = UUID.randomUUID().toString();
+        List<MessageRecord> msgs = List.of(
+            rec("system_prompt", "sys"),
+            rec("user", "hello"),
+            rec("assistant", "hi")
+        );
+        List<HistoryMessage> history = captureHistory(externalId, 50L, msgs);
+        assertThat(history).hasSize(3);
+        assertThat(history.get(0)).isInstanceOf(HistoryMessage.SystemPrompt.class);
+        assertThat(history.get(1)).isInstanceOf(HistoryMessage.User.class);
+        assertThat(history.get(2)).isInstanceOf(HistoryMessage.Assistant.class);
+    }
+
+    @Test
+    void loadHistory_compactInMiddle_dropsMessagesBeforeCompactAndEmitsCompactAsUser() {
+        String externalId = UUID.randomUUID().toString();
+        List<MessageRecord> msgs = List.of(
+            rec("system_prompt", "sys"),
+            rec("user", "old message"),
+            rec("assistant", "old reply"),
+            rec("compact", "summary of earlier"),
+            rec("user", "new question"),
+            rec("assistant", "new answer")
+        );
+        List<HistoryMessage> history = captureHistory(externalId, 51L, msgs);
+        // SystemPrompt + User(compact) + User(new) + Assistant(new)
+        assertThat(history).hasSize(4);
+        assertThat(history.get(0)).isInstanceOf(HistoryMessage.SystemPrompt.class);
+        assertThat(history.get(1)).isInstanceOf(HistoryMessage.User.class);
+        assertThat(((HistoryMessage.User) history.get(1)).content())
+                .startsWith("Previous conversation summary:\n\nsummary of earlier");
+        assertThat(history.get(2)).isInstanceOf(HistoryMessage.User.class);
+        assertThat(((HistoryMessage.User) history.get(2)).content()).isEqualTo("new question");
+        assertThat(history.get(3)).isInstanceOf(HistoryMessage.Assistant.class);
+    }
+
+    @Test
+    void loadHistory_multipleCompacts_usesOnlyMostRecent() {
+        String externalId = UUID.randomUUID().toString();
+        List<MessageRecord> msgs = List.of(
+            rec("compact", "first summary"),
+            rec("user", "middle message"),
+            rec("compact", "second summary"),
+            rec("user", "latest question")
+        );
+        List<HistoryMessage> history = captureHistory(externalId, 52L, msgs);
+        // No SystemPrompt (empty), User(compact2), User(latest)
+        assertThat(history).hasSize(2);
+        assertThat(((HistoryMessage.User) history.get(0)).content())
+                .startsWith("Previous conversation summary:\n\nsecond summary");
+        assertThat(((HistoryMessage.User) history.get(1)).content()).isEqualTo("latest question");
     }
 
     @Test
