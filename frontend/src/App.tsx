@@ -493,31 +493,14 @@ function App() {
                         );
                       },
                       img: ({ src, alt }: { src?: string; alt?: string }) => (
-                        <div style={{ position: 'relative', display: 'inline-block', maxWidth: 380 }}>
+                        <div className="relative inline-block max-w-[380px]">
                           <img
                             src={src}
                             alt={alt ?? 'screenshot'}
                             onClick={() => src && setLightboxSrc(src)}
-                            style={{
-                              maxWidth: '100%',
-                              borderRadius: 8,
-                              border: '1px solid #d0d8e8',
-                              display: 'block',
-                              cursor: 'pointer',
-                            }}
+                            className="block max-w-full rounded-lg border border-[#d0d8e8] cursor-pointer"
                           />
-                          <div
-                            style={{
-                              position: 'absolute',
-                              bottom: 8,
-                              right: 8,
-                              background: 'rgba(0,0,0,0.55)',
-                              borderRadius: 5,
-                              padding: '3px 8px',
-                              color: '#fff',
-                              fontSize: '0.72rem',
-                            }}
-                          >
+                          <div className="absolute bottom-2 right-2 rounded-[5px] bg-black/55 px-2 py-[3px] text-[0.72rem] text-white">
                             click to expand
                           </div>
                         </div>
