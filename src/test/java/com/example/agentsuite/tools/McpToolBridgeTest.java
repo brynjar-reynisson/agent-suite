@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -330,5 +331,69 @@ class McpToolBridgeTest {
 
         assertThat(result).startsWith("![screenshot](http://localhost:8090/images/screenshot_");
         assertThat(result).endsWith(".png)");
+    }
+
+    @Test
+    void callMcpTool_afterFailure_nextCallUsesReconnectedClient() throws IOException {
+        Path config = tempDir.resolve(".mcp.json");
+        Files.writeString(config, """
+                {"mcpServers": {"srv": {"command": "x", "args": []}}}""");
+
+        Map<String, Object> emptySchema = Map.of("type", "object");
+        McpSchema.ListToolsResult listResult = new McpSchema.ListToolsResult(
+                List.of(McpSchema.Tool.builder("do_thing", emptySchema).description("do").build()), null);
+
+        McpSyncClient firstClient = mock(McpSyncClient.class);
+        McpSyncClient secondClient = mock(McpSyncClient.class);
+        when(firstClient.listTools()).thenReturn(listResult);
+        when(firstClient.callTool(any())).thenThrow(new RuntimeException("connection reset"));
+
+        McpSchema.TextContent textContent = mock(McpSchema.TextContent.class);
+        when(textContent.text()).thenReturn("ok");
+        when(secondClient.callTool(any())).thenReturn(
+                new McpSchema.CallToolResult(List.of(textContent), false, null, null));
+
+        AtomicInteger createCount = new AtomicInteger();
+        McpToolBridge bridge = new McpToolBridge(config.toString(), List.of(), 30,
+                (name, cfg) -> createCount.getAndIncrement() == 0 ? firstClient : secondClient, null);
+
+        ToolExecutor executor = bridge.toolEntries().values().iterator().next();
+        dev.langchain4j.agent.tool.ToolExecutionRequest req =
+                dev.langchain4j.agent.tool.ToolExecutionRequest.builder()
+                        .name("mcp__srv__do_thing").arguments("{}").build();
+
+        assertThat(executor.execute(req, null)).contains("connection reset");
+        assertThat(executor.execute(req, null)).isEqualTo("ok");
+        assertThat(createCount.get()).isEqualTo(2);
+    }
+
+    @Test
+    void callMcpTool_reconnectFactoryThrows_returnsErrorGracefully() throws IOException {
+        Path config = tempDir.resolve(".mcp.json");
+        Files.writeString(config, """
+                {"mcpServers": {"srv": {"command": "x", "args": []}}}""");
+
+        Map<String, Object> emptySchema = Map.of("type", "object");
+        McpSchema.ListToolsResult listResult = new McpSchema.ListToolsResult(
+                List.of(McpSchema.Tool.builder("do_thing", emptySchema).description("do").build()), null);
+
+        McpSyncClient deadClient = mock(McpSyncClient.class);
+        when(deadClient.listTools()).thenReturn(listResult);
+        when(deadClient.callTool(any())).thenThrow(new RuntimeException("timeout"));
+
+        AtomicInteger createCount = new AtomicInteger();
+        McpToolBridge bridge = new McpToolBridge(config.toString(), List.of(), 30,
+                (name, cfg) -> {
+                    if (createCount.getAndIncrement() == 0) return deadClient;
+                    throw new RuntimeException("cannot reconnect");
+                }, null);
+
+        ToolExecutor executor = bridge.toolEntries().values().iterator().next();
+        dev.langchain4j.agent.tool.ToolExecutionRequest req =
+                dev.langchain4j.agent.tool.ToolExecutionRequest.builder()
+                        .name("mcp__srv__do_thing").arguments("{}").build();
+
+        assertThat(executor.execute(req, null)).contains("timeout");
+        assertThat(executor.execute(req, null)).contains("timeout");
     }
 }

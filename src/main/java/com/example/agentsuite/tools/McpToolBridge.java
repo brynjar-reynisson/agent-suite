@@ -31,6 +31,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
@@ -50,9 +52,19 @@ public class McpToolBridge implements DynamicToolProvider {
     @JsonIgnoreProperties(ignoreUnknown = true)
     record McpConfig(Map<String, McpServerConfig> mcpServers) {}
 
+    private record ManagedClient(
+            AtomicReference<McpSyncClient> ref,
+            ReentrantLock lock,
+            String serverName,
+            McpServerConfig config,
+            BiFunction<String, McpServerConfig, McpSyncClient> factory) {
+
+        McpSyncClient get() { return ref.get(); }
+    }
+
     private final Map<ToolSpecification, ToolExecutor> toolEntries;
     private final Map<String, Map<ToolSpecification, ToolExecutor>> rootToolEntries;
-    private final List<McpSyncClient> clients;
+    private final List<ManagedClient> clients;
     private final ImageContentHandler imageContentHandler;
 
     @Autowired
@@ -148,8 +160,8 @@ public class McpToolBridge implements DynamicToolProvider {
 
     @PreDestroy
     void close() {
-        for (McpSyncClient client : clients) {
-            try { client.closeGracefully(); } catch (Exception e) {
+        for (ManagedClient managed : clients) {
+            try { managed.get().closeGracefully(); } catch (Exception e) {
                 log.warn("Error closing MCP client", e);
             }
         }
@@ -186,13 +198,16 @@ public class McpToolBridge implements DynamicToolProvider {
             McpSyncClient client;
             try {
                 client = clientFactory.apply(serverName, serverConfig);
-                clients.add(client);
             } catch (Exception e) {
                 Throwable root = e;
                 while (root.getCause() != null) root = root.getCause();
                 log.error("Failed to connect to MCP server '{}': {} (root: {})", serverName, e.getMessage(), root.getMessage(), e);
                 continue;
             }
+            ManagedClient managed = new ManagedClient(
+                    new AtomicReference<>(client), new ReentrantLock(),
+                    serverName, serverConfig, clientFactory);
+            clients.add(managed);
 
             McpSchema.ListToolsResult listResult;
             try {
@@ -213,7 +228,7 @@ public class McpToolBridge implements DynamicToolProvider {
                         .build();
 
                 ToolExecutor executor = (req, memId) -> callMcpTool(
-                        client, serverName, originalName, req.arguments(), callTimeoutSeconds);
+                        managed, originalName, req.arguments(), callTimeoutSeconds);
 
                 entries.put(spec, executor);
                 log.info("Registered MCP tool: {}{}", namespacedName,
@@ -240,9 +255,27 @@ public class McpToolBridge implements DynamicToolProvider {
         return new McpServerConfig(ex.apply(cfg.command()), args, env, ex.apply(cfg.url()), cfg.transport());
     }
 
+    private void tryReconnect(ManagedClient managed, McpSyncClient failedClient) {
+        if (!managed.lock().tryLock()) return;
+        try {
+            if (managed.ref().get() != failedClient) return;
+            try {
+                McpSyncClient fresh = managed.factory().apply(managed.serverName(), managed.config());
+                managed.ref().set(fresh);
+                try { failedClient.closeGracefully(); } catch (Exception ignored) {}
+                log.info("Reconnected MCP server '{}'", managed.serverName());
+            } catch (Exception e) {
+                log.error("Failed to reconnect MCP server '{}': {}", managed.serverName(), e.getMessage());
+            }
+        } finally {
+            managed.lock().unlock();
+        }
+    }
+
     @SuppressWarnings("unchecked")
-    private String callMcpTool(McpSyncClient client, String serverName,
-                                String toolName, String argumentsJson, int timeoutSeconds) {
+    private String callMcpTool(ManagedClient managed, String toolName,
+                                String argumentsJson, int timeoutSeconds) {
+        McpSyncClient client = managed.get();
         try {
             Map<String, Object> args = argumentsJson != null && !argumentsJson.isBlank()
                     ? MAPPER.readValue(argumentsJson, Map.class)
@@ -268,12 +301,14 @@ public class McpToolBridge implements DynamicToolProvider {
             String output = String.join("\n", parts);
 
             if (Boolean.TRUE.equals(result.isError())) {
-                return "Error from MCP server '" + serverName + "': " + output;
+                return "Error from MCP server '" + managed.serverName() + "': " + output;
             }
             return output;
         } catch (Exception e) {
-            log.error("MCP tool call failed: server={}, tool={}", serverName, toolName, e);
-            return "Error calling MCP tool '" + toolName + "' on server '" + serverName + "': " + e.getMessage();
+            log.error("MCP tool call failed: server={}, tool={}", managed.serverName(), toolName, e);
+            tryReconnect(managed, client);
+            return "Error calling MCP tool '" + toolName + "' on server '"
+                    + managed.serverName() + "': " + e.getMessage();
         }
     }
 
