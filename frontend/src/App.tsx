@@ -9,6 +9,7 @@ import { useAuth, getAccessToken } from './auth';
 import { UserAvatar } from './UserAvatar';
 import { ToolStrip } from './ToolStrip';
 import { ToolInfoModal } from './ToolInfoModal';
+import { ImageLightbox } from './ImageLightbox';
 
 function formatToolArgs(args: string): string {
   try {
@@ -179,6 +180,7 @@ function App() {
   }, [messages]);
 
   const [disabledTools, setDisabledTools] = useState<Set<string>>(new Set());
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const availableToolsKey = availableTools.join(',');
   useEffect(() => {
@@ -490,6 +492,36 @@ function App() {
                           </a>
                         );
                       },
+                      img: ({ src, alt }: { src?: string; alt?: string }) => (
+                        <div style={{ position: 'relative', display: 'inline-block', maxWidth: 380 }}>
+                          <img
+                            src={src}
+                            alt={alt ?? 'screenshot'}
+                            onClick={() => src && setLightboxSrc(src)}
+                            style={{
+                              maxWidth: '100%',
+                              borderRadius: 8,
+                              border: '1px solid #d0d8e8',
+                              display: 'block',
+                              cursor: 'pointer',
+                            }}
+                          />
+                          <div
+                            style={{
+                              position: 'absolute',
+                              bottom: 8,
+                              right: 8,
+                              background: 'rgba(0,0,0,0.55)',
+                              borderRadius: 5,
+                              padding: '3px 8px',
+                              color: '#fff',
+                              fontSize: '0.72rem',
+                            }}
+                          >
+                            click to expand
+                          </div>
+                        </div>
+                      ),
                     }}
                   >
                     {msg.content}
@@ -582,6 +614,13 @@ function App() {
         onClose={() => setIsPanelOpen(false)}
         onSelect={loadConversation}
       />
+      {lightboxSrc && (
+        <ImageLightbox
+          src={lightboxSrc}
+          alt="screenshot"
+          onClose={() => setLightboxSrc(null)}
+        />
+      )}
     </div>
   );
 }
