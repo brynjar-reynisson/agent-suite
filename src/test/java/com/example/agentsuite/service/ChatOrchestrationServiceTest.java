@@ -328,6 +328,87 @@ class ChatOrchestrationServiceTest {
         assertThat(transcript).doesNotContain("ignored");
     }
 
+    // --- compactMerge() tests ---
+
+    @Test
+    void compactMerge_mergesLastTwoCompacts() {
+        ConversationRecord conv = mock(ConversationRecord.class);
+        when(conv.getConversationId()).thenReturn(30L);
+        when(conv.getUserId()).thenReturn(1L);
+        when(conversationService.findByExternalId("abc")).thenReturn(Optional.of(conv));
+        List<MessageRecord> msgs30 = List.of(
+            rec("user", "hello"),
+            rec("compact", "first summary"),
+            rec("user", "follow up"),
+            rec("compact", "second summary")
+        );
+        when(conversationService.getMessages(30L)).thenReturn(msgs30);
+
+        String result = orchestration.compactMerge("abc", 1L);
+
+        assertThat(result).isEqualTo("first summary\n\n---\n\nsecond summary");
+        verify(conversationService).addMessage(30L, 1L, "compact", "first summary\n\n---\n\nsecond summary");
+    }
+
+    @Test
+    void compactMerge_usesLastTwoWhenMoreExist() {
+        ConversationRecord conv = mock(ConversationRecord.class);
+        when(conv.getConversationId()).thenReturn(33L);
+        when(conv.getUserId()).thenReturn(1L);
+        when(conversationService.findByExternalId("abc")).thenReturn(Optional.of(conv));
+        List<MessageRecord> msgs33 = List.of(
+            rec("compact", "old summary"),
+            rec("compact", "second summary"),
+            rec("compact", "third summary")
+        );
+        when(conversationService.getMessages(33L)).thenReturn(msgs33);
+
+        String result = orchestration.compactMerge("abc", 1L);
+
+        assertThat(result).isEqualTo("second summary\n\n---\n\nthird summary");
+    }
+
+    @Test
+    void compactMerge_onlyOneCompact_throwsIllegalArgument() {
+        ConversationRecord conv = mock(ConversationRecord.class);
+        when(conv.getConversationId()).thenReturn(31L);
+        when(conv.getUserId()).thenReturn(1L);
+        when(conversationService.findByExternalId("abc")).thenReturn(Optional.of(conv));
+        List<MessageRecord> msgs31 = List.of(
+            rec("user", "hello"),
+            rec("compact", "only summary")
+        );
+        when(conversationService.getMessages(31L)).thenReturn(msgs31);
+
+        assertThatThrownBy(() -> orchestration.compactMerge("abc", 1L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Need at least two compact messages to merge.");
+    }
+
+    @Test
+    void compactMerge_noCompacts_throwsIllegalArgument() {
+        ConversationRecord conv = mock(ConversationRecord.class);
+        when(conv.getConversationId()).thenReturn(32L);
+        when(conv.getUserId()).thenReturn(1L);
+        when(conversationService.findByExternalId("abc")).thenReturn(Optional.of(conv));
+        List<MessageRecord> msgs32 = List.of(
+            rec("user", "hello"),
+            rec("assistant", "hi")
+        );
+        when(conversationService.getMessages(32L)).thenReturn(msgs32);
+
+        assertThatThrownBy(() -> orchestration.compactMerge("abc", 1L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Need at least two compact messages to merge.");
+    }
+
+    @Test
+    void compactMerge_conversationNotFound_throwsNoSuchElement() {
+        when(conversationService.findByExternalId("missing")).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> orchestration.compactMerge("missing", 1L))
+            .isInstanceOf(java.util.NoSuchElementException.class);
+    }
+
     @Test
     void toolBatch_persistedAsToolCallAndToolResult() {
         String externalId = UUID.randomUUID().toString();

@@ -194,6 +194,21 @@ public class AiController {
         }
     }
 
+    @PostMapping("/ai/conversations/{externalId}/compact-merge")
+    public ResponseEntity<Map<String, String>> compactMerge(
+            @PathVariable String externalId,
+            HttpServletRequest request) {
+        long userId = currentUserId(request);
+        try {
+            String merged = orchestrationService.compactMerge(externalId, userId);
+            return ResponseEntity.ok(Map.of("summary", merged));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @RequestMapping(path = "/ai/chat", method = {RequestMethod.GET, RequestMethod.POST})
     public SseEmitter chat(@RequestParam(defaultValue = "Hello, how are you?") String message,
                            @RequestParam(defaultValue = "") String prompt,

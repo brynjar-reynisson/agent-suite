@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  chatStream, compactConversation, execTool, getDirectories, getConversationDetail, getUserConfig, type Message, type ConversationSummary,
+  chatStream, compactConversation, compactMergeConversation, execTool, getDirectories, getConversationDetail, getUserConfig, type Message, type ConversationSummary,
 } from './api';
 import { ConversationPanel } from './ConversationPanel';
 import ReactMarkdown from 'react-markdown';
@@ -323,6 +323,28 @@ function App() {
         setMessages((prev) => [...prev, { role: 'compact', content: summary }]);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Compact failed.';
+        setMessages((prev) => [...prev, { role: 'ai', content: `Error: ${msg}` }]);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    if (message === '/compact-merge') {
+      if (!conversationId.current) {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'ai', content: 'Start a conversation before merging compacts.' },
+        ]);
+        setLoading(false);
+        return;
+      }
+      try {
+        const token = await getAccessToken();
+        const { summary } = await compactMergeConversation(conversationId.current, token);
+        setMessages((prev) => [...prev, { role: 'compact', content: summary }]);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Compact merge failed.';
         setMessages((prev) => [...prev, { role: 'ai', content: `Error: ${msg}` }]);
       } finally {
         setLoading(false);

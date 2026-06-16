@@ -152,3 +152,18 @@ export const compactConversation = async (
   }
   return res.json();
 };
+
+export const compactMergeConversation = async (
+  conversationId: string,
+  token?: string | null,
+): Promise<{ summary: string }> => {
+  const res = await fetch(
+    `${API_BASE_URL}/ai/conversations/${encodeURIComponent(conversationId)}/compact-merge`,
+    { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {} },
+  );
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { error?: string }).error ?? `Compact merge failed (${res.status})`);
+  }
+  return res.json();
+};

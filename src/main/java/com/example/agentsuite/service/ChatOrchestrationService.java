@@ -231,6 +231,30 @@ public class ChatOrchestrationService {
         return summary;
     }
 
+    public String compactMerge(String externalId, long userId) {
+        ConversationRecord conv = conversationService.findByExternalId(externalId)
+                .filter(c -> c.getUserId().equals(userId))
+                .orElseThrow(() -> new java.util.NoSuchElementException("Conversation not found: " + externalId));
+
+        long convDbId = conv.getConversationId();
+        List<MessageRecord> records = conversationService.getMessages(convDbId);
+
+        List<MessageRecord> compacts = new ArrayList<>();
+        for (int i = records.size() - 1; i >= 0 && compacts.size() < 2; i--) {
+            if ("compact".equals(records.get(i).getType())) {
+                compacts.add(0, records.get(i));
+            }
+        }
+
+        if (compacts.size() < 2) {
+            throw new IllegalArgumentException("Need at least two compact messages to merge.");
+        }
+
+        String merged = compacts.get(0).getMessage() + "\n\n---\n\n" + compacts.get(1).getMessage();
+        conversationService.addMessage(convDbId, userId, "compact", merged);
+        return merged;
+    }
+
     static String buildTranscript(List<MessageRecord> records) {
         StringBuilder sb = new StringBuilder();
         for (MessageRecord r : records) {
