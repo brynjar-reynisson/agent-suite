@@ -33,11 +33,13 @@ export interface ChatRequest {
   model?: string;
   tools?: string;
   conversationId?: string;
+  requestId?: string;
 }
 
 export interface StreamCallbacks {
   onToolCall: (tc: ToolCall) => void;
   onContent: (text: string) => void;
+  onError?: (message: string) => void;
 }
 
 export const chatStream = async (
@@ -60,11 +62,16 @@ export const chatStream = async (
       model: params.model ?? 'deepseek-v4-pro',
       ...(params.tools ? { tools: params.tools } : {}),
       ...(params.conversationId ? { conversationId: params.conversationId } : {}),
+      ...(params.requestId ? { requestId: params.requestId } : {}),
     }),
     onmessage(ev) {
       if (ev.event === 'tool_call') callbacks.onToolCall(JSON.parse(ev.data));
       if (ev.event === 'content') callbacks.onContent(ev.data);
+      if (ev.event === 'error') callbacks.onError?.(ev.data);
       if (ev.event === 'done') controller.abort();
+    },
+    onclose() {
+      throw new Error('Stream closed by server');
     },
     onerror(err) {
       throw err;
