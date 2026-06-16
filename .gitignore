@@ -56,3 +56,6 @@ frontend/.env.local
 
 # Temporary rendered audio files
 tmp_audio_files/
+
+# Temporary screenshot files
+tmp_screenshot_files/

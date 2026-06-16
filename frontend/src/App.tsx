@@ -9,6 +9,7 @@ import { useAuth, getAccessToken } from './auth';
 import { UserAvatar } from './UserAvatar';
 import { ToolStrip } from './ToolStrip';
 import { ToolInfoModal } from './ToolInfoModal';
+import { ImageLightbox } from './ImageLightbox';
 
 function formatToolArgs(args: string): string {
   try {
@@ -179,6 +180,7 @@ function App() {
   }, [messages]);
 
   const [disabledTools, setDisabledTools] = useState<Set<string>>(new Set());
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const availableToolsKey = availableTools.join(',');
   useEffect(() => {
@@ -490,6 +492,19 @@ function App() {
                           </a>
                         );
                       },
+                      img: ({ src, alt }: { src?: string; alt?: string }) => (
+                        <div className="relative inline-block max-w-[380px]">
+                          <img
+                            src={src}
+                            alt={alt ?? 'screenshot'}
+                            onClick={() => src && setLightboxSrc(src)}
+                            className="block max-w-full rounded-lg border border-[#d0d8e8] cursor-pointer"
+                          />
+                          <div className="absolute bottom-2 right-2 rounded-[5px] bg-black/55 px-2 py-[3px] text-[0.72rem] text-white">
+                            click to expand
+                          </div>
+                        </div>
+                      ),
                     }}
                   >
                     {msg.content}
@@ -582,6 +597,13 @@ function App() {
         onClose={() => setIsPanelOpen(false)}
         onSelect={loadConversation}
       />
+      {lightboxSrc && (
+        <ImageLightbox
+          src={lightboxSrc}
+          alt="screenshot"
+          onClose={() => setLightboxSrc(null)}
+        />
+      )}
     </div>
   );
 }
