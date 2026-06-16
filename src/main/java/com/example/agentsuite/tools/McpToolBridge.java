@@ -53,21 +53,26 @@ public class McpToolBridge implements DynamicToolProvider {
     private final Map<ToolSpecification, ToolExecutor> toolEntries;
     private final Map<String, Map<ToolSpecification, ToolExecutor>> rootToolEntries;
     private final List<McpSyncClient> clients;
+    private final ImageContentHandler imageContentHandler;
 
     @Autowired
     public McpToolBridge(
             @Value("${mcp.config.path:.mcp.json}") String configPath,
             @Value("${mcp.call-timeout-seconds:90}") int callTimeoutSeconds,
-            @Value("${mcp.root-config.enabled:true}") boolean rootConfigEnabled) {
+            @Value("${mcp.root-config.enabled:true}") boolean rootConfigEnabled,
+            ImageContentHandler imageContentHandler) {
         this(configPath,
                 rootConfigEnabled ? RootDirectories.nonEmpty() : Set.of(),
                 callTimeoutSeconds,
-                (name, cfg) -> defaultCreateClient(name, cfg, callTimeoutSeconds));
+                (name, cfg) -> defaultCreateClient(name, cfg, callTimeoutSeconds),
+                imageContentHandler);
     }
 
     McpToolBridge(String configPath, Collection<String> rootDirectories, int callTimeoutSeconds,
-                  BiFunction<String, McpServerConfig, McpSyncClient> clientFactory) {
+                  BiFunction<String, McpServerConfig, McpSyncClient> clientFactory,
+                  ImageContentHandler imageContentHandler) {
         this.clients = new ArrayList<>();
+        this.imageContentHandler = imageContentHandler;
         this.toolEntries = loadEntries(new File(configPath), null, callTimeoutSeconds, clientFactory);
 
         Map<String, Map<ToolSpecification, ToolExecutor>> scoped = new LinkedHashMap<>();
@@ -246,10 +251,21 @@ public class McpToolBridge implements DynamicToolProvider {
             McpSchema.CallToolResult result = client.callTool(
                     new McpSchema.CallToolRequest(toolName, args));
 
-            String output = result.content().stream()
+            List<String> parts = new ArrayList<>();
+
+            result.content().stream()
                     .filter(c -> c instanceof McpSchema.TextContent)
                     .map(c -> ((McpSchema.TextContent) c).text())
-                    .collect(Collectors.joining("\n"));
+                    .forEach(parts::add);
+
+            if (imageContentHandler != null) {
+                result.content().stream()
+                        .filter(c -> c instanceof McpSchema.ImageContent)
+                        .map(c -> imageContentHandler.handle((McpSchema.ImageContent) c))
+                        .forEach(parts::add);
+            }
+
+            String output = String.join("\n", parts);
 
             if (Boolean.TRUE.equals(result.isError())) {
                 return "Error from MCP server '" + serverName + "': " + output;

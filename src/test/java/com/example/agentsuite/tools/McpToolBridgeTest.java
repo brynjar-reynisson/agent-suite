@@ -10,11 +10,13 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -27,7 +29,7 @@ class McpToolBridgeTest {
     void toolEntries_noConfigFile_returnsEmpty() {
         McpToolBridge bridge = new McpToolBridge(
                 tempDir.resolve("nonexistent.json").toString(), List.of(), 30,
-                (name, config) -> { throw new AssertionError("Should not create client"); });
+                (name, config) -> { throw new AssertionError("Should not create client"); }, null);
 
         assertThat(bridge.toolEntries()).isEmpty();
     }
@@ -38,7 +40,7 @@ class McpToolBridgeTest {
         Files.writeString(config, "{\"mcpServers\": {}}");
 
         McpToolBridge bridge = new McpToolBridge(config.toString(), List.of(), 30,
-                (name, cfg) -> { throw new AssertionError("Should not create client"); });
+                (name, cfg) -> { throw new AssertionError("Should not create client"); }, null);
 
         assertThat(bridge.toolEntries()).isEmpty();
     }
@@ -57,7 +59,7 @@ class McpToolBridgeTest {
                 }""");
 
         McpToolBridge bridge = new McpToolBridge(config.toString(), List.of(), 30,
-                (name, cfg) -> { throw new RuntimeException("connection refused"); });
+                (name, cfg) -> { throw new RuntimeException("connection refused"); }, null);
 
         assertThat(bridge.toolEntries()).isEmpty();
     }
@@ -89,7 +91,7 @@ class McpToolBridgeTest {
         when(mockClient.listTools()).thenReturn(listResult);
 
         McpToolBridge bridge = new McpToolBridge(config.toString(), List.of(), 30,
-                (name, cfg) -> mockClient);
+                (name, cfg) -> mockClient, null);
 
         Map<ToolSpecification, ToolExecutor> entries = bridge.toolEntries();
 
@@ -123,7 +125,7 @@ class McpToolBridgeTest {
 
         Map<String, McpSyncClient> clients = Map.of("server1", client1, "server2", client2);
         McpToolBridge bridge = new McpToolBridge(config.toString(), List.of(), 30,
-                (name, cfg) -> clients.get(name));
+                (name, cfg) -> clients.get(name), null);
 
         Map<ToolSpecification, ToolExecutor> entries = bridge.toolEntries();
         assertThat(entries).hasSize(2);
@@ -161,7 +163,7 @@ class McpToolBridgeTest {
                 "global-srv", mockClientWithTool("g_tool", "Global tool"),
                 "obsidian", mockClientWithTool("read_note", "Read a note"));
         McpToolBridge bridge = new McpToolBridge(globalConfig.toString(),
-                List.of(root.toString()), 30, (name, cfg) -> clients.get(name));
+                List.of(root.toString()), 30, (name, cfg) -> clients.get(name), null);
 
         // global view unchanged
         assertThat(bridge.toolEntries().keySet().stream().map(ToolSpecification::name))
@@ -179,7 +181,7 @@ class McpToolBridgeTest {
                 {"mcpServers": {"global-srv": {"command": "g", "args": []}}}""");
 
         McpToolBridge bridge = new McpToolBridge(globalConfig.toString(),
-                List.of(), 30, (name, cfg) -> mockClientWithTool("g_tool", "Global tool"));
+                List.of(), 30, (name, cfg) -> mockClientWithTool("g_tool", "Global tool"), null);
 
         assertThat(bridge.scopedProvider("C:/no/such/root").toolEntries()).hasSize(1);
         assertThat(bridge.scopedProvider("").toolEntries()).hasSize(1);
@@ -198,7 +200,7 @@ class McpToolBridgeTest {
         AtomicReference<McpToolBridge.McpServerConfig> captured = new AtomicReference<>();
         new McpToolBridge(tempDir.resolve("no-global.json").toString(),
                 List.of(root.toString()), 30,
-                (name, cfg) -> { captured.set(cfg); return mockClientWithTool("t", "d"); });
+                (name, cfg) -> { captured.set(cfg); return mockClientWithTool("t", "d"); }, null);
 
         String expectedRoot = root.toString().replace('\\', '/');
         assertThat(captured.get().command()).isEqualTo(expectedRoot + "/bin/run");
@@ -212,7 +214,7 @@ class McpToolBridgeTest {
 
         McpToolBridge bridge = new McpToolBridge(tempDir.resolve("no-global.json").toString(),
                 List.of(root.toString()), 30,
-                (name, cfg) -> { throw new AssertionError("Should not create client"); });
+                (name, cfg) -> { throw new AssertionError("Should not create client"); }, null);
 
         assertThat(bridge.scopedProvider(root.toString()).toolEntries()).isEmpty();
     }
@@ -224,7 +226,7 @@ class McpToolBridgeTest {
 
         McpToolBridge bridge = new McpToolBridge(tempDir.resolve("no-global.json").toString(),
                 List.of(root.toString()), 30,
-                (name, cfg) -> { throw new AssertionError("Should not create client"); });
+                (name, cfg) -> { throw new AssertionError("Should not create client"); }, null);
 
         assertThat(bridge.scopedProvider(root.toString()).toolEntries()).isEmpty();
     }
@@ -240,7 +242,7 @@ class McpToolBridgeTest {
 
         McpToolBridge bridge = new McpToolBridge(tempDir.resolve("no-global.json").toString(),
                 List.of(root.toString()), 30,
-                (name, cfg) -> mockClientWithTool("t", "d"));
+                (name, cfg) -> mockClientWithTool("t", "d"), null);
 
         assertThat(bridge.scopedProvider(root.toString()).toolEntries()).hasSize(1);
     }
@@ -258,7 +260,7 @@ class McpToolBridgeTest {
                 List.of(root.toString()), 30,
                 (name, cfg) -> "g".equals(cfg.command())
                         ? mockClientWithTool("search", "global search")
-                        : mockClientWithTool("search", "root search"));
+                        : mockClientWithTool("search", "root search"), null);
 
         Map<ToolSpecification, ToolExecutor> merged = bridge.scopedProvider(root.toString()).toolEntries();
         assertThat(merged).hasSize(1);
@@ -279,10 +281,54 @@ class McpToolBridgeTest {
                 "zeta", mockClientWithTool("z_tool", "Z"),
                 "alpha", mockClientWithTool("a_tool", "A"));
         McpToolBridge bridge = new McpToolBridge(globalConfig.toString(),
-                List.of(root.toString()), 30, (name, cfg) -> clients.get(name));
+                List.of(root.toString()), 30, (name, cfg) -> clients.get(name), null);
 
         assertThat(bridge.toolNames(root.toString()))
                 .containsExactly("mcp__alpha__a_tool", "mcp__zeta__z_tool");
         assertThat(bridge.toolNames()).containsExactly("mcp__zeta__z_tool");
+    }
+
+    @Test
+    void callMcpTool_imageContent_savesFileAndReturnsMarkdownUrl() throws Exception {
+        Path config = tempDir.resolve(".mcp.json");
+        Files.writeString(config, """
+                {
+                  "mcpServers": {
+                    "cc": { "command": "x", "args": [] }
+                  }
+                }""");
+
+        Map<String, Object> emptySchema = Map.of("type", "object");
+        McpSchema.Tool tool = McpSchema.Tool.builder("take_screenshot", emptySchema)
+                .description("Take a screenshot").build();
+        McpSchema.ListToolsResult listResult = new McpSchema.ListToolsResult(List.of(tool), null);
+
+        String base64Png = Base64.getEncoder().encodeToString(new byte[]{(byte)0x89,0x50,0x4E,0x47});
+        McpSchema.ImageContent imageContent = McpSchema.ImageContent.builder(base64Png, "image/png").build();
+        McpSchema.CallToolResult callResult = new McpSchema.CallToolResult(List.of(imageContent), false, null, null);
+
+        McpSyncClient mockClient = mock(McpSyncClient.class);
+        when(mockClient.listTools()).thenReturn(listResult);
+        when(mockClient.callTool(any())).thenReturn(callResult);
+
+        Path imageDir = tempDir.resolve("images");
+        Files.createDirectories(imageDir);
+        ImageContentHandler imgHandler = new ImageContentHandler("http://localhost:8090", imageDir.toString());
+        imgHandler.init();
+
+        McpToolBridge bridge = new McpToolBridge(config.toString(), List.of(), 30,
+                (name, cfg) -> mockClient, imgHandler);
+
+        Map<ToolSpecification, ToolExecutor> entries = bridge.toolEntries();
+        ToolExecutor executor = entries.values().iterator().next();
+        dev.langchain4j.agent.tool.ToolExecutionRequest req =
+                dev.langchain4j.agent.tool.ToolExecutionRequest.builder()
+                        .name("mcp__cc__take_screenshot")
+                        .arguments("{}")
+                        .build();
+        String result = executor.execute(req, null);
+
+        assertThat(result).startsWith("![screenshot](http://localhost:8090/images/screenshot_");
+        assertThat(result).endsWith(".png)");
     }
 }
