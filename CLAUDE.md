@@ -121,6 +121,12 @@ POST /ai/conversations/{externalId}/compact
   Auth required; caller must own the conversation (404 otherwise).
   Returns { "summary": "..." } on success, 400 if nothing to compact, 404 if not found.
 
+POST /ai/conversations/{externalId}/compact-merge
+  Concatenates the last two compact rows for a conversation (older first, newer second,
+  separated by ---) and stores the result as a new compact row. No LLM is involved.
+  Auth required; caller must own the conversation (404 otherwise).
+  Returns { "summary": "..." } on success, 400 if fewer than two compacts exist, 404 if not found.
+
 GET /audio/{filename}
   Serves a WAV or MP3 file from tmp_audio_files/. Intentionally unauthenticated (path-confined + extension-locked).
   Returns 200 audio/wav or audio/mpeg, 404 if not found, 400 for unsupported extension.
