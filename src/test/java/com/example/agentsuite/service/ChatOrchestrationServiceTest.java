@@ -44,7 +44,7 @@ class ChatOrchestrationServiceTest {
         }).when(chatService).chatStream(any(), any(), any());
 
         List<ChatEvent> events = new ArrayList<>();
-        orchestration.chatStream(null, 1L, "deepseek-v4-pro", "Be helpful", "Hi", "",
+        orchestration.chatStream(null, 1L, "deepseek-v4-pro", "Be helpful", "Hi", "", null,
                 events::add, new Object[0]);
 
         verifyNoInteractions(conversationService);
@@ -71,7 +71,7 @@ class ChatOrchestrationServiceTest {
 
         List<ChatEvent> events = new ArrayList<>();
         orchestration.chatStream(externalId, 1L, "deepseek-v4-pro", "Be helpful", "Hello",
-                "/projects", events::add, new Object[0]);
+                "/projects", null, events::add, new Object[0]);
 
         verify(conversationService).createConversation(eq(1L), eq("Hello"), eq("/projects"), eq(externalId));
         verify(conversationService).addMessage(eq(convDbId), eq(1L), eq("model_change"), eq("deepseek-v4-pro"));
@@ -101,7 +101,7 @@ class ChatOrchestrationServiceTest {
         }).when(chatService).chatStreamWithHistory(any(), any(), any());
 
         orchestration.chatStream(externalId, 1L, "deepseek-v4-pro", "Be helpful", "Hello",
-                "/projects", e -> {}, new Object[0]);
+                "/projects", null, e -> {}, new Object[0]);
 
         @SuppressWarnings("unchecked")
         var historyCaptor = org.mockito.ArgumentCaptor.forClass(List.class);
@@ -109,7 +109,8 @@ class ChatOrchestrationServiceTest {
         List<HistoryMessage> history = historyCaptor.getValue();
         assertThat(history).hasSize(1);
         assertThat(history.get(0)).isInstanceOf(HistoryMessage.SystemPrompt.class);
-        assertThat(((HistoryMessage.SystemPrompt) history.get(0)).content()).isEqualTo("Be helpful");
+        assertThat(((HistoryMessage.SystemPrompt) history.get(0)).content())
+                .isEqualTo("Be helpful\nWorking directory: /projects");
     }
 
     @Test
@@ -133,7 +134,7 @@ class ChatOrchestrationServiceTest {
         }).when(chatService).chatStreamWithHistory(any(), any(), any());
 
         orchestration.chatStream(externalId, 1L, "deepseek-v4-pro", "", "Follow up",
-                "/projects", e -> {}, new Object[0]);
+                "/projects", null, e -> {}, new Object[0]);
 
         verify(conversationService, never()).addMessage(eq(convDbId), anyLong(), eq("model_change"), any());
         verify(conversationService, never()).addMessage(eq(convDbId), anyLong(), eq("system_prompt"), any());
@@ -160,7 +161,7 @@ class ChatOrchestrationServiceTest {
         }).when(chatService).chatStreamWithHistory(any(), any(), any());
 
         orchestration.chatStream(externalId, 1L, "sonnet-4.6", "", "Continue",
-                "/projects", e -> {}, new Object[0]);
+                "/projects", null, e -> {}, new Object[0]);
 
         verify(conversationService).addMessage(eq(convDbId), eq(1L), eq("model_change"), eq("sonnet-4.6"));
     }
@@ -190,7 +191,7 @@ class ChatOrchestrationServiceTest {
             return null;
         }).when(chatService).chatStreamWithHistory(any(), any(), any());
 
-        orchestration.chatStream(externalId, 1L, "deepseek-v4-pro", "sys", "q", "", e -> {}, new Object[0]);
+        orchestration.chatStream(externalId, 1L, "deepseek-v4-pro", "sys", "q", "", null, e -> {}, new Object[0]);
 
         var captor = org.mockito.ArgumentCaptor.forClass(List.class);
         verify(chatService, atLeastOnce()).chatStreamWithHistory(captor.capture(), any(), any());
@@ -351,7 +352,7 @@ class ChatOrchestrationServiceTest {
         }).when(chatService).chatStreamWithHistory(any(), any(), any());
 
         orchestration.chatStream(externalId, 1L, "deepseek-v4-pro", "", "List files",
-                "/projects", e -> {}, new Object[0]);
+                "/projects", null, e -> {}, new Object[0]);
 
         verify(conversationService).addMessage(eq(convDbId), eq(1L), eq("tool_call"),
                 argThat(json -> json.contains("\"name\":\"ls\"")));
@@ -359,5 +360,107 @@ class ChatOrchestrationServiceTest {
                 argThat(json -> json.contains("file1")));
         verify(conversationService).addMessage(eq(convDbId), eq(1L), eq("assistant"),
                 eq("Here are the files."));
+    }
+
+    @Test
+    void errorEventPersistsPartialTurnProgress() {
+        String externalId = UUID.randomUUID().toString();
+        long convDbId = 15L;
+        ConversationRecord conv = mock(ConversationRecord.class);
+        when(conv.getConversationId()).thenReturn(convDbId);
+        when(conv.getUserId()).thenReturn(1L);
+        when(conversationService.findByExternalId(externalId)).thenReturn(Optional.of(conv));
+        when(conversationService.findLastModelChange(convDbId)).thenReturn(Optional.of("deepseek-v4-pro"));
+        when(conversationService.findLastSystemPrompt(convDbId)).thenReturn(Optional.of(""));
+        when(conversationService.getMessages(convDbId)).thenReturn(List.of());
+
+        doAnswer(inv -> {
+            Consumer<ChatEvent> emitter = inv.getArgument(2);
+            emitter.accept(new ChatEvent.ToolBatch(List.of(
+                    new ChatEvent.ToolBatch.ToolExecution("ls", "{}", "file1"))));
+            emitter.accept(new ChatEvent.Error("Tool timed out"));
+            return null;
+        }).when(chatService).chatStreamWithHistory(any(), any(), any());
+
+        orchestration.chatStream(externalId, 1L, "deepseek-v4-pro", "", "List files",
+                "", null, e -> {}, new Object[0]);
+
+        verify(conversationService).addMessage(eq(convDbId), eq(1L), eq("tool_call"),
+                argThat(json -> json.contains("\"name\":\"ls\"")));
+        verify(conversationService).addMessage(eq(convDbId), eq(1L), eq("tool_result"),
+                argThat(json -> json.contains("file1")));
+        verify(conversationService, never()).addMessage(eq(convDbId), eq(1L), eq("assistant"), any());
+    }
+
+    @Test
+    void duplicateRequestId_skipsUserMessageInsert() {
+        String externalId = UUID.randomUUID().toString();
+        long convDbId = 16L;
+        String requestId = UUID.randomUUID().toString();
+        ConversationRecord conv = mock(ConversationRecord.class);
+        when(conv.getConversationId()).thenReturn(convDbId);
+        when(conv.getUserId()).thenReturn(1L);
+        when(conversationService.findByExternalId(externalId)).thenReturn(Optional.of(conv));
+        when(conversationService.findLastModelChange(convDbId)).thenReturn(Optional.of("deepseek-v4-pro"));
+        when(conversationService.findLastSystemPrompt(convDbId)).thenReturn(Optional.of(""));
+        when(conversationService.getMessages(convDbId)).thenReturn(List.of());
+
+        doAnswer(inv -> {
+            Consumer<ChatEvent> emitter = inv.getArgument(2);
+            emitter.accept(new ChatEvent.Content("Hi!"));
+            emitter.accept(new ChatEvent.Done());
+            return null;
+        }).when(chatService).chatStreamWithHistory(any(), any(), any());
+
+        orchestration.chatStream(externalId, 1L, "deepseek-v4-pro", "", "Hello",
+                "", requestId, e -> {}, new Object[0]);
+        orchestration.chatStream(externalId, 1L, "deepseek-v4-pro", "", "Hello",
+                "", requestId, e -> {}, new Object[0]);
+
+        verify(conversationService, times(1)).addMessage(eq(convDbId), eq(1L), eq("user"), eq("Hello"));
+        verify(chatService, times(1)).chatStreamWithHistory(any(), any(), any());
+    }
+
+    @Test
+    void loadHistory_rootDirectory_appendedFreshToSystemPromptForLlm() {
+        String externalId = UUID.randomUUID().toString();
+        long convDbId = 17L;
+        ConversationRecord conv = mock(ConversationRecord.class);
+        when(conv.getConversationId()).thenReturn(convDbId);
+        when(conv.getUserId()).thenReturn(1L);
+        when(conversationService.findByExternalId(externalId)).thenReturn(Optional.of(conv));
+        when(conversationService.findLastModelChange(convDbId)).thenReturn(Optional.of("deepseek-v4-pro"));
+        when(conversationService.findLastSystemPrompt(convDbId)).thenReturn(Optional.of("Be helpful"));
+
+        MessageRecord sysRecord = mock(MessageRecord.class);
+        when(sysRecord.getType()).thenReturn("system_prompt");
+        when(sysRecord.getMessage()).thenReturn("Be helpful");
+        when(conversationService.getMessages(convDbId)).thenReturn(List.of(sysRecord));
+
+        doAnswer(inv -> {
+            Consumer<ChatEvent> emitter = inv.getArgument(2);
+            emitter.accept(new ChatEvent.Done());
+            return null;
+        }).when(chatService).chatStreamWithHistory(any(), any(), any());
+
+        orchestration.chatStream(externalId, 1L, "deepseek-v4-pro", "Be helpful", "q",
+                "/projects", null, e -> {}, new Object[0]);
+
+        @SuppressWarnings("unchecked")
+        var captor = org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(chatService).chatStreamWithHistory(captor.capture(), eq("q"), any());
+        HistoryMessage.SystemPrompt sp = (HistoryMessage.SystemPrompt) captor.getValue().get(0);
+        assertThat(sp.content()).isEqualTo("Be helpful\nWorking directory: /projects");
+    }
+
+    @Test
+    void applyWorkingDirectory_variousCombinations() {
+        assertThat(ChatOrchestrationService.applyWorkingDirectory("", "")).isEqualTo("");
+        assertThat(ChatOrchestrationService.applyWorkingDirectory("Be helpful", ""))
+                .isEqualTo("Be helpful");
+        assertThat(ChatOrchestrationService.applyWorkingDirectory("", "/p"))
+                .isEqualTo("Working directory: /p");
+        assertThat(ChatOrchestrationService.applyWorkingDirectory("Be helpful", "/p"))
+                .isEqualTo("Be helpful\nWorking directory: /p");
     }
 }

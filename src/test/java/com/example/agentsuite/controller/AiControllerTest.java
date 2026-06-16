@@ -91,11 +91,11 @@ class AiControllerTest {
         // Model validation now happens inside ChatOrchestrationService; simulate it sending an error event.
         doAnswer(inv -> {
             @SuppressWarnings("unchecked")
-            Consumer<ChatEvent> consumer = inv.getArgument(6);
+            Consumer<ChatEvent> consumer = inv.getArgument(7);
             consumer.accept(new ChatEvent.Error("Unknown model: gpt-4o"));
             consumer.accept(new ChatEvent.Done());
             return null;
-        }).when(orchestrationService).chatStream(isNull(), anyLong(), eq("gpt-4o"), any(), any(), any(),
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), eq("gpt-4o"), any(), any(), any(), any(),
                 any(Consumer.class), any());
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat").param("model", "gpt-4o"))
@@ -449,10 +449,10 @@ class AiControllerTest {
     void chat_withUnixToolsAndValidRootDirectory_noErrorEvent() throws Exception {
         doAnswer(inv -> {
             @SuppressWarnings("unchecked")
-            Consumer<ChatEvent> consumer = inv.getArgument(6);
+            Consumer<ChatEvent> consumer = inv.getArgument(7);
             consumer.accept(new ChatEvent.Done());
             return null;
-        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(),
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
                 any(Consumer.class), any());
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
@@ -471,10 +471,10 @@ class AiControllerTest {
     void chat_guestUser_noToolsParam_onlyWebToolPassedToOrchestration() throws Exception {
         doAnswer(inv -> {
             @SuppressWarnings("unchecked")
-            Consumer<ChatEvent> consumer = inv.getArgument(6);
+            Consumer<ChatEvent> consumer = inv.getArgument(7);
             consumer.accept(new ChatEvent.Done());
             return null;
-        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(),
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
                 any(Consumer.class), any());
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat"))
@@ -483,7 +483,7 @@ class AiControllerTest {
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
 
         verify(orchestrationService).chatStream(
-                isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
+                isNull(), anyLong(), any(), any(), any(), any(), any(), any(Consumer.class),
                 argThat(arr -> arr instanceof Object[] t && t.length == 1 && t[0] instanceof WebTools));
     }
 
@@ -491,10 +491,10 @@ class AiControllerTest {
     void chat_guestUserWithRootDirectory_webAndUnixPassedToOrchestration() throws Exception {
         doAnswer(inv -> {
             @SuppressWarnings("unchecked")
-            Consumer<ChatEvent> consumer = inv.getArgument(6);
+            Consumer<ChatEvent> consumer = inv.getArgument(7);
             consumer.accept(new ChatEvent.Done());
             return null;
-        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(),
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
                 any(Consumer.class), any());
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
@@ -504,7 +504,7 @@ class AiControllerTest {
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
 
         verify(orchestrationService).chatStream(
-                isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
+                isNull(), anyLong(), any(), any(), any(), any(), any(), any(Consumer.class),
                 argThat(arr -> arr instanceof Object[] t && t.length == 2
                         && t[0] instanceof WebTools && t[1] instanceof UnixTools));
     }
@@ -513,10 +513,10 @@ class AiControllerTest {
     void chat_guestUserRequestsMdWriter_mdWriterStrippedServerSide() throws Exception {
         doAnswer(inv -> {
             @SuppressWarnings("unchecked")
-            Consumer<ChatEvent> consumer = inv.getArgument(6);
+            Consumer<ChatEvent> consumer = inv.getArgument(7);
             consumer.accept(new ChatEvent.Done());
             return null;
-        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(),
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
                 any(Consumer.class), any());
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
@@ -526,7 +526,7 @@ class AiControllerTest {
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
 
         verify(orchestrationService).chatStream(
-                isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
+                isNull(), anyLong(), any(), any(), any(), any(), any(), any(Consumer.class),
                 argThat(arr -> arr instanceof Object[] t && t.length == 1 && t[0] instanceof WebTools));
     }
 
@@ -534,10 +534,10 @@ class AiControllerTest {
     void chat_guestUserRequestsUnixOnly_noRootDirectory_emptyToolArray() throws Exception {
         doAnswer(inv -> {
             @SuppressWarnings("unchecked")
-            Consumer<ChatEvent> consumer = inv.getArgument(6);
+            Consumer<ChatEvent> consumer = inv.getArgument(7);
             consumer.accept(new ChatEvent.Done());
             return null;
-        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(),
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
                 any(Consumer.class), any());
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
@@ -547,7 +547,7 @@ class AiControllerTest {
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
 
         verify(orchestrationService).chatStream(
-                isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
+                isNull(), anyLong(), any(), any(), any(), any(), any(), any(Consumer.class),
                 argThat(arr -> arr instanceof Object[] t && t.length == 0));
     }
 
@@ -558,10 +558,10 @@ class AiControllerTest {
 
         doAnswer(inv -> {
             @SuppressWarnings("unchecked")
-            Consumer<ChatEvent> consumer = inv.getArgument(6);
+            Consumer<ChatEvent> consumer = inv.getArgument(7);
             consumer.accept(new ChatEvent.Done());
             return null;
-        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(),
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
                 any(Consumer.class), any());
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
@@ -571,7 +571,7 @@ class AiControllerTest {
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
 
         verify(orchestrationService).chatStream(
-                isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
+                isNull(), anyLong(), any(), any(), any(), any(), any(), any(Consumer.class),
                 argThat(arr -> arr instanceof Object[] t && t.length == 3
                         && t[0] instanceof WebTools && t[1] instanceof McpToolBridge.ScopedTools
                         && t[2] instanceof com.example.agentsuite.tools.AudioTools));
@@ -584,10 +584,10 @@ class AiControllerTest {
 
         doAnswer(inv -> {
             @SuppressWarnings("unchecked")
-            Consumer<ChatEvent> consumer = inv.getArgument(6);
+            Consumer<ChatEvent> consumer = inv.getArgument(7);
             consumer.accept(new ChatEvent.Done());
             return null;
-        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(),
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
                 any(Consumer.class), any());
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
@@ -599,7 +599,7 @@ class AiControllerTest {
 
         // order is a deliberate contract: grantedToolGroups order (web, md-writer, mcp, audio) then unix last
         verify(orchestrationService).chatStream(
-                isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
+                isNull(), anyLong(), any(), any(), any(), any(), any(), any(Consumer.class),
                 argThat(arr -> arr instanceof Object[] t && t.length == 5
                         && t[0] instanceof WebTools
                         && t[1] instanceof MarkDownWriter
@@ -625,10 +625,10 @@ class AiControllerTest {
 
         doAnswer(inv -> {
             @SuppressWarnings("unchecked")
-            Consumer<ChatEvent> consumer = inv.getArgument(6);
+            Consumer<ChatEvent> consumer = inv.getArgument(7);
             consumer.accept(new ChatEvent.Done());
             return null;
-        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(),
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
                 any(Consumer.class), any());
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
@@ -640,7 +640,7 @@ class AiControllerTest {
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
 
         verify(orchestrationService).chatStream(
-                isNull(), anyLong(), any(), any(), any(), any(), any(Consumer.class),
+                isNull(), anyLong(), any(), any(), any(), any(), any(), any(Consumer.class),
                 argThat(arr -> arr instanceof Object[] t && t.length == 2
                         && t[0] instanceof WebTools && t[1] instanceof UnixTools));
     }

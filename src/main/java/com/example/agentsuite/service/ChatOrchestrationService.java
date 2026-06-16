@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 @Service
@@ -21,6 +22,7 @@ public class ChatOrchestrationService {
     private final ModelRegistry modelRegistry;
     private final ConversationService conversationService;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private final Map<Long, String> lastRequestIdByConversation = new ConcurrentHashMap<>();
 
     public ChatOrchestrationService(ModelRegistry modelRegistry,
                                      ConversationService conversationService) {
@@ -29,7 +31,7 @@ public class ChatOrchestrationService {
     }
 
     public void chatStream(String conversationId, long userId, String model, String systemPrompt,
-                           String userMessage, String rootDirectory,
+                           String userMessage, String rootDirectory, String requestId,
                            Consumer<ChatEvent> emitter, Object[] tools) {
 
         if (conversationId == null || conversationId.isBlank()) {
@@ -39,7 +41,7 @@ public class ChatOrchestrationService {
                 emitter.accept(new ChatEvent.Done());
                 return;
             }
-            service.chatStream(systemPrompt, userMessage, emitter, tools);
+            service.chatStream(applyWorkingDirectory(systemPrompt, rootDirectory), userMessage, emitter, tools);
             return;
         }
 
@@ -53,7 +55,12 @@ public class ChatOrchestrationService {
             return;
         }
 
-        List<HistoryMessage> history = loadHistory(conversationDbId);
+        if (isDuplicateRequest(conversationDbId, requestId)) {
+            emitter.accept(new ChatEvent.Done());
+            return;
+        }
+
+        List<HistoryMessage> history = loadHistory(conversationDbId, rootDirectory);
 
         try {
             conversationService.addMessage(conversationDbId, userId, "user", userMessage);
@@ -89,9 +96,24 @@ public class ChatOrchestrationService {
                     persistTurnResult(convId, userId, toolBatchBuffer, contentBuffer.toString());
                     emitter.accept(event);
                 }
-                case ChatEvent.Error e -> emitter.accept(event);
+                case ChatEvent.Error e -> {
+                    persistTurnResult(convId, userId, toolBatchBuffer, contentBuffer.toString());
+                    emitter.accept(event);
+                }
             }
         }, tools);
+    }
+
+    static String applyWorkingDirectory(String prompt, String rootDirectory) {
+        String p = prompt != null ? prompt : "";
+        if (rootDirectory == null || rootDirectory.isEmpty()) return p;
+        return (p.isEmpty() ? "" : p + "\n") + "Working directory: " + rootDirectory;
+    }
+
+    private boolean isDuplicateRequest(long conversationDbId, String requestId) {
+        if (requestId == null || requestId.isBlank()) return false;
+        String previous = lastRequestIdByConversation.put(conversationDbId, requestId);
+        return requestId.equals(previous);
     }
 
     private long resolveConversation(String externalId, long userId, String model, String systemPrompt,
@@ -132,7 +154,7 @@ public class ChatOrchestrationService {
                 });
     }
 
-    private List<HistoryMessage> loadHistory(long conversationDbId) {
+    private List<HistoryMessage> loadHistory(long conversationDbId, String rootDirectory) {
         List<MessageRecord> records = conversationService.getMessages(conversationDbId);
 
         String lastSystemPrompt = null;
@@ -149,8 +171,10 @@ public class ChatOrchestrationService {
         }
 
         List<HistoryMessage> history = new ArrayList<>();
-        if (lastSystemPrompt != null && !lastSystemPrompt.isEmpty()) {
-            history.add(new HistoryMessage.SystemPrompt(lastSystemPrompt));
+        String combinedSystemPrompt = applyWorkingDirectory(
+                lastSystemPrompt != null ? lastSystemPrompt : "", rootDirectory);
+        if (!combinedSystemPrompt.isEmpty()) {
+            history.add(new HistoryMessage.SystemPrompt(combinedSystemPrompt));
         }
 
         if (compactIndex >= 0) {

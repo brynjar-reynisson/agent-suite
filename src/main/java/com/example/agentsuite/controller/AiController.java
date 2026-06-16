@@ -201,6 +201,7 @@ public class AiController {
                            @RequestParam(defaultValue = "deepseek-v4-pro") String model,
                            @RequestParam(defaultValue = "") String tools,
                            @RequestParam(defaultValue = "") String conversationId,
+                           @RequestParam(defaultValue = "") String requestId,
                            HttpServletRequest request) {
 
         SseEmitter emitter = new SseEmitter(300000L);
@@ -239,15 +240,12 @@ public class AiController {
         }
         Object[] toolArray = buildToolInstances(String.join(",", authorized), rootDirectory, braveApiKey, mcpToolBridge, baseUrl, audioDir);
 
-        String effectivePrompt = rootDirectory.isEmpty() ? prompt
-                : (prompt.isEmpty() ? "" : prompt + "\n") + "Working directory: " + rootDirectory;
-
         CompletableFuture.runAsync(() -> {
             try {
                 orchestrationService.chatStream(
                         conversationId.isEmpty() ? null : conversationId,
                         userId,
-                        model, effectivePrompt, message, rootDirectory,
+                        model, prompt, message, rootDirectory, requestId.isBlank() ? null : requestId,
                         event -> {
                             switch (event) {
                                 case ChatEvent.ToolBatch tb -> {
