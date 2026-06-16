@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class McpToolBridgeTest {
@@ -365,6 +366,7 @@ class McpToolBridgeTest {
         assertThat(executor.execute(req, null)).contains("connection reset");
         assertThat(executor.execute(req, null)).isEqualTo("ok");
         assertThat(createCount.get()).isEqualTo(2);
+        verify(firstClient).closeGracefully();
     }
 
     @Test

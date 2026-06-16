@@ -161,8 +161,13 @@ public class McpToolBridge implements DynamicToolProvider {
     @PreDestroy
     void close() {
         for (ManagedClient managed : clients) {
-            try { managed.get().closeGracefully(); } catch (Exception e) {
+            managed.lock().lock();
+            try {
+                managed.get().closeGracefully();
+            } catch (Exception e) {
                 log.warn("Error closing MCP client", e);
+            } finally {
+                managed.lock().unlock();
             }
         }
     }
@@ -228,7 +233,7 @@ public class McpToolBridge implements DynamicToolProvider {
                         .build();
 
                 ToolExecutor executor = (req, memId) -> callMcpTool(
-                        managed, originalName, req.arguments(), callTimeoutSeconds);
+                        managed, originalName, req.arguments());
 
                 entries.put(spec, executor);
                 log.info("Registered MCP tool: {}{}", namespacedName,
@@ -256,7 +261,10 @@ public class McpToolBridge implements DynamicToolProvider {
     }
 
     private void tryReconnect(ManagedClient managed, McpSyncClient failedClient) {
-        if (!managed.lock().tryLock()) return;
+        if (!managed.lock().tryLock()) {
+            log.debug("Reconnect for '{}' already in progress, skipping", managed.serverName());
+            return;
+        }
         try {
             if (managed.ref().get() != failedClient) return;
             try {
@@ -274,7 +282,7 @@ public class McpToolBridge implements DynamicToolProvider {
 
     @SuppressWarnings("unchecked")
     private String callMcpTool(ManagedClient managed, String toolName,
-                                String argumentsJson, int timeoutSeconds) {
+                                String argumentsJson) {
         McpSyncClient client = managed.get();
         try {
             Map<String, Object> args = argumentsJson != null && !argumentsJson.isBlank()
