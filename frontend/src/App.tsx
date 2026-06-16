@@ -181,6 +181,8 @@ function App() {
 
   const [disabledTools, setDisabledTools] = useState<Set<string>>(new Set());
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const availableToolsKey = availableTools.join(',');
   useEffect(() => {
@@ -331,6 +333,12 @@ function App() {
     const matched = PROMPT_BANK.find(p => p.name === prompt);
     const resolvedPrompt = matched?.text ?? prompt;
     const enabledTools = availableTools.filter(t => !disabledTools.has(t)).join(',');
+    const requestId = crypto.randomUUID();
+    const onError = (message: string) => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      setErrorToast(message || 'An error occurred');
+      toastTimerRef.current = setTimeout(() => setErrorToast(null), 5000);
+    };
     try {
       const token = await getAccessToken();
       await chatStream(
@@ -341,6 +349,7 @@ function App() {
           model: model,
           tools: enabledTools,
           conversationId: conversationId.current,
+          requestId: requestId,
         },
         {
           onToolCall: (tc) => {
@@ -368,6 +377,7 @@ function App() {
               return msgs;
             });
           },
+          onError,
         },
         token,
       );
@@ -603,6 +613,11 @@ function App() {
           alt="screenshot"
           onClose={() => setLightboxSrc(null)}
         />
+      )}
+      {errorToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm shadow-lg whitespace-pre-wrap max-w-md text-center">
+          {errorToast}
+        </div>
       )}
     </div>
   );
