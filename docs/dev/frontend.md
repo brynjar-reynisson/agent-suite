@@ -17,7 +17,13 @@ Production deployment: `https://agent.breynisson.org`
 
 ## Key Files
 
-- `App.tsx` — chat UI: model selector, SSE streaming, tool call display, system prompt and root directory inputs. Generates a UUID per session (`crypto.randomUUID()` in a `useRef`) and passes it as `conversationId` on every request. Fetches `UserConfig` (isAdmin + grantedToolGroups) via `/ai/config/user` on load and auth change; derives `availableTools` from `grantedToolGroups` plus `unix`/`md-writer` context gates; filters `PROMPT_BANK` to hide `md-writer` prompts for non-admins; resets all conversation state on sign-out. Computes `historySizeBytes` (useMemo over messages since last compact) and renders a colour-coded MB pill in the bottom-right of the chat area (gray < 1.5 MB, amber 1.5–2.5 MB, red ≥ 2.5 MB). Adds a custom `img` renderer to `ReactMarkdown` that renders markdown images (e.g. screenshots from MCP tools) as clickable thumbnails (max 380px); clicking opens `ImageLightbox` via `lightboxSrc` state.
+- `App.tsx` — shell: layout, header, settings panel, footer input. Owns UI state (model, prompt, rootDirectory, disabledTools, panel/modal/lightbox open flags). Wires `useConversation` and `useUserConfig` hooks together; derives `availableTools` from `grantedToolGroups` + `rootDirectory`; filters `PROMPT_BANK` for non-admins.
+- `useConversation.ts` — all conversation logic. Owns messages, loading, error toast, conversationId, lastSentModel/Prompt refs. Exposes `handleSend` (dispatches `!exec`, `/compact`, `/compact-merge`, and normal chat streaming), `loadConversation` (returns `ConversationDetail` for App to apply settings from), and `resetConversation`. Resets on sign-out by watching `useAuth()` internally.
+- `useUserConfig.ts` — fetches `UserConfig` (`isAdmin`, `grantedToolGroups`) via `/ai/config/user` on load and on auth change.
+- `MessageList.tsx` — renders all message types (user, ai with tool calls, meta, compact). Owns the auto-scroll ref and history-size MB pill (gray < 1.5 MB, amber 1.5–2.5 MB, red ≥ 2.5 MB). Custom `img` renderer produces clickable thumbnails (max 380px) that fire `onImageClick` to open `ImageLightbox`.
+- `config.ts` — `MODELS` array and `PROMPT_BANK` definitions.
+- `MetaMessage.tsx` — renders model/system-prompt change markers in the chat timeline.
+- `PromptCombobox.tsx` — text input with a dropdown preset picker backed by `PROMPT_BANK`.
 - `ToolStrip.tsx` — icon-only strip above the input showing active tool groups from `availableTools`. Click-to-toggle disabled state; disabled tools are excluded from the `tools` param sent to the backend (opt-out).
 - `ImageLightbox.tsx` — full-screen lightbox overlay rendered via `ReactDOM.createPortal`. Closes on X button, Escape key, or click outside the image.
 - `api.ts` — `chatStream()`, `getDirectories()`, `getUserConfig()` (returns `UserConfig`), `execTool()` API client. `ChatRequest` includes optional `conversationId` and `tools`.
