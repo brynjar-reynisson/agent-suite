@@ -19,7 +19,7 @@ Exports a single factory function:
 ```ts
 interface MorganPluginOptions {
   devLogFile: string      // path relative to frontend working directory
-  previewLogFile: string
+  previewLogFile: string  // used for vite preview (prod)
   format?: string         // defaults to 'combined'
 }
 
@@ -46,7 +46,7 @@ plugins: [
   react(),
   morganPlugin({
     devLogFile: '../logs/frontend-dev-access.log',
-    previewLogFile: '../logs/frontend-preview-access.log',
+    previewLogFile: '../logs/frontend-prod-access.log',
     format: 'combined',
   }),
 ],
@@ -63,7 +63,7 @@ Add to `frontend/package.json` devDependencies:
 | Environment | File |
 |-------------|------|
 | Dev (port 5177) | `logs/frontend-dev-access.log` |
-| Preview/prod (port 5176) | `logs/frontend-preview-access.log` |
+| Preview/prod (port 5176) | `logs/frontend-prod-access.log` |
 
 Both paths are in `logs/` at the project root, which is already gitignored. The write stream opens in append mode, so restarts do not truncate existing logs.
 
