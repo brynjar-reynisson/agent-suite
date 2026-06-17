@@ -24,7 +24,7 @@ export function morganPlugin(options: MorganPluginOptions): Plugin {
       const logPath = path.resolve(root, options.devLogFile)
       fs.mkdirSync(path.dirname(logPath), { recursive: true })
       const stream = fs.createWriteStream(logPath, { flags: 'a' })
-      server.httpServer?.on('close', () => stream.destroy())
+      server.httpServer?.on('close', () => stream.end())
       server.middlewares.use(morgan(format, { stream }))
     },
 
@@ -32,7 +32,7 @@ export function morganPlugin(options: MorganPluginOptions): Plugin {
       const logPath = path.resolve(root, options.previewLogFile)
       fs.mkdirSync(path.dirname(logPath), { recursive: true })
       const stream = fs.createWriteStream(logPath, { flags: 'a' })
-      server.httpServer?.on('close', () => stream.destroy())
+      server.httpServer?.on('close', () => stream.end())
       server.middlewares.use(morgan(format, { stream }))
     },
   }
