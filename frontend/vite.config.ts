@@ -1,9 +1,17 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { morganPlugin } from './plugins/morganPlugin'
 
 export default defineConfig(() => {
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      morganPlugin({
+        devLogFile: '../logs/frontend-dev-access.log',
+        previewLogFile: '../logs/frontend-prod-access.log',
+        format: 'combined',
+      }),
+    ],
     server: {
       port: 5177,
       host: '0.0.0.0',
