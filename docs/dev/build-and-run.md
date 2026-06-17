@@ -42,3 +42,12 @@ Dev and prod servers auto-start on Windows login via:
 - `C:\Users\Lenovo\start-agent-suite-prod.ps1`
 
 (Windows Startup folder shortcuts)
+
+## Frontend Logging
+
+| Environment | Log file |
+|-------------|----------|
+| Dev (port 5177) | `logs/frontend-dev-access.log` |
+| Prod/preview (port 5176) | `logs/frontend-prod-access.log` |
+
+Morgan `combined` format. Append-mode — not truncated on restart. `logs/` is gitignored.
