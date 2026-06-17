@@ -21,18 +21,20 @@ export function morganPlugin(options: MorganPluginOptions): Plugin {
     },
 
     configureServer(server) {
+      if (!server.httpServer) return
       const logPath = path.resolve(root, options.devLogFile)
       fs.mkdirSync(path.dirname(logPath), { recursive: true })
       const stream = fs.createWriteStream(logPath, { flags: 'a' })
-      server.httpServer?.on('close', () => stream.end())
+      server.httpServer.on('close', () => stream.end())
       server.middlewares.use(morgan(format, { stream }))
     },
 
     configurePreviewServer(server) {
+      if (!server.httpServer) return
       const logPath = path.resolve(root, options.previewLogFile)
       fs.mkdirSync(path.dirname(logPath), { recursive: true })
       const stream = fs.createWriteStream(logPath, { flags: 'a' })
-      server.httpServer?.on('close', () => stream.end())
+      server.httpServer.on('close', () => stream.end())
       server.middlewares.use(morgan(format, { stream }))
     },
   }
