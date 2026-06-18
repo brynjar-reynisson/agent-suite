@@ -59,6 +59,10 @@ public class ImageContentHandler {
         }
 
         String encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8).replace("+", "%20");
-        return "![screenshot](" + baseUrl + "/images/" + encoded + ")";
+        String imageUrl = baseUrl + "/images/" + encoded;
+        return "![screenshot](" + imageUrl + ")\n" +
+                "*(You cannot view this image directly. " +
+                "Call `mcp__computer-control__take_screenshot_with_ocr` to read its contents, " +
+                "or share the URL with the user: " + imageUrl + ")*";
     }
 }
