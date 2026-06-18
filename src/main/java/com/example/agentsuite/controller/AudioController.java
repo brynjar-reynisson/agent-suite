@@ -4,16 +4,23 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.ResourceRegion;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpRange;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -40,7 +47,10 @@ public class AudioController {
     // Intentionally unauthenticated: access is path-confined to tmp_audio_files/ and
     // extension-locked to .wav/.mp3. Per-user auth can be added later if needed.
     @GetMapping("/audio/{filename}")
-    public ResponseEntity<byte[]> serveAudio(@PathVariable String filename) {
+    public ResponseEntity<ResourceRegion> serveAudio(
+            @PathVariable String filename,
+            @RequestHeader HttpHeaders headers) {
+
         if (filename.contains("/") || filename.contains("\\") || filename.contains("..")) {
             return ResponseEntity.notFound().build();
         }
@@ -54,22 +64,30 @@ public class AudioController {
         }
 
         Path file = audioDir.resolve(filename).normalize();
-        if (!file.startsWith(audioDir)) {
+        if (!file.startsWith(audioDir) || !Files.isRegularFile(file)) {
             return ResponseEntity.notFound().build();
         }
 
-        if (!Files.isRegularFile(file)) {
-            return ResponseEntity.notFound().build();
-        }
+        Resource resource = new FileSystemResource(file.toFile());
+        List<HttpRange> ranges = headers.getRange();
 
         try {
-            byte[] bytes = Files.readAllBytes(file);
-            return ResponseEntity.ok()
+            long contentLength = resource.contentLength();
+            ResourceRegion region;
+            HttpStatus status;
+            if (ranges.isEmpty()) {
+                region = new ResourceRegion(resource, 0, contentLength);
+                status = HttpStatus.OK;
+            } else {
+                region = ranges.get(0).toResourceRegion(resource);
+                status = HttpStatus.PARTIAL_CONTENT;
+            }
+            return ResponseEntity.status(status)
                     .contentType(mediaType)
-                    .header("X-Content-Type-Options", "nosniff")
-                    .body(bytes);
+                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                    .body(region);
         } catch (IOException e) {
-            log.error("Failed to read audio file {}", filename, e);
+            log.error("Failed to serve audio file {}", filename, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
