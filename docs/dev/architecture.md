@@ -45,8 +45,11 @@ If `conversationId` is provided, `ChatOrchestrationService` persists all message
 - `McpToolBridge` — Spring singleton; parses `.mcp.json` at startup, connects MCP servers (stdio + Streamable HTTP via MCP SDK 2.0.0), discovers tools via `tools/list`, builds namespaced `ToolSpecification+ToolExecutor` pairs (`mcp__<serverName>__<toolName>`). Also scans each allowed root for `<root>/.agent-suite-mcp.json` (same schema; `${root}` expands to that directory). `scopedProvider(rootDirectory)` merges global + per-root tools. Per-root scanning disabled in tests via `mcp.root-config.enabled=false`. `@PreDestroy` closes all connections. Registered as the `"mcp"` tool group (admin-only). `callMcpTool()` delegates `McpSchema.ImageContent` results to `ImageContentHandler`.
 - `McpJsonSchemaConverter` — converts MCP tool input schemas (`Map<String,Object>`) to LangChain4j `JsonObjectSchema`.
 
+> **Per-root MCP server notes (`C:\REAPER\Projects\.agent-suite-mcp.json`):**
+> `computer-control` — provides `take_screenshot_with_ocr` and `list_windows`. Requires `"env": {"PYTHONUTF8": "1"}` in its config entry; without it, the PyInstaller-bundled server crashes with `UnicodeEncodeError` when OCR detects non-ASCII characters (e.g. CJK) because Windows defaults the console to cp1252.
+
 **Media**
-- `ImageContentHandler` — receives `McpSchema.ImageContent` from `McpToolBridge`, decodes base64, writes `screenshot_<UUID>.<ext>` to `tmp_screenshot_files/`, returns a markdown image link. Supports `image/png`, `image/jpeg`, `image/webp`.
+- `ImageContentHandler` — receives `McpSchema.ImageContent` from `McpToolBridge`, decodes base64, writes `screenshot_<UUID>.<ext>` to `tmp_screenshot_files/`, returns a markdown image link. Supports `image/png`, `image/jpeg`, `image/webp`. Appends an italicised note to the tool result telling non-vision models (e.g. DeepSeek) to call `mcp__computer-control__take_screenshot_with_ocr` to read the image rather than guessing its contents.
 - `ImageController` — `GET /images/{filename}` endpoint serving PNG/JPG/JPEG/WEBP from `tmp_screenshot_files/`. Path-confined, extension-locked, unauthenticated.
 - `AudioController` — `GET /audio/{filename}` endpoint serving WAV/MP3 from `tmp_audio_files/`. Path-confined, extension-locked, unauthenticated. Supports HTTP Range requests (returns 206 Partial Content + `Content-Range` for Range requests, 200 for full-file requests) so embedded `<audio>` players can stream and seek without buffering the entire file first.
 
