@@ -3,6 +3,7 @@ package com.example.agentsuite.controller;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -62,7 +63,7 @@ class AudioControllerTest {
     void getAudio_dotDotTraversal_returns404() {
         // Directly call controller to bypass MockMvc URL normalization
         AudioController controller = new AudioController(audioDir.toString());
-        ResponseEntity<byte[]> response = controller.serveAudio("../secret.wav");
+        ResponseEntity<?> response = controller.serveAudio("../secret.wav", new HttpHeaders());
         assertThat(response.getStatusCode().value()).isEqualTo(404);
     }
 

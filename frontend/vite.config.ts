@@ -25,6 +25,10 @@ export default defineConfig(() => {
           target: 'http://localhost:8090',
           changeOrigin: true,
         },
+        '/images': {
+          target: 'http://localhost:8090',
+          changeOrigin: true,
+        },
       },
     },
     preview: {
@@ -37,6 +41,10 @@ export default defineConfig(() => {
           changeOrigin: true,
         },
         '/audio': {
+          target: 'http://localhost:8091',
+          changeOrigin: true,
+        },
+        '/images': {
           target: 'http://localhost:8091',
           changeOrigin: true,
         },
