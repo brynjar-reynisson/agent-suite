@@ -35,7 +35,12 @@ POST /ai/conversations/{externalId}/compact-merge
 
 GET /audio/{filename}
   Serves a WAV or MP3 file from tmp_audio_files/. Intentionally unauthenticated (path-confined + extension-locked).
-  Returns 200 audio/wav or audio/mpeg, 404 if not found, 400 for unsupported extension.
+  Supports HTTP Range requests (responds 206 Partial Content with Content-Range when a Range header is present,
+  200 for full-file requests). Advertises Accept-Ranges: bytes. 404 if not found, 400 for unsupported extension.
+
+GET /images/{filename}
+  Serves a PNG/JPG/JPEG/WEBP screenshot from tmp_screenshot_files/. Intentionally unauthenticated (path-confined + extension-locked).
+  Returns 200 with the appropriate image content-type, 404 if not found, 400 for unsupported extension.
 ```
 
 Streaming response: Server-Sent Events with event types `tool_call`, `content`, `error`, `done`.

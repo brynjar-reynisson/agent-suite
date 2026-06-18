@@ -48,7 +48,7 @@ If `conversationId` is provided, `ChatOrchestrationService` persists all message
 **Media**
 - `ImageContentHandler` — receives `McpSchema.ImageContent` from `McpToolBridge`, decodes base64, writes `screenshot_<UUID>.<ext>` to `tmp_screenshot_files/`, returns a markdown image link. Supports `image/png`, `image/jpeg`, `image/webp`.
 - `ImageController` — `GET /images/{filename}` endpoint serving PNG/JPG/JPEG/WEBP from `tmp_screenshot_files/`. Path-confined, extension-locked, unauthenticated.
-- `AudioController` — `GET /audio/{filename}` endpoint serving WAV/MP3 from `tmp_audio_files/`. Path-confined, extension-locked, unauthenticated.
+- `AudioController` — `GET /audio/{filename}` endpoint serving WAV/MP3 from `tmp_audio_files/`. Path-confined, extension-locked, unauthenticated. Supports HTTP Range requests (returns 206 Partial Content + `Content-Range` for Range requests, 200 for full-file requests) so embedded `<audio>` players can stream and seek without buffering the entire file first.
 
 **Config**
 - `WebConfig` — CORS config allowing `localhost:5176/5177`, `127.0.0.1:5176/5177`, `https://agent.breynisson.org`, `https://dev.agent.breynisson.org`.
