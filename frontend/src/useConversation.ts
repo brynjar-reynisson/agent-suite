@@ -23,6 +23,8 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
   const lastSentModel = useRef<string | null>(null);
   const lastSentPrompt = useRef<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [editorFile, setEditorFile] = useState<{ path: string; rootDirectory: string } | null>(null);
+  const closeEditor = useCallback(() => setEditorFile(null), []);
 
   const historySizeBytes = useMemo(() => {
     const lastCompactIdx = messages.reduce(
@@ -61,6 +63,17 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
 
   const handleSend = async (input: string) => {
     if (!input.trim() || loading) return;
+
+    // intercept !edit before adding to conversation history
+    const editMatch = input.match(/^!edit\s+(.+)$/i);
+    if (editMatch) {
+      if (!rootDirectory) {
+        showToast('Select a root directory first');
+      } else {
+        setEditorFile({ path: editMatch[1].trim(), rootDirectory });
+      }
+      return;
+    }
 
     const userMessage: Message = { role: 'user', content: input };
     const metaMessages: Message[] = [];
@@ -190,5 +203,5 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
     }
   };
 
-  return { messages, loading, errorToast, historySizeBytes, handleSend, resetConversation, loadConversation };
+  return { messages, loading, errorToast, historySizeBytes, handleSend, resetConversation, loadConversation, editorFile, closeEditor };
 }
