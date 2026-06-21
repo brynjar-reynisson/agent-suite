@@ -167,3 +167,36 @@ export const compactMergeConversation = async (
   }
   return res.json();
 };
+
+export const readFile = async (
+  path: string,
+  rootDirectory: string,
+  token?: string | null,
+): Promise<string> => {
+  const response = await fetch(
+    `${API_BASE_URL}/ai/files?${new URLSearchParams({ path, rootDirectory })}`,
+    { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+  );
+  if (!response.ok) throw new Error(`Failed to read file (${response.status})`);
+  return response.text();
+};
+
+export const writeFile = async (
+  path: string,
+  rootDirectory: string,
+  content: string,
+  token?: string | null,
+): Promise<void> => {
+  const response = await fetch(
+    `${API_BASE_URL}/ai/files?${new URLSearchParams({ path, rootDirectory })}`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'text/plain',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: content,
+    },
+  );
+  if (!response.ok) throw new Error(`Failed to write file (${response.status})`);
+};
