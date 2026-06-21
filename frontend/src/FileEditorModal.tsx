@@ -17,6 +17,7 @@ interface Props {
 
 export function FileEditorModal({ path, rootDirectory, onClose, plugins }: Props) {
   const [content, setContent] = useState('');
+  const [isNewFile, setIsNewFile] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -32,9 +33,16 @@ export function FileEditorModal({ path, rootDirectory, onClose, plugins }: Props
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
+    setIsNewFile(false);
     getAccessToken()
       .then(token => readFile(path, rootDirectory, token))
-      .then(text => { if (!cancelled) { setContent(text); setLoading(false); } })
+      .then(text => {
+        if (!cancelled) {
+          if (text === null) { setIsNewFile(true); setContent(''); }
+          else { setContent(text); }
+          setLoading(false);
+        }
+      })
       .catch((err: Error) => { if (!cancelled) { setLoadError(err.message); setLoading(false); } });
     return () => { cancelled = true; };
   }, [path, rootDirectory]);
@@ -62,7 +70,9 @@ export function FileEditorModal({ path, rootDirectory, onClose, plugins }: Props
     >
       <div className="bg-white rounded-xl shadow-2xl flex flex-col w-[800px] max-w-[95vw] h-[80vh]">
         <div className="px-5 py-3 border-b border-gray-100 flex justify-between items-center flex-shrink-0">
-          <span className="text-sm font-mono text-gray-700 truncate">{path}</span>
+          <span className="text-sm font-mono text-gray-700 truncate">
+            {path}{isNewFile && <span className="font-sans text-xs text-gray-400 ml-2">(new file)</span>}
+          </span>
           <button
             onClick={onClose}
             aria-label="Close"

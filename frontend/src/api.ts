@@ -172,11 +172,12 @@ export const readFile = async (
   path: string,
   rootDirectory: string,
   token?: string | null,
-): Promise<string> => {
+): Promise<string | null> => {
   const response = await fetch(
     `${API_BASE_URL}/ai/files?${new URLSearchParams({ path, rootDirectory })}`,
     { headers: token ? { Authorization: `Bearer ${token}` } : {} },
   );
+  if (response.status === 404) return null;
   if (!response.ok) throw new Error(`Failed to read file (${response.status})`);
   return response.text();
 };
