@@ -201,3 +201,41 @@ export const writeFile = async (
   );
   if (!response.ok) throw new Error(`Failed to write file (${response.status})`);
 };
+
+export interface ExecCallbacks {
+  onOutput: (line: string) => void;
+  onDone: (exitCode: number) => void;
+  onError?: (message: string) => void;
+}
+
+export const execShellStream = async (
+  command: string,
+  rootDirectory: string,
+  callbacks: ExecCallbacks,
+  token?: string | null,
+): Promise<void> => {
+  const controller = new AbortController();
+  await fetchEventSource(`${API_BASE_URL}/ai/exec`, {
+    method: 'POST',
+    signal: controller.signal,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: new URLSearchParams({ command, rootDirectory }),
+    onmessage(ev) {
+      if (ev.event === 'output') callbacks.onOutput(ev.data);
+      if (ev.event === 'done') {
+        callbacks.onDone(parseInt(ev.data, 10));
+        controller.abort();
+      }
+      if (ev.event === 'error') callbacks.onError?.(ev.data);
+    },
+    onclose() {
+      // normal close after 'done' — nothing to do
+    },
+    onerror(err) {
+      throw err;
+    },
+  });
+};
