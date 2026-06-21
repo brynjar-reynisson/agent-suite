@@ -71,7 +71,11 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
       if (!rootDirectory) {
         showToast('Select a root directory first');
       } else if (!isAdmin) {
-        showToast('Permission denied');
+        setMessages(prev => [
+          ...prev,
+          { role: 'user', content: input },
+          { role: 'ai', content: 'Error: Permission denied' },
+        ]);
       } else {
         setEditorFile({ path: editMatch[1].trim(), rootDirectory });
       }
