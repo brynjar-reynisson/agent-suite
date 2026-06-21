@@ -6,6 +6,7 @@ import { UserAvatar } from './UserAvatar';
 import { ToolStrip } from './ToolStrip';
 import { ToolInfoModal } from './ToolInfoModal';
 import { ImageLightbox } from './ImageLightbox';
+import { FileEditorModal } from './FileEditorModal';
 import { PromptCombobox } from './PromptCombobox';
 import { MessageList } from './MessageList';
 import { useUserConfig } from './useUserConfig';
@@ -64,7 +65,7 @@ function App() {
     }
   }, [user]);
 
-  const { messages, loading, errorToast, historySizeBytes, handleSend, resetConversation, loadConversation } =
+  const { messages, loading, errorToast, historySizeBytes, handleSend, resetConversation, loadConversation, editorFile, closeEditor } =
     useConversation({ model, prompt, rootDirectory, availableTools, disabledTools });
 
   const startNewConversation = () => {
@@ -209,6 +210,13 @@ function App() {
           src={lightboxSrc}
           alt="screenshot"
           onClose={() => setLightboxSrc(null)}
+        />
+      )}
+      {editorFile && (
+        <FileEditorModal
+          path={editorFile.path}
+          rootDirectory={editorFile.rootDirectory}
+          onClose={closeEditor}
         />
       )}
       {errorToast && (
