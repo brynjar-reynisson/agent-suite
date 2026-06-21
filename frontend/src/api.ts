@@ -223,6 +223,11 @@ export const execShellStream = async (
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: new URLSearchParams({ command, rootDirectory }),
+    async onopen(response) {
+      if (response.status === 403) throw new Error('Permission denied');
+      if (response.status === 400) throw new Error('Invalid request');
+      if (!response.ok) throw new Error(`Server error (${response.status})`);
+    },
     onmessage(ev) {
       if (ev.event === 'output') callbacks.onOutput(ev.data);
       if (ev.event === 'done') {
