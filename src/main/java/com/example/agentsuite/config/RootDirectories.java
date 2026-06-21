@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
  */
 public final class RootDirectories {
 
-    public static final Set<String> ALLOWED = Set.of(
+    public static final Set<String> ALLOWED = new java.util.LinkedHashSet<>(Set.of(
             "",
             "C:/Users/Lenovo/misc_projects/dragon",
             "C:/Users/Lenovo/misc_projects/gexplorer",
@@ -23,7 +23,7 @@ public final class RootDirectories {
             "C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian",
             "C:/REAPER/Projects",
             "C:/Users/Lenovo/IdeaProjects/digital-me"
-    );
+    ));
 
     private RootDirectories() {}
 
