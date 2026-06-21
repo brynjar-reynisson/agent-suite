@@ -22,6 +22,13 @@ GET /ai/config/mcp-tools
   Admin-only. Returns JSON array of connected MCP tool names (mcp__<server>__<tool>),
   merged global + per-root for the given rootDirectory. Non-admins get 403.
 
+POST /ai/exec
+  ?command=<shell command>        (required; passed to cmd /c on Windows, sh -c on Unix)
+  ?rootDirectory=<path>           (required; must be non-empty and in allowlist; used as CWD)
+  Admin-only. Executes a shell command with rootDirectory as CWD. Returns text/event-stream.
+  Events: output/<line>, done/<exit code>, error/<message>. Non-admins get 403.
+  Empty or invalid rootDirectory gets 400. Process timeout: 10 minutes.
+
 POST /ai/conversations/{externalId}/compact
   Summarises conversation history via LLM and stores result as a `compact` message.
   Auth required; caller must own the conversation (404 otherwise).

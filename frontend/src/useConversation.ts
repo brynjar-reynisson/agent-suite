@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  chatStream, compactConversation, compactMergeConversation, execTool,
+  chatStream, compactConversation, compactMergeConversation, execTool, execShellStream,
   getConversationDetail, type ConversationDetail, type ConversationSummary, type Message,
 } from './api';
 import { useAuth, getAccessToken } from './auth';
@@ -71,6 +71,62 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
         showToast('Select a root directory first');
       } else {
         setEditorFile({ path: editMatch[1].trim(), rootDirectory });
+      }
+      return;
+    }
+
+    // intercept !! for direct shell execution
+    const execMatch = input.match(/^!!(.+)$/);
+    if (execMatch) {
+      if (!rootDirectory) {
+        showToast('Select a root directory first');
+        return;
+      }
+      const command = execMatch[1].trim();
+      setMessages(prev => [
+        ...prev,
+        { role: 'user', content: input },
+        { role: 'ai', content: '```\n```' },
+      ]);
+      setLoading(true);
+      let accumulated = '';
+      try {
+        const token = await getAccessToken();
+        await execShellStream(command, rootDirectory, {
+          onOutput: (line) => {
+            accumulated += line + '\n';
+            setMessages(prev => {
+              const msgs = [...prev];
+              msgs[msgs.length - 1] = { role: 'ai', content: '```\n' + accumulated + '```' };
+              return msgs;
+            });
+          },
+          onDone: (exitCode) => {
+            if (exitCode !== 0) accumulated += '[exit ' + exitCode + ']\n';
+            setMessages(prev => {
+              const msgs = [...prev];
+              msgs[msgs.length - 1] = { role: 'ai', content: '```\n' + accumulated + '```' };
+              return msgs;
+            });
+            setLoading(false);
+          },
+          onError: (message) => {
+            setMessages(prev => {
+              const msgs = [...prev];
+              msgs[msgs.length - 1] = { role: 'ai', content: 'Error: ' + message };
+              return msgs;
+            });
+            setLoading(false);
+          },
+        }, token);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : 'Exec failed';
+        setMessages(prev => {
+          const msgs = [...prev];
+          msgs[msgs.length - 1] = { role: 'ai', content: 'Error: ' + msg };
+          return msgs;
+        });
+        setLoading(false);
       }
       return;
     }
