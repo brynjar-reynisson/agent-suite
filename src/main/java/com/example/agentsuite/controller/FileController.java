@@ -26,11 +26,13 @@ public class FileController {
             @RequestParam String rootDirectory,
             HttpServletRequest request) {
         validateAccess(path, rootDirectory, request);
-        Path resolved = resolveSafe(path, rootDirectory);
+        Path resolved = resolveSafeExisting(path, rootDirectory);
         try {
             return ResponseEntity.ok(Files.readString(resolved, StandardCharsets.UTF_8));
-        } catch (IOException e) {
+        } catch (java.nio.file.NoSuchFileException e) {
             return ResponseEntity.notFound().build();
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().build();
         }
     }
 
@@ -41,7 +43,7 @@ public class FileController {
             @RequestBody String content,
             HttpServletRequest request) {
         validateAccess(path, rootDirectory, request);
-        Path resolved = resolveSafe(path, rootDirectory);
+        Path resolved = resolveSafeForWrite(path, rootDirectory);
         Path temp;
         try {
             temp = Files.createTempFile(resolved.getParent(), ".tmp-edit-", null);
@@ -83,15 +85,39 @@ public class FileController {
         return false;
     }
 
-    private Path resolveSafe(String relPath, String rootDirectory) {
+    // For GET — file must exist; toRealPath() on the resolved path catches in-root symlinks
+    private Path resolveSafeExisting(String relPath, String rootDirectory) {
         try {
             Path root = Path.of(rootDirectory).toRealPath();
-            Path resolved = root.resolve(relPath).normalize();
+            Path resolved = root.resolve(relPath).normalize().toRealPath();
             if (!resolved.startsWith(root))
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Path escapes root");
             return resolved;
+        } catch (ResponseStatusException e) {
+            throw e;
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot resolve root directory");
+            // toRealPath on the resolved path fails when the file doesn't exist → 404
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "File not found");
+        }
+    }
+
+    // For PUT — file may not exist; canonicalize the parent and reconstruct
+    private Path resolveSafeForWrite(String relPath, String rootDirectory) {
+        try {
+            Path root = Path.of(rootDirectory).toRealPath();
+            Path normalized = root.resolve(relPath).normalize();
+            if (!normalized.startsWith(root))
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Path escapes root");
+            // Canonicalize the parent (must exist) to catch symlinks in the directory path
+            Path canonicalParent = normalized.getParent().toRealPath();
+            Path resolved = canonicalParent.resolve(normalized.getFileName());
+            if (!resolved.startsWith(root))
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Path escapes root");
+            return resolved;
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot resolve path");
         }
     }
 }
