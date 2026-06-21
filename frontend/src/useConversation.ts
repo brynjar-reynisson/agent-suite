@@ -12,9 +12,10 @@ interface UseConversationOptions {
   rootDirectory: string;
   availableTools: string[];
   disabledTools: Set<string>;
+  isAdmin: boolean;
 }
 
-export function useConversation({ model, prompt, rootDirectory, availableTools, disabledTools }: UseConversationOptions) {
+export function useConversation({ model, prompt, rootDirectory, availableTools, disabledTools, isAdmin }: UseConversationOptions) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
@@ -69,6 +70,8 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
     if (editMatch) {
       if (!rootDirectory) {
         showToast('Select a root directory first');
+      } else if (!isAdmin) {
+        showToast('Permission denied');
       } else {
         setEditorFile({ path: editMatch[1].trim(), rootDirectory });
       }

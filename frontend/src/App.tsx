@@ -66,7 +66,7 @@ function App() {
   }, [user]);
 
   const { messages, loading, errorToast, historySizeBytes, handleSend, resetConversation, loadConversation, editorFile, closeEditor } =
-    useConversation({ model, prompt, rootDirectory, availableTools, disabledTools });
+    useConversation({ model, prompt, rootDirectory, availableTools, disabledTools, isAdmin });
 
   const startNewConversation = () => {
     resetConversation();
