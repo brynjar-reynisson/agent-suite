@@ -16,6 +16,7 @@ export interface Message {
 export interface ConversationSummary {
   externalId: string;
   name: string;
+  customName: string | null;
   createTime: string;
   initialModel: string;
   systemPrompt: string;
@@ -136,6 +137,25 @@ export const getConversationDetail = async (
   );
   if (!response.ok) throw new Error('Conversation not found');
   return response.json();
+};
+
+export const renameConversation = async (
+  externalId: string,
+  customName: string,
+  token?: string | null,
+): Promise<void> => {
+  const res = await fetch(
+    `${API_BASE_URL}/ai/conversations/${encodeURIComponent(externalId)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: new URLSearchParams({ customName }),
+    },
+  );
+  if (!res.ok) throw new Error(`Rename failed (${res.status})`);
 };
 
 export const compactConversation = async (
