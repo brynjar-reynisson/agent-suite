@@ -330,8 +330,9 @@ class McpToolBridgeTest {
                         .build();
         String result = executor.execute(req, null);
 
-        assertThat(result).startsWith("![screenshot](http://localhost:8090/images/screenshot_");
-        assertThat(result).endsWith(".png)");
+        String firstLine = result.lines().findFirst().orElseThrow();
+        assertThat(firstLine).startsWith("![screenshot](http://localhost:8090/images/screenshot_");
+        assertThat(firstLine).endsWith(".png)");
     }
 
     @Test

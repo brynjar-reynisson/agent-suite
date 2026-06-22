@@ -33,12 +33,13 @@ class ImageContentHandlerTest {
     @Test
     void handle_pngContent_savesFileAndReturnsMarkdownUrl() throws Exception {
         String result = handler.handle(imageContent("image/png"));
+        String firstLine = result.lines().findFirst().orElseThrow();
 
-        assertThat(result).startsWith("![screenshot](http://localhost:8090/images/screenshot_");
-        assertThat(result).endsWith(".png)");
+        assertThat(firstLine).startsWith("![screenshot](http://localhost:8090/images/screenshot_");
+        assertThat(firstLine).endsWith(".png)");
 
         // file was written to the image dir
-        String filename = result.replaceAll(".*images/(.+)\\)", "$1");
+        String filename = firstLine.replaceAll(".*images/(.+)\\)", "$1");
         assertThat(Files.exists(imageDir.resolve(filename))).isTrue();
     }
 
@@ -46,14 +47,14 @@ class ImageContentHandlerTest {
     void handle_jpegContent_savesFileWithJpgExtension() {
         String result = handler.handle(imageContent("image/jpeg"));
 
-        assertThat(result).endsWith(".jpg)");
+        assertThat(result.lines().findFirst().orElseThrow()).endsWith(".jpg)");
     }
 
     @Test
     void handle_webpContent_savesFileWithWebpExtension() {
         String result = handler.handle(imageContent("image/webp"));
 
-        assertThat(result).endsWith(".webp)");
+        assertThat(result.lines().findFirst().orElseThrow()).endsWith(".webp)");
     }
 
     @Test
@@ -68,7 +69,8 @@ class ImageContentHandlerTest {
         // All generated filenames are alphanumeric + underscores + hyphens — no encoding needed.
         // This test verifies the URL does not contain spaces or raw special characters.
         String result = handler.handle(imageContent("image/png"));
-        String url = result.replaceAll("!\\[screenshot]\\((.+)\\)", "$1");
+        String firstLine = result.lines().findFirst().orElseThrow();
+        String url = firstLine.replaceAll("!\\[screenshot]\\((.+)\\)", "$1");
         assertThat(url).doesNotContain(" ");
         assertThat(url).startsWith("http://localhost:8090/images/screenshot_");
     }
