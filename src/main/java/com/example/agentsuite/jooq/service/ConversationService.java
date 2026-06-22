@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
@@ -78,26 +79,20 @@ public class ConversationService {
 
     @Transactional(readOnly = true)
     public List<ConversationSummaryDto> getConversationSummaries(long userId) {
-        return conversationRepository.findByUserId(userId).stream()
+        List<ConversationRecord> convs = conversationRepository.findByUserId(userId);
+        if (convs.isEmpty()) return List.of();
+        List<Long> ids = convs.stream().map(ConversationRecord::getConversationId).toList();
+        Map<Long, String[]> meta = messageRepository.findFirstMetaByConversationIds(ids);
+        return convs.stream()
                 .map(conv -> {
-                    List<MessageRecord> msgs = messageRepository.findByConversationId(conv.getConversationId());
-                    String initialModel = msgs.stream()
-                            .filter(m -> "model_change".equals(m.getType()))
-                            .findFirst()
-                            .map(MessageRecord::getMessage)
-                            .orElse("");
-                    String systemPrompt = msgs.stream()
-                            .filter(m -> "system_prompt".equals(m.getType()))
-                            .findFirst()
-                            .map(MessageRecord::getMessage)
-                            .orElse("");
+                    String[] m = meta.getOrDefault(conv.getConversationId(), new String[]{"", ""});
                     return new ConversationSummaryDto(
                             conv.getExternalId(),
                             conv.getConversationName(),
                             conv.getCustomName(),
                             conv.getCreateTime().toString(),
-                            initialModel,
-                            systemPrompt
+                            m[0],
+                            m[1]
                     );
                 })
                 .toList();

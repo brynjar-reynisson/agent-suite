@@ -17,6 +17,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -250,5 +251,23 @@ class ConversationServiceTest {
         String extId = conversationRepo.findById(guestConvId).orElseThrow().getExternalId();
         assertThrows(NoSuchElementException.class,
                 () -> service.renameConversation(extId, someoneId, "Hacked"));
+    }
+
+    @Test
+    void findFirstMetaByConversationIds_returnsFirstModelAndPromptPerConversation() {
+        // guestConvId: first model_change = "deepseek-v4-pro",
+        //              first system_prompt = "You are a helpful assistant."
+        // someoneConvId: first model_change = "gemini-2.5-pro",
+        //                first system_prompt = "You are a coding assistant."
+        Map<Long, String[]> meta = messageRepo.findFirstMetaByConversationIds(
+                List.of(guestConvId, someoneConvId));
+
+        assertThat(meta).containsKey(guestConvId);
+        assertThat(meta.get(guestConvId)[0]).isEqualTo("deepseek-v4-pro");
+        assertThat(meta.get(guestConvId)[1]).isEqualTo("You are a helpful assistant.");
+
+        assertThat(meta).containsKey(someoneConvId);
+        assertThat(meta.get(someoneConvId)[0]).isEqualTo("gemini-2.5-pro");
+        assertThat(meta.get(someoneConvId)[1]).isEqualTo("You are a coding assistant.");
     }
 }

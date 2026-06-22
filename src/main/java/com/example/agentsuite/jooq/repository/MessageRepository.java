@@ -4,7 +4,9 @@ import com.example.agentsuite.jooq.generated.tables.records.MessageRecord;
 import org.jooq.DSLContext;
 import org.springframework.stereotype.Repository;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.example.agentsuite.jooq.generated.Tables.MESSAGE;
@@ -52,5 +54,25 @@ public class MessageRepository {
                 .orderBy(MESSAGE.MESSAGE_TIME.desc(), MESSAGE.MESSAGE_ID.desc())
                 .limit(1)
                 .fetchOptional(MESSAGE.MESSAGE_);
+    }
+
+    public Map<Long, String[]> findFirstMetaByConversationIds(List<Long> conversationIds) {
+        if (conversationIds.isEmpty()) return Map.of();
+        Map<Long, String[]> result = new HashMap<>();
+        dsl.select(MESSAGE.CONVERSATION_ID, MESSAGE.TYPE, MESSAGE.MESSAGE_)
+                .from(MESSAGE)
+                .where(MESSAGE.CONVERSATION_ID.in(conversationIds))
+                .and(MESSAGE.TYPE.in("model_change", "system_prompt"))
+                .orderBy(MESSAGE.MESSAGE_TIME.asc(), MESSAGE.MESSAGE_ID.asc())
+                .forEach(r -> {
+                    long convId = r.value1();
+                    String type = r.value2();
+                    String msg = r.value3();
+                    result.computeIfAbsent(convId, k -> new String[]{"", ""});
+                    String[] arr = result.get(convId);
+                    if ("model_change".equals(type) && arr[0].isEmpty()) arr[0] = msg;
+                    else if ("system_prompt".equals(type) && arr[1].isEmpty()) arr[1] = msg;
+                });
+        return result;
     }
 }
