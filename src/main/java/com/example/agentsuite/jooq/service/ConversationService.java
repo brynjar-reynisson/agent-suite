@@ -66,6 +66,16 @@ public class ConversationService {
         return messageRepository.findLastSystemPrompt(conversationId);
     }
 
+    @Transactional
+    public void renameConversation(String externalId, long userId, String customName) {
+        ConversationRecord conv = conversationRepository.findByExternalId(externalId)
+                .orElseThrow(() -> new NoSuchElementException("Conversation not found: " + externalId));
+        if (!conv.getUserId().equals(userId)) {
+            throw new NoSuchElementException("Conversation not found: " + externalId);
+        }
+        conversationRepository.updateCustomName(conv.getConversationId(), customName);
+    }
+
     @Transactional(readOnly = true)
     public List<ConversationSummaryDto> getConversationSummaries(long userId) {
         return conversationRepository.findByUserId(userId).stream()
@@ -84,6 +94,7 @@ public class ConversationService {
                     return new ConversationSummaryDto(
                             conv.getExternalId(),
                             conv.getConversationName(),
+                            conv.getCustomName(),
                             conv.getCreateTime().toString(),
                             initialModel,
                             systemPrompt
@@ -140,6 +151,7 @@ public class ConversationService {
         return new ConversationDetailDto(
                 conv.getExternalId(),
                 conv.getConversationName(),
+                conv.getCustomName(),
                 conv.getCreateTime().toString(),
                 initialModel,
                 systemPrompt,

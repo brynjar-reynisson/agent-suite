@@ -47,4 +47,11 @@ public class ConversationRepository {
                 .orderBy(CONVERSATION.CREATE_TIME.desc())
                 .fetch();
     }
+
+    public void updateCustomName(long conversationId, String customName) {
+        dsl.update(CONVERSATION)
+                .set(CONVERSATION.CUSTOM_NAME, customName)
+                .where(CONVERSATION.CONVERSATION_ID.eq(conversationId))
+                .execute();
+    }
 }

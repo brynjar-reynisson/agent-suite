@@ -41,6 +41,7 @@ class ConversationServiceTest {
         when(conv.getUserId()).thenReturn(1L);
         when(conv.getExternalId()).thenReturn("ext-1");
         when(conv.getConversationName()).thenReturn("test");
+        when(conv.getCustomName()).thenReturn(null);
         when(conv.getCreateTime()).thenReturn(java.time.OffsetDateTime.now());
         when(conv.getRootDirectory()).thenReturn("");
         when(conversationRepository.findByExternalId("ext-1")).thenReturn(Optional.of(conv));

@@ -214,4 +214,41 @@ class ConversationServiceTest {
         assertThat(aiMsg.toolCalls().get(0).name()).isEqualTo("ls");
         assertThat(aiMsg.toolCalls().get(0).arguments()).isEqualTo("{}");
     }
+
+    @Test
+    void getConversationSummaries_customNameIsNullWhenNotSet() {
+        List<ConversationSummaryDto> summaries = service.getConversationSummaries(guestId);
+        assertThat(summaries).isNotEmpty();
+        assertThat(summaries.get(0).customName()).isNull();
+    }
+
+    @Test
+    void renameConversation_setsCustomName() {
+        String extId = conversationRepo.findById(guestConvId).orElseThrow().getExternalId();
+        service.renameConversation(extId, guestId, "My Custom Name");
+
+        ConversationSummaryDto summary = service.getConversationSummaries(guestId).stream()
+                .filter(s -> s.externalId().equals(extId))
+                .findFirst().orElseThrow();
+        assertThat(summary.customName()).isEqualTo("My Custom Name");
+    }
+
+    @Test
+    void renameConversation_clearCustomName_returnsNull() {
+        String extId = conversationRepo.findById(guestConvId).orElseThrow().getExternalId();
+        service.renameConversation(extId, guestId, "Temp Name");
+        service.renameConversation(extId, guestId, null);
+
+        ConversationSummaryDto summary = service.getConversationSummaries(guestId).stream()
+                .filter(s -> s.externalId().equals(extId))
+                .findFirst().orElseThrow();
+        assertThat(summary.customName()).isNull();
+    }
+
+    @Test
+    void renameConversation_throwsWhenNotOwner() {
+        String extId = conversationRepo.findById(guestConvId).orElseThrow().getExternalId();
+        assertThrows(NoSuchElementException.class,
+                () -> service.renameConversation(extId, someoneId, "Hacked"));
+    }
 }

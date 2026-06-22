@@ -5,6 +5,7 @@ import java.util.List;
 public record ConversationDetailDto(
         String externalId,
         String name,
+        String customName,
         String createTime,
         String initialModel,
         String systemPrompt,

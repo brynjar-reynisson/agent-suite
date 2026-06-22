@@ -401,7 +401,7 @@ class AiControllerTest {
     @Test
     void conversations_returnsSummaryList() throws Exception {
         when(conversationService.getConversationSummaries(anyLong())).thenReturn(List.of(
-                new ConversationSummaryDto("ext-abc", "Hello world", "2026-06-01T10:00:00Z",
+                new ConversationSummaryDto("ext-abc", "Hello world", null, "2026-06-01T10:00:00Z",
                         "deepseek-v4-pro", "")
         ));
 
@@ -424,7 +424,7 @@ class AiControllerTest {
     @Test
     void conversationDetail_knownId_returnsMessages() throws Exception {
         when(conversationService.getConversationDetail(eq("ext-abc"), anyLong())).thenReturn(
-                new ConversationDetailDto("ext-abc", "Hello", "2026-06-01T10:00:00Z",
+                new ConversationDetailDto("ext-abc", "Hello", null, "2026-06-01T10:00:00Z",
                         "deepseek-v4-pro", "", "",
                         List.of(new ConversationDetailDto.MessageDto("user", "Hi there", List.of())))
         );
