@@ -403,15 +403,13 @@ class AiControllerTest {
     @Test
     void conversations_returnsSummaryList() throws Exception {
         when(conversationService.getConversationSummaries(anyLong())).thenReturn(List.of(
-                new ConversationSummaryDto("ext-abc", "Hello world", null, "2026-06-01T10:00:00Z",
-                        "deepseek-v4-pro", "")
+                new ConversationSummaryDto("ext-abc", "Hello world", null, "2026-06-01T10:00:00Z")
         ));
 
         mockMvc.perform(get("/ai/conversations"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].externalId").value("ext-abc"))
-                .andExpect(jsonPath("$[0].name").value("Hello world"))
-                .andExpect(jsonPath("$[0].initialModel").value("deepseek-v4-pro"));
+                .andExpect(jsonPath("$[0].name").value("Hello world"));
     }
 
     @Test

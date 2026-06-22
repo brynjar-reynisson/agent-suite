@@ -4,7 +4,5 @@ public record ConversationSummaryDto(
         String externalId,
         String name,
         String customName,
-        String createTime,
-        String initialModel,
-        String systemPrompt
+        String createTime
 ) {}

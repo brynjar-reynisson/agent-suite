@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
@@ -79,22 +78,13 @@ public class ConversationService {
 
     @Transactional(readOnly = true)
     public List<ConversationSummaryDto> getConversationSummaries(long userId) {
-        List<ConversationRecord> convs = conversationRepository.findByUserId(userId);
-        if (convs.isEmpty()) return List.of();
-        List<Long> ids = convs.stream().map(ConversationRecord::getConversationId).toList();
-        Map<Long, String[]> meta = messageRepository.findFirstMetaByConversationIds(ids);
-        return convs.stream()
-                .map(conv -> {
-                    String[] m = meta.getOrDefault(conv.getConversationId(), new String[]{"", ""});
-                    return new ConversationSummaryDto(
-                            conv.getExternalId(),
-                            conv.getConversationName(),
-                            conv.getCustomName(),
-                            conv.getCreateTime().toString(),
-                            m[0],
-                            m[1]
-                    );
-                })
+        return conversationRepository.findByUserId(userId).stream()
+                .map(conv -> new ConversationSummaryDto(
+                        conv.getExternalId(),
+                        conv.getConversationName(),
+                        conv.getCustomName(),
+                        conv.getCreateTime().toString()
+                ))
                 .toList();
     }
 
