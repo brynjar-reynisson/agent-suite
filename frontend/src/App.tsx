@@ -93,7 +93,7 @@ function App() {
   return (
     <div className="flex flex-col h-screen bg-gray-100 font-sans">
       <header className="bg-white shadow-sm p-4 flex justify-between items-center">
-        <div className="flex items-baseline gap-3 min-w-0">
+        <div className="flex items-baseline gap-3 min-w-0 flex-1 overflow-hidden">
           <h1 className="text-xl font-bold text-gray-800 flex-shrink-0">AgentSuite Chat</h1>
           {activeConvDisplayName && (
             <span className="text-sm text-gray-400 truncate min-w-0">{activeConvDisplayName}</span>
