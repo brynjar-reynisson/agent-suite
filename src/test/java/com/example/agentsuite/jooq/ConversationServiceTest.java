@@ -138,6 +138,7 @@ class ConversationServiceTest {
         assertThat(summaries).isNotEmpty();
         assertThat(summaries.get(0).name()).isEqualTo("Guest Chat");
         assertThat(summaries.get(0).initialModel()).isEqualTo("deepseek-v4-pro");
+        assertThat(summaries.get(0).systemPrompt()).isEqualTo("You are a helpful assistant.");
     }
 
     @Test
