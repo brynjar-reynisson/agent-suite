@@ -18,11 +18,11 @@ export interface ConversationSummary {
   name: string;
   customName: string | null;
   createTime: string;
-  initialModel: string;
-  systemPrompt: string;
 }
 
 export interface ConversationDetail extends ConversationSummary {
+  initialModel: string;
+  systemPrompt: string;
   rootDirectory: string;
   messages: Message[];
 }
