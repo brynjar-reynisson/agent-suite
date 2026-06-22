@@ -61,19 +61,21 @@ Ownership enforcement mirrors the pattern already used in `getConversationDetail
 
 ### DTOs
 
-Both `ConversationSummaryDto` and `ConversationDetailDto` gain a `customName` field (`String`, nullable). The existing `name` field continues to carry the auto-generated name.
+Both `ConversationSummaryDto` and `ConversationDetailDto` gain a `customName` field (`String`, nullable). The existing `name` field continues to carry the auto-generated name (`conv.getConversationName()`); `customName` maps from `conv.getCustomName()` (null if unset).
 
 ```java
 // ConversationSummaryDto
 public record ConversationSummaryDto(
         String externalId,
         String name,
-        String customName,   // new — nullable
+        String customName,   // new — nullable; null means no custom name set
         String createTime,
         String initialModel,
         String systemPrompt
 ) {}
 ```
+
+`ConversationDetailDto` gains the same `customName` field in the same position after `name`.
 
 ### Endpoint
 
