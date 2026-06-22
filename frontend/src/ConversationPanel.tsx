@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { getConversations, type ConversationSummary } from './api';
+import { useRef, useState, useEffect } from 'react';
+import { getConversations, renameConversation, type ConversationSummary } from './api';
 import { getAccessToken } from './auth';
 
 interface Props {
@@ -18,6 +18,9 @@ export function ConversationPanel({ isOpen, onClose, onSelect }: Props) {
   const [listError, setListError] = useState<string | null>(null);
   const [selectError, setSelectError] = useState<string | null>(null);
   const [selecting, setSelecting] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const editHandledRef = useRef(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -34,11 +37,11 @@ export function ConversationPanel({ isOpen, onClose, onSelect }: Props) {
   useEffect(() => {
     if (!isOpen) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !editingId) onClose();
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, editingId]);
 
   const handleSelect = async (conv: ConversationSummary) => {
     setSelecting(conv.externalId);
@@ -50,6 +53,41 @@ export function ConversationPanel({ isOpen, onClose, onSelect }: Props) {
     } finally {
       setSelecting(null);
     }
+  };
+
+  const startEdit = (conv: ConversationSummary) => {
+    editHandledRef.current = false;
+    setEditingId(conv.externalId);
+    setEditValue(conv.customName ?? conv.name);
+  };
+
+  const saveEdit = async (conv: ConversationSummary) => {
+    if (editHandledRef.current) return;
+    editHandledRef.current = true;
+    const trimmed = editValue.trim();
+    const prevCustomName = conv.customName;
+    setConversations(prev =>
+      prev.map(c =>
+        c.externalId === conv.externalId ? { ...c, customName: trimmed || null } : c,
+      ),
+    );
+    setEditingId(null);
+    try {
+      const token = await getAccessToken();
+      await renameConversation(conv.externalId, trimmed, token);
+    } catch {
+      setConversations(prev =>
+        prev.map(c =>
+          c.externalId === conv.externalId ? { ...c, customName: prevCustomName } : c,
+        ),
+      );
+      setSelectError('Failed to rename conversation');
+    }
+  };
+
+  const cancelEdit = () => {
+    editHandledRef.current = true;
+    setEditingId(null);
   };
 
   if (!isOpen) return null;
@@ -85,24 +123,75 @@ export function ConversationPanel({ isOpen, onClose, onSelect }: Props) {
           {!listLoading && !listError && conversations.length === 0 && (
             <p className="p-4 text-sm text-gray-400">No conversations yet.</p>
           )}
-          {conversations.map((conv) => (
-            <button
-              key={conv.externalId}
-              onClick={() => handleSelect(conv)}
-              disabled={selecting !== null}
-              title={conv.name}
-              className="w-full text-left px-4 py-5 border-b hover:bg-gray-50 transition-colors disabled:opacity-50"
-            >
-              <div className="flex justify-between items-baseline gap-2">
-                <span className="text-gray-800 text-sm truncate">
-                  {selecting === conv.externalId ? 'Loading...' : conv.name}
-                </span>
-                <span className="text-xs text-gray-400 shrink-0">
-                  {formatDate(conv.createTime)}
-                </span>
+          {conversations.map((conv) => {
+            const displayName = conv.customName ?? conv.name;
+            const isEditing = editingId === conv.externalId;
+
+            return (
+              <div key={conv.externalId} className="border-b">
+                <div
+                  role="button"
+                  tabIndex={isEditing || selecting !== null ? -1 : 0}
+                  onClick={() => !isEditing && selecting === null && handleSelect(conv)}
+                  onKeyDown={e => {
+                    if ((e.key === 'Enter' || e.key === ' ') && !isEditing && selecting === null)
+                      handleSelect(conv);
+                  }}
+                  title={displayName}
+                  className={`w-full text-left px-4 py-5 transition-colors ${
+                    isEditing || selecting !== null
+                      ? 'opacity-50 cursor-default'
+                      : 'hover:bg-gray-50 cursor-pointer'
+                  }`}
+                >
+                  <div className="flex justify-between items-baseline gap-2">
+                    <div className="flex items-center gap-1 min-w-0 flex-1">
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          if (!isEditing) startEdit(conv);
+                        }}
+                        className="text-gray-400 hover:text-gray-600 shrink-0 leading-none text-base"
+                        aria-label="Rename conversation"
+                        title="Rename"
+                      >
+                        ✎
+                      </button>
+                      {isEditing ? (
+                        <input
+                          autoFocus
+                          className="flex-1 text-sm text-gray-800 border border-blue-400 rounded px-1 outline-none"
+                          value={editValue}
+                          onChange={e => setEditValue(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              saveEdit(conv);
+                            }
+                            if (e.key === 'Escape') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              cancelEdit();
+                            }
+                          }}
+                          onBlur={() => saveEdit(conv)}
+                          onClick={e => e.stopPropagation()}
+                        />
+                      ) : (
+                        <span className="text-gray-800 text-sm truncate">
+                          {selecting === conv.externalId ? 'Loading...' : displayName}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-400 shrink-0">
+                      {formatDate(conv.createTime)}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </button>
-          ))}
+            );
+          })}
         </div>
       </div>
     </>
