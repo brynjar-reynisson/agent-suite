@@ -96,7 +96,7 @@ function App() {
         <div className="flex items-baseline gap-3 min-w-0">
           <h1 className="text-xl font-bold text-gray-800 flex-shrink-0">AgentSuite Chat</h1>
           {activeConvDisplayName && (
-            <span className="text-sm text-gray-400 truncate">{activeConvDisplayName}</span>
+            <span className="text-sm text-gray-400 truncate min-w-0">{activeConvDisplayName}</span>
           )}
         </div>
         <div className="flex gap-2 items-center">
