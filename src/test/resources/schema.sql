@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS "conversation" (
     "create_time"       TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     "root_directory"    TEXT,
     "external_id"       TEXT                     NOT NULL DEFAULT RANDOM_UUID() UNIQUE,
+    "custom_name"       TEXT,
     CONSTRAINT "fk_conversation_user" FOREIGN KEY ("user_id") REFERENCES "suite_user" ("user_id")
 );
 

@@ -89,6 +89,11 @@ public class Conversation extends TableImpl<ConversationRecord> {
      */
     public final TableField<ConversationRecord, String> EXTERNAL_ID = createField(DSL.name("external_id"), SQLDataType.CLOB.nullable(false), this, "");
 
+    /**
+     * The column <code>public.conversation.custom_name</code>.
+     */
+    public final TableField<ConversationRecord, String> CUSTOM_NAME = createField(DSL.name("custom_name"), SQLDataType.CLOB, this, "");
+
     private Conversation(Name alias, Table<ConversationRecord> aliased) {
         this(alias, aliased, (Field<?>[]) null, null);
     }
