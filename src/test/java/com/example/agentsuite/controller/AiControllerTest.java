@@ -37,12 +37,14 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import java.util.function.Consumer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -442,6 +444,31 @@ class AiControllerTest {
                 .thenThrow(new NoSuchElementException("not found"));
 
         mockMvc.perform(get("/ai/conversations/unknown"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void rename_validRequest_returns200() throws Exception {
+        mockMvc.perform(patch("/ai/conversations/ext-abc")
+                        .param("customName", "My label"))
+                .andExpect(status().isOk());
+        verify(conversationService).renameConversation(eq("ext-abc"), anyLong(), eq("My label"));
+    }
+
+    @Test
+    void rename_emptyCustomName_callsServiceWithNull() throws Exception {
+        mockMvc.perform(patch("/ai/conversations/ext-abc")
+                        .param("customName", ""))
+                .andExpect(status().isOk());
+        verify(conversationService).renameConversation(eq("ext-abc"), anyLong(), isNull());
+    }
+
+    @Test
+    void rename_notFound_returns404() throws Exception {
+        doThrow(new NoSuchElementException("not found"))
+                .when(conversationService).renameConversation(eq("unknown"), anyLong(), any());
+        mockMvc.perform(patch("/ai/conversations/unknown")
+                        .param("customName", "anything"))
                 .andExpect(status().isNotFound());
     }
 

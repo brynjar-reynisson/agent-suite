@@ -29,6 +29,11 @@ POST /ai/exec
   Events: output/<line>, done/<exit code>, error/<message>. Non-admins get 403.
   Empty or invalid rootDirectory gets 400. Process timeout: 10 minutes.
 
+PATCH /ai/conversations/{externalId}
+  ?customName=<string>   (empty string clears the custom name, reverting to auto-generated)
+  Auth required; caller must own the conversation (404 otherwise).
+  Returns 200 OK (no body) on success.
+
 POST /ai/conversations/{externalId}/compact
   Summarises conversation history via LLM and stores result as a `compact` message.
   Auth required; caller must own the conversation (404 otherwise).

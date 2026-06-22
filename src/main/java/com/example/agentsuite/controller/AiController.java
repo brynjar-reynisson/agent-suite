@@ -177,6 +177,21 @@ public class AiController {
         }
     }
 
+    @PatchMapping("/ai/conversations/{externalId}")
+    public ResponseEntity<Void> renameConversation(
+            @PathVariable String externalId,
+            @RequestParam String customName,
+            HttpServletRequest request) {
+        long userId = currentUserId(request);
+        String normalized = customName.isBlank() ? null : customName.trim();
+        try {
+            conversationService.renameConversation(externalId, userId, normalized);
+            return ResponseEntity.ok().build();
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @PostMapping("/ai/conversations/{externalId}/compact")
     public ResponseEntity<Map<String, String>> compact(
             @PathVariable String externalId,
