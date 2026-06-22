@@ -26,6 +26,7 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editorFile, setEditorFile] = useState<{ path: string; rootDirectory: string } | null>(null);
   const closeEditor = useCallback(() => setEditorFile(null), []);
+  const [activeConvDisplayName, setActiveConvDisplayName] = useState<string | null>(null);
 
   const historySizeBytes = useMemo(() => {
     const lastCompactIdx = messages.reduce(
@@ -40,6 +41,7 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
     lastSentModel.current = null;
     lastSentPrompt.current = null;
     setMessages([]);
+    setActiveConvDisplayName(null);
   }, []);
 
   useEffect(() => {
@@ -53,8 +55,15 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
     lastSentModel.current = detail.initialModel;
     lastSentPrompt.current = detail.systemPrompt;
     setMessages(detail.messages);
+    setActiveConvDisplayName(conv.customName ?? conv.name);
     return detail;
   };
+
+  const updateActiveConvDisplayName = useCallback((externalId: string, displayName: string) => {
+    if (externalId === conversationId.current) {
+      setActiveConvDisplayName(displayName);
+    }
+  }, []);
 
   const showToast = (message: string) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -266,5 +275,5 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
     }
   };
 
-  return { messages, loading, errorToast, historySizeBytes, handleSend, resetConversation, loadConversation, editorFile, closeEditor };
+  return { messages, loading, errorToast, historySizeBytes, handleSend, resetConversation, loadConversation, editorFile, closeEditor, activeConvDisplayName, updateActiveConvDisplayName };
 }

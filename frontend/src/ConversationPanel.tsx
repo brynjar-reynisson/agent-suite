@@ -6,13 +6,14 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (conv: ConversationSummary) => Promise<void>;
+  onRename?: (externalId: string, displayName: string) => void;
 }
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
-export function ConversationPanel({ isOpen, onClose, onSelect }: Props) {
+export function ConversationPanel({ isOpen, onClose, onSelect, onRename }: Props) {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
@@ -75,6 +76,7 @@ export function ConversationPanel({ isOpen, onClose, onSelect }: Props) {
     try {
       const token = await getAccessToken();
       await renameConversation(conv.externalId, trimmed, token);
+      onRename?.(conv.externalId, trimmed || conv.name);
     } catch {
       setConversations(prev =>
         prev.map(c =>

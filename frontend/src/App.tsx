@@ -65,7 +65,7 @@ function App() {
     }
   }, [user]);
 
-  const { messages, loading, errorToast, historySizeBytes, handleSend, resetConversation, loadConversation, editorFile, closeEditor } =
+  const { messages, loading, errorToast, historySizeBytes, handleSend, resetConversation, loadConversation, editorFile, closeEditor, activeConvDisplayName, updateActiveConvDisplayName } =
     useConversation({ model, prompt, rootDirectory, availableTools, disabledTools, isAdmin });
 
   const startNewConversation = () => {
@@ -93,7 +93,12 @@ function App() {
   return (
     <div className="flex flex-col h-screen bg-gray-100 font-sans">
       <header className="bg-white shadow-sm p-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-gray-800">AgentSuite Chat</h1>
+        <div className="flex items-baseline gap-3 min-w-0">
+          <h1 className="text-xl font-bold text-gray-800 flex-shrink-0">AgentSuite Chat</h1>
+          {activeConvDisplayName && (
+            <span className="text-sm text-gray-400 truncate">{activeConvDisplayName}</span>
+          )}
+        </div>
         <div className="flex gap-2 items-center">
           <select
             value={model}
@@ -204,6 +209,7 @@ function App() {
         isOpen={isPanelOpen}
         onClose={() => setIsPanelOpen(false)}
         onSelect={handleLoadConversation}
+        onRename={updateActiveConvDisplayName}
       />
       {lightboxSrc && (
         <ImageLightbox
