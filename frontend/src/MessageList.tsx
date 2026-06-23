@@ -75,7 +75,7 @@ export function MessageList({ messages, loading, historySizeBytes, onImageClick 
                   remarkPlugins={[remarkGfm]}
                   components={{
                     pre({ children }: { children?: React.ReactNode }) {
-                      const codeEl = Children.toArray(children).find(isValidElement) as ReactElement | undefined;
+                      const codeEl = Children.toArray(children).find(isValidElement) as ReactElement<{ className?: string; children?: React.ReactNode }> | undefined;
                       const lang = /language-(\w+)/.exec(codeEl?.props?.className ?? '')?.[1] ?? '';
                       if (lang) {
                         return (
