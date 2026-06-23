@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiFunction;
@@ -42,6 +43,9 @@ public class McpToolBridge implements DynamicToolProvider {
 
     private static final Logger log = LoggerFactory.getLogger(McpToolBridge.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    // obsidian-mcp's ConnectionMonitor closes the MCP transport (without exiting the process)
+    // after ~70s of inactivity (30s grace + 60s idle). Reconnect proactively before that fires.
+    private static final long PROACTIVE_RECONNECT_IDLE_MS = 60_000;
 
     static final String ROOT_CONFIG_FILENAME = ".agent-suite-mcp.json";
 
@@ -57,6 +61,7 @@ public class McpToolBridge implements DynamicToolProvider {
             ReentrantLock lock,
             String serverName,
             McpServerConfig config,
+            AtomicLong lastCallMs,
             BiFunction<String, McpServerConfig, McpSyncClient> factory) {
 
         McpSyncClient get() { return ref.get(); }
@@ -211,7 +216,8 @@ public class McpToolBridge implements DynamicToolProvider {
             }
             ManagedClient managed = new ManagedClient(
                     new AtomicReference<>(client), new ReentrantLock(),
-                    serverName, serverConfig, clientFactory);
+                    serverName, serverConfig,
+                    new AtomicLong(System.currentTimeMillis()), clientFactory);
             clients.add(managed);
 
             McpSchema.ListToolsResult listResult;
@@ -270,6 +276,7 @@ public class McpToolBridge implements DynamicToolProvider {
             try {
                 McpSyncClient fresh = managed.factory().apply(managed.serverName(), managed.config());
                 managed.ref().set(fresh);
+                managed.lastCallMs().set(System.currentTimeMillis());
                 try { failedClient.closeGracefully(); } catch (Exception ignored) {}
                 log.info("Reconnected MCP server '{}'", managed.serverName());
             } catch (Exception e) {
@@ -283,6 +290,13 @@ public class McpToolBridge implements DynamicToolProvider {
     @SuppressWarnings("unchecked")
     private String callMcpTool(ManagedClient managed, String toolName,
                                 String argumentsJson) {
+        long idleMs = System.currentTimeMillis() - managed.lastCallMs().get();
+        if (idleMs > PROACTIVE_RECONNECT_IDLE_MS) {
+            log.info("MCP server '{}' idle for {}s — reconnecting proactively",
+                    managed.serverName(), idleMs / 1000);
+            tryReconnect(managed, managed.get());
+        }
+
         McpSyncClient client = managed.get();
         try {
             Map<String, Object> args = argumentsJson != null && !argumentsJson.isBlank()
@@ -308,6 +322,7 @@ public class McpToolBridge implements DynamicToolProvider {
 
             String output = String.join("\n", parts);
 
+            managed.lastCallMs().set(System.currentTimeMillis());
             if (Boolean.TRUE.equals(result.isError())) {
                 return "Error from MCP server '" + managed.serverName() + "': " + output;
             }

@@ -22,3 +22,4 @@ cd ..
 
 echo Restarting prod servers...
 powershell.exe -File "C:\Users\Lenovo\start-agent-suite-prod.ps1"
+echo Restarted prod servers

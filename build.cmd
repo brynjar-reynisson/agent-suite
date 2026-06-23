@@ -9,3 +9,4 @@ if errorlevel 1 exit /b 1
 
 echo Restarting dev servers...
 powershell.exe -File "C:\Users\Lenovo\start-agent-suite-dev.ps1"
+echo Restarted dev servers

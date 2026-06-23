@@ -65,6 +65,11 @@ export const chatStream = async (
       ...(params.conversationId ? { conversationId: params.conversationId } : {}),
       ...(params.requestId ? { requestId: params.requestId } : {}),
     }),
+    async onopen(response) {
+      if (!response.headers.get('content-type')?.startsWith('text/event-stream')) {
+        throw new Error('Server unavailable, please try again');
+      }
+    },
     onmessage(ev) {
       if (ev.event === 'tool_call') callbacks.onToolCall(JSON.parse(ev.data));
       if (ev.event === 'content') callbacks.onContent(ev.data);
@@ -72,7 +77,7 @@ export const chatStream = async (
       if (ev.event === 'done') controller.abort();
     },
     onclose() {
-      throw new Error('Stream closed by server');
+      throw new Error('Connection closed unexpectedly, please try again');
     },
     onerror(err) {
       throw err;
