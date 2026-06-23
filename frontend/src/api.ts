@@ -11,6 +11,7 @@ export interface Message {
   role: 'user' | 'ai' | 'meta' | 'compact';
   content: string;
   toolCalls?: ToolCall[];
+  sourceLanguage?: string;
 }
 
 export interface ConversationSummary {
