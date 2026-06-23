@@ -6,6 +6,24 @@ import {
 import { useAuth, getAccessToken } from './auth';
 import { PROMPT_BANK } from './config';
 
+const EXT_TO_LANG: Record<string, string> = {
+  md: 'md', markdown: 'md',
+  java: 'java',
+  ts: 'ts', tsx: 'tsx',
+  js: 'js', jsx: 'jsx',
+  json: 'json',
+  yaml: 'yaml', yml: 'yaml',
+  sh: 'sh', bash: 'sh',
+  xml: 'xml', html: 'html', css: 'css',
+};
+
+function catFileLang(command: string): string {
+  if (!command.startsWith('cat ')) return '';
+  const lastToken = command.trim().split(/\s+/).pop() ?? '';
+  const ext = lastToken.replace(/["']/g, '').split('.').pop()?.toLowerCase() ?? '';
+  return EXT_TO_LANG[ext] ?? '';
+}
+
 interface UseConversationOptions {
   model: string;
   prompt: string;
@@ -167,7 +185,11 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
         const command = input.slice(1).trim();
         const token = await getAccessToken();
         const result = await execTool(command, rootDirectory, token);
-        setMessages((prev) => [...prev, { role: 'ai', content: '```\n' + result + '\n```' }]);
+        const lang = catFileLang(command);
+        setMessages((prev) => [...prev, lang
+          ? { role: 'ai', content: result, sourceLanguage: lang }
+          : { role: 'ai', content: '```\n' + result + '\n```' },
+        ]);
       } catch (error: any) {
         setMessages((prev) => [...prev, { role: 'ai', content: `Error: ${error.message}` }]);
       } finally {

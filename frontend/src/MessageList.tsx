@@ -1,7 +1,8 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, Children, isValidElement, type ReactElement } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { MetaMessage } from './MetaMessage';
+import { FileContentRenderer } from './FileContentRenderer';
 import type { Message } from './api';
 
 function formatToolArgs(args: string): string {
@@ -63,11 +64,28 @@ export function MessageList({ messages, loading, historySizeBytes, onImageClick 
                 ))}
               </div>
             )}
-            {msg.content && (
+            {msg.content && msg.sourceLanguage && (
+              <FileContentRenderer language={msg.sourceLanguage}>
+                {msg.content}
+              </FileContentRenderer>
+            )}
+            {msg.content && !msg.sourceLanguage && (
               <div className={`prose max-w-none ${msg.role === 'user' ? 'prose-invert' : ''}`}>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
+                    pre({ children }: { children?: React.ReactNode }) {
+                      const codeEl = Children.toArray(children).find(isValidElement) as ReactElement | undefined;
+                      const lang = /language-(\w+)/.exec(codeEl?.props?.className ?? '')?.[1] ?? '';
+                      if (lang) {
+                        return (
+                          <FileContentRenderer language={lang}>
+                            {String(codeEl?.props?.children ?? '').trimEnd()}
+                          </FileContentRenderer>
+                        );
+                      }
+                      return <pre>{children}</pre>;
+                    },
                     a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
                       if (href && /\.(wav|mp3)$/i.test(href)) {
                         return (
