@@ -8,10 +8,12 @@ import com.example.agentsuite.service.AuthorizationService;
 import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatOrchestrationService;
 import com.example.agentsuite.service.ModelRegistry;
+import com.example.agentsuite.tools.GitTools;
 import com.example.agentsuite.tools.MarkDownWriter;
 import com.example.agentsuite.tools.McpToolBridge;
 import com.example.agentsuite.tools.UnixTools;
 import com.example.agentsuite.tools.WebTools;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -312,8 +314,9 @@ class AiControllerTest {
     @Test
     void buildToolInstances_unixGroup_withRootDirectory_returnsUnixTools() {
         Object[] result = AiController.buildToolInstances("unix", tempDir.toString(), "", null, null, null);
-        assertThat(result).hasSize(1);
+        assertThat(result).hasSize(2);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
+        assertThat(result[1]).isInstanceOf(GitTools.class);
     }
 
     @Test
@@ -331,8 +334,9 @@ class AiControllerTest {
     @Test
     void buildToolInstances_multipleGroups_onlyKnownGroupsAdded() {
         Object[] result = AiController.buildToolInstances("unix,unknown", tempDir.toString(), "", null, null, null);
-        assertThat(result).hasSize(1);
+        assertThat(result).hasSize(2);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
+        assertThat(result[1]).isInstanceOf(GitTools.class);
     }
 
     @Test
@@ -351,9 +355,10 @@ class AiControllerTest {
     @Test
     void buildToolInstances_unixAndMdWriter_withRootDirectory_returnsBothInstances() {
         Object[] result = AiController.buildToolInstances("unix,md-writer", tempDir.toString(), "", null, null, null);
-        assertThat(result).hasSize(2);
+        assertThat(result).hasSize(3);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
-        assertThat(result[1]).isInstanceOf(MarkDownWriter.class);
+        assertThat(result[1]).isInstanceOf(GitTools.class);
+        assertThat(result[2]).isInstanceOf(MarkDownWriter.class);
     }
 
     @Test
@@ -530,8 +535,8 @@ class AiControllerTest {
 
         verify(orchestrationService).chatStream(
                 isNull(), anyLong(), any(), any(), any(), any(), any(), any(Consumer.class),
-                argThat(arr -> arr instanceof Object[] t && t.length == 2
-                        && t[0] instanceof WebTools && t[1] instanceof UnixTools));
+                argThat(arr -> arr instanceof Object[] t && t.length == 3
+                        && t[0] instanceof WebTools && t[1] instanceof UnixTools && t[2] instanceof GitTools));
     }
 
     @Test
@@ -622,15 +627,16 @@ class AiControllerTest {
 
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
 
-        // order is a deliberate contract: grantedToolGroups order (web, md-writer, mcp, audio) then unix last
+        // order is a deliberate contract: grantedToolGroups order (web, md-writer, mcp, audio) then unix last (UnixTools + GitTools)
         verify(orchestrationService).chatStream(
                 isNull(), anyLong(), any(), any(), any(), any(), any(), any(Consumer.class),
-                argThat(arr -> arr instanceof Object[] t && t.length == 5
+                argThat(arr -> arr instanceof Object[] t && t.length == 6
                         && t[0] instanceof WebTools
                         && t[1] instanceof MarkDownWriter
                         && t[2] instanceof McpToolBridge.ScopedTools
                         && t[3] instanceof com.example.agentsuite.tools.AudioTools
-                        && t[4] instanceof UnixTools));
+                        && t[4] instanceof UnixTools
+                        && t[5] instanceof GitTools));
     }
 
     @Test
@@ -666,8 +672,8 @@ class AiControllerTest {
 
         verify(orchestrationService).chatStream(
                 isNull(), anyLong(), any(), any(), any(), any(), any(), any(Consumer.class),
-                argThat(arr -> arr instanceof Object[] t && t.length == 2
-                        && t[0] instanceof WebTools && t[1] instanceof UnixTools));
+                argThat(arr -> arr instanceof Object[] t && t.length == 3
+                        && t[0] instanceof WebTools && t[1] instanceof UnixTools && t[2] instanceof GitTools));
     }
 
     @Test
@@ -697,6 +703,60 @@ class AiControllerTest {
         mockMvc.perform(post("/ai/conversations/empty-conv/compact"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Nothing to compact."));
+    }
+
+    @Test
+    void chat_adminWithRootDirectory_systemPromptIncludesGitDirective() throws Exception {
+        when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
+        when(authorizationService.isAdmin(42L)).thenReturn(true);
+
+        AtomicReference<String> capturedPrompt = new AtomicReference<>();
+        doAnswer(inv -> {
+            capturedPrompt.set(inv.getArgument(3));
+            @SuppressWarnings("unchecked")
+            Consumer<ChatEvent> consumer = inv.getArgument(7);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
+                any(Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
+                        .header("Authorization", "Bearer " + makeAdminJwt("admin-sub", "admin@test.com"))
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(request().asyncStarted()).andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
+
+        assertThat(capturedPrompt.get()).contains(AiController.GIT_COMMIT_DIRECTIVE);
+    }
+
+    @Test
+    void chat_adminWithDirectiveAlreadyInPrompt_directiveNotDuplicated() throws Exception {
+        when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
+        when(authorizationService.isAdmin(42L)).thenReturn(true);
+
+        AtomicReference<String> capturedPrompt = new AtomicReference<>();
+        doAnswer(inv -> {
+            capturedPrompt.set(inv.getArgument(3));
+            @SuppressWarnings("unchecked")
+            Consumer<ChatEvent> consumer = inv.getArgument(7);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
+                any(Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
+                        .header("Authorization", "Bearer " + makeAdminJwt("admin-sub", "admin@test.com"))
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite")
+                        .param("prompt", AiController.GIT_COMMIT_DIRECTIVE))
+                .andExpect(request().asyncStarted()).andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
+
+        String received = capturedPrompt.get();
+        int first = received.indexOf(AiController.GIT_COMMIT_DIRECTIVE);
+        int second = received.indexOf(AiController.GIT_COMMIT_DIRECTIVE, first + 1);
+        assertThat(second).isEqualTo(-1);
     }
 
     private static String makeAdminJwt(String sub, String email) {

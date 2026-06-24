@@ -9,6 +9,7 @@ import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatOrchestrationService;
 import com.example.agentsuite.service.ModelRegistry;
 import com.example.agentsuite.tools.Git;
+import com.example.agentsuite.tools.GitTools;
 import com.example.agentsuite.tools.MarkDownWriter;
 import com.example.agentsuite.tools.McpToolBridge;
 import com.example.agentsuite.tools.UnixTools;
@@ -43,6 +44,10 @@ import java.util.stream.Collectors;
 public class AiController {
 
     private static final Logger log = LoggerFactory.getLogger(AiController.class);
+
+    static final String GIT_COMMIT_DIRECTIVE =
+            "After creating or modifying any file, always call gitAdd with the file path " +
+            "and then gitCommit with a descriptive commit message.";
 
     private final ChatOrchestrationService orchestrationService;
     private final ModelRegistry modelRegistry;
@@ -270,12 +275,20 @@ public class AiController {
         }
         Object[] toolArray = buildToolInstances(String.join(",", authorized), rootDirectory, braveApiKey, mcpToolBridge, baseUrl, audioDir);
 
+        final String effectivePrompt;
+        if (Arrays.stream(toolArray).anyMatch(t -> t instanceof GitTools)
+                && !prompt.contains(GIT_COMMIT_DIRECTIVE)) {
+            effectivePrompt = prompt.isBlank() ? GIT_COMMIT_DIRECTIVE : prompt + "\n\n" + GIT_COMMIT_DIRECTIVE;
+        } else {
+            effectivePrompt = prompt;
+        }
+
         CompletableFuture.runAsync(() -> {
             try {
                 orchestrationService.chatStream(
                         conversationId.isEmpty() ? null : conversationId,
                         userId,
-                        model, prompt, message, rootDirectory, requestId.isBlank() ? null : requestId,
+                        model, effectivePrompt, message, rootDirectory, requestId.isBlank() ? null : requestId,
                         event -> {
                             switch (event) {
                                 case ChatEvent.ToolBatch tb -> {
@@ -329,7 +342,10 @@ public class AiController {
             if (!seen.add(g)) continue;
             switch (g) {
                 case "unix" -> {
-                    if (!rootDirectory.isEmpty()) instances.add(new UnixTools(rootDirectory));
+                    if (!rootDirectory.isEmpty()) {
+                        instances.add(new UnixTools(rootDirectory));
+                        instances.add(new GitTools(rootDirectory));
+                    }
                 }
                 case "md-writer" -> {
                     // MarkDownWriter requires a rootDirectory anchor; entitlement is still granted, tool just can't be instantiated without it
