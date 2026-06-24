@@ -31,6 +31,8 @@ Spring Boot 3.5 + LangChain4j 1.16.2. Java 21.
 
 Tool groups: `web` (all users), `unix`/`md-writer`/`mcp` (admin + non-empty `rootDirectory`). Backend computes the authoritative set; frontend `tools` param is opt-out only. The `unix` group includes `UnixTools` (ls/cat/grep) and `GitTools` (gitAdd/gitCommit); a system prompt directive is auto-injected when git tools are active. When the `mcp` group detects obsidian tools (root contains `.agent-suite-mcp.json` with an obsidian server), `edit-note`/`create-note`/`delete-note` executors are wrapped to git-commit the file before every call, and a read-before-write directive is also injected.
 
+**Conversation directives:** Sending `/clear` as the user message stores a `clear` marker in the database and resets the agent's context — no history before the marker is sent to the LLM on subsequent turns, though all messages remain visible in the UI. `/clear` and `compact` use the same cutoff logic: whichever marker is more recent wins.
+
 <!-- agent-lsp:rules:start -->
 ## agent-lsp Skills
 
