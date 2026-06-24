@@ -46,7 +46,7 @@ abstract class AbstractLangChain4jChatService implements ChatService {
         AiServices<AssistantService> builder = AiServices.builder(AssistantService.class)
                 .chatModel(model)
                 .chatMemory(memory)
-                .maxSequentialToolsInvocations(20);
+                .maxSequentialToolsInvocations(ChatService.MAX_SEQUENTIAL_TOOL_INVOCATIONS);
 
         if (!systemPrompt.isBlank()) {
             builder.systemMessageProvider(id -> systemPrompt);
@@ -165,9 +165,18 @@ abstract class AbstractLangChain4jChatService implements ChatService {
             emitter.accept(new ChatEvent.Content(response));
             emitter.accept(new ChatEvent.Done());
         } catch (Exception e) {
-            emitter.accept(new ChatEvent.Error(e.getMessage()));
+            emitter.accept(new ChatEvent.Error(toUserFacingError(e)));
             emitter.accept(new ChatEvent.Done());
         }
+    }
+
+    static String toUserFacingError(Exception e) {
+        String msg = e.getMessage() != null ? e.getMessage() : "";
+        if (msg.toLowerCase().contains("sequential")) {
+            return "Tool call limit reached (" + ChatService.MAX_SEQUENTIAL_TOOL_INVOCATIONS +
+                    " per turn). Send another message to continue.";
+        }
+        return msg;
     }
 
     private List<ChatMessage> buildMessageList(List<HistoryMessage> history) {

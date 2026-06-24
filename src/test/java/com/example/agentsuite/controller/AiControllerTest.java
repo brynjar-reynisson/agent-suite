@@ -759,6 +759,60 @@ class AiControllerTest {
         assertThat(second).isEqualTo(-1);
     }
 
+    @Test
+    void chat_withToolsActive_systemPromptIncludesToolCallLimitDirective() throws Exception {
+        when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
+        when(authorizationService.isAdmin(42L)).thenReturn(true);
+
+        AtomicReference<String> capturedPrompt = new AtomicReference<>();
+        doAnswer(inv -> {
+            capturedPrompt.set(inv.getArgument(3));
+            @SuppressWarnings("unchecked")
+            Consumer<ChatEvent> consumer = inv.getArgument(7);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
+                any(Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
+                        .header("Authorization", "Bearer " + makeAdminJwt("admin-sub", "admin@test.com"))
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(request().asyncStarted()).andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
+
+        assertThat(capturedPrompt.get()).contains(AiController.TOOL_CALL_LIMIT_DIRECTIVE);
+    }
+
+    @Test
+    void chat_withToolsActive_toolCallLimitDirectiveNotDuplicated() throws Exception {
+        when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
+        when(authorizationService.isAdmin(42L)).thenReturn(true);
+
+        AtomicReference<String> capturedPrompt = new AtomicReference<>();
+        doAnswer(inv -> {
+            capturedPrompt.set(inv.getArgument(3));
+            @SuppressWarnings("unchecked")
+            Consumer<ChatEvent> consumer = inv.getArgument(7);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
+                any(Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
+                        .header("Authorization", "Bearer " + makeAdminJwt("admin-sub", "admin@test.com"))
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite")
+                        .param("prompt", AiController.TOOL_CALL_LIMIT_DIRECTIVE))
+                .andExpect(request().asyncStarted()).andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
+
+        String received = capturedPrompt.get();
+        int first = received.indexOf(AiController.TOOL_CALL_LIMIT_DIRECTIVE);
+        int second = received.indexOf(AiController.TOOL_CALL_LIMIT_DIRECTIVE, first + 1);
+        assertThat(second).isEqualTo(-1);
+    }
+
     // --- obsidian safeguards ---
 
     @Test

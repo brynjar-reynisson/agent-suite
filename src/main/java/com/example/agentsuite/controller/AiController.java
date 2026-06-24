@@ -7,6 +7,7 @@ import com.example.agentsuite.jooq.service.ConversationService;
 import com.example.agentsuite.service.AuthorizationService;
 import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatOrchestrationService;
+import com.example.agentsuite.service.ChatService;
 import com.example.agentsuite.service.ModelRegistry;
 import com.example.agentsuite.tools.Git;
 import com.example.agentsuite.tools.GitTools;
@@ -50,6 +51,11 @@ import java.util.stream.Collectors;
 public class AiController {
 
     private static final Logger log = LoggerFactory.getLogger(AiController.class);
+
+    static final String TOOL_CALL_LIMIT_DIRECTIVE =
+            "You have a budget of " + ChatService.MAX_SEQUENTIAL_TOOL_INVOCATIONS +
+            " sequential tool calls per turn. Plan accordingly — prefer targeted calls over " +
+            "speculative exploration, and stop early once the goal is achieved.";
 
     static final String GIT_COMMIT_DIRECTIVE =
             "After creating or modifying any file, always call gitAdd with the file path " +
@@ -289,6 +295,9 @@ public class AiController {
         Object[] toolArray = buildToolInstances(String.join(",", authorized), rootDirectory, braveApiKey, mcpToolBridge, baseUrl, audioDir);
 
         String p = prompt;
+        if (toolArray.length > 0 && !p.contains(TOOL_CALL_LIMIT_DIRECTIVE)) {
+            p = p.isBlank() ? TOOL_CALL_LIMIT_DIRECTIVE : p + "\n\n" + TOOL_CALL_LIMIT_DIRECTIVE;
+        }
         if (Arrays.stream(toolArray).anyMatch(t -> t instanceof GitTools)
                 && !p.contains(GIT_COMMIT_DIRECTIVE)) {
             p = p.isBlank() ? GIT_COMMIT_DIRECTIVE : p + "\n\n" + GIT_COMMIT_DIRECTIVE;
