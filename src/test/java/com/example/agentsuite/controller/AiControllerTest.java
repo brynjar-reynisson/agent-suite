@@ -759,6 +759,175 @@ class AiControllerTest {
         assertThat(second).isEqualTo(-1);
     }
 
+    // --- obsidian safeguards ---
+
+    @Test
+    void obsidianRelativePath_editNote_noFolder_returnsFilename() {
+        String result = AiController.obsidianRelativePath(
+                "mcp__obsidian__edit-note", Map.of("filename", "Thinking module.md"));
+        assertThat(result).isEqualTo("Thinking module.md");
+    }
+
+    @Test
+    void obsidianRelativePath_editNote_withFolder_returnsFolderSlashFilename() {
+        String result = AiController.obsidianRelativePath(
+                "mcp__obsidian__edit-note", Map.of("filename", "spec.md", "folder", "docs/specs"));
+        assertThat(result).isEqualTo("docs/specs/spec.md");
+    }
+
+    @Test
+    void obsidianRelativePath_createNote_withFolder_returnsFolderSlashFilename() {
+        String result = AiController.obsidianRelativePath(
+                "mcp__obsidian__create-note", Map.of("filename", "new.md", "folder", "archive"));
+        assertThat(result).isEqualTo("archive/new.md");
+    }
+
+    @Test
+    void obsidianRelativePath_deleteNote_returnsPath() {
+        String result = AiController.obsidianRelativePath(
+                "mcp__obsidian__delete-note", Map.of("path", "old/note.md"));
+        assertThat(result).isEqualTo("old/note.md");
+    }
+
+    @Test
+    void obsidianRelativePath_readNote_returnsNull() {
+        String result = AiController.obsidianRelativePath(
+                "mcp__obsidian__read-note", Map.of("filename", "anything.md"));
+        assertThat(result).isNull();
+    }
+
+    @Test
+    void obsidianRelativePath_editNote_missingFilename_returnsNull() {
+        String result = AiController.obsidianRelativePath(
+                "mcp__obsidian__edit-note", Map.of());
+        assertThat(result).isNull();
+    }
+
+    @Test
+    void preCommitObsidianFile_existingFile_commitsBeforeEdit(@TempDir Path dir) throws Exception {
+        new com.example.agentsuite.tools.ProcessRunner(
+                new String[]{"git", "-C", dir.toString(), "init"}).run();
+        new com.example.agentsuite.tools.ProcessRunner(
+                new String[]{"git", "-C", dir.toString(), "config", "user.email", "t@t.com"}).run();
+        new com.example.agentsuite.tools.ProcessRunner(
+                new String[]{"git", "-C", dir.toString(), "config", "user.name", "T"}).run();
+        java.nio.file.Files.writeString(dir.resolve("note.md"), "original content");
+        new com.example.agentsuite.tools.ProcessRunner(
+                new String[]{"git", "-C", dir.toString(), "add", "note.md"}).run();
+        new com.example.agentsuite.tools.ProcessRunner(
+                new String[]{"git", "-C", dir.toString(), "commit", "-m", "initial"}).run();
+
+        com.example.agentsuite.tools.Git git = new com.example.agentsuite.tools.Git(dir.toString());
+        java.nio.file.Files.writeString(dir.resolve("note.md"), "modified content");
+
+        AiController.preCommitObsidianFile(git, dir.toString(),
+                "mcp__obsidian__edit-note", "{\"filename\":\"note.md\"}");
+
+        com.example.agentsuite.tools.ProcessRunner.Output log =
+                new com.example.agentsuite.tools.ProcessRunner(
+                        new String[]{"git", "-C", dir.toString(), "log", "--oneline"}).run();
+        assertThat(log.stdOut()).contains("pre-edit backup: note.md");
+    }
+
+    @Test
+    void preCommitObsidianFile_nonExistentFile_skipsCommit(@TempDir Path dir) throws Exception {
+        new com.example.agentsuite.tools.ProcessRunner(
+                new String[]{"git", "-C", dir.toString(), "init"}).run();
+        new com.example.agentsuite.tools.ProcessRunner(
+                new String[]{"git", "-C", dir.toString(), "config", "user.email", "t@t.com"}).run();
+        new com.example.agentsuite.tools.ProcessRunner(
+                new String[]{"git", "-C", dir.toString(), "config", "user.name", "T"}).run();
+
+        com.example.agentsuite.tools.Git git = new com.example.agentsuite.tools.Git(dir.toString());
+        AiController.preCommitObsidianFile(git, dir.toString(),
+                "mcp__obsidian__create-note", "{\"filename\":\"new.md\"}");
+
+        com.example.agentsuite.tools.ProcessRunner.Output log =
+                new com.example.agentsuite.tools.ProcessRunner(
+                        new String[]{"git", "-C", dir.toString(), "log", "--oneline"}).run();
+        assertThat(log.stdOut()).doesNotContain("pre-edit backup");
+    }
+
+    @Test
+    void buildToolInstances_mcpGroup_withObsidianTools_returnsWrappedScopedTools() {
+        dev.langchain4j.agent.tool.ToolSpecification editNoteSpec =
+                dev.langchain4j.agent.tool.ToolSpecification.builder()
+                        .name("mcp__obsidian__edit-note").description("edit").build();
+        when(mcpToolBridge.scopedProvider(tempDir.toString()))
+                .thenReturn(new McpToolBridge.ScopedTools(Map.of(editNoteSpec, (req, mem) -> "ok")));
+
+        Object[] result = AiController.buildToolInstances("mcp", tempDir.toString(), "", mcpToolBridge, null, null);
+
+        assertThat(result).hasSize(1);
+        assertThat(result[0]).isInstanceOf(McpToolBridge.ScopedTools.class);
+        // wrapped provider still exposes the edit-note tool
+        McpToolBridge.ScopedTools scoped = (McpToolBridge.ScopedTools) result[0];
+        assertThat(scoped.toolEntries().keySet().stream().map(s -> s.name()))
+                .contains("mcp__obsidian__edit-note");
+    }
+
+    @Test
+    void chat_adminWithObsidianMcpTools_systemPromptIncludesObsidianDirective() throws Exception {
+        when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
+        when(authorizationService.isAdmin(42L)).thenReturn(true);
+        dev.langchain4j.agent.tool.ToolSpecification editNoteSpec =
+                dev.langchain4j.agent.tool.ToolSpecification.builder()
+                        .name("mcp__obsidian__edit-note").description("edit").build();
+        when(mcpToolBridge.scopedProvider("C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian"))
+                .thenReturn(new McpToolBridge.ScopedTools(Map.of(editNoteSpec, (req, mem) -> "ok")));
+
+        AtomicReference<String> capturedPrompt = new AtomicReference<>();
+        doAnswer(inv -> {
+            capturedPrompt.set(inv.getArgument(3));
+            @SuppressWarnings("unchecked")
+            java.util.function.Consumer<ChatEvent> consumer = inv.getArgument(7);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
+                any(java.util.function.Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
+                        .header("Authorization", "Bearer " + makeAdminJwt("admin-sub", "admin@test.com"))
+                        .param("rootDirectory", "C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian"))
+                .andExpect(request().asyncStarted()).andReturn();
+        mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
+
+        assertThat(capturedPrompt.get()).contains(AiController.OBSIDIAN_READ_BEFORE_WRITE_DIRECTIVE);
+    }
+
+    @Test
+    void chat_adminWithObsidianMcpTools_directiveNotDuplicated() throws Exception {
+        when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
+        when(authorizationService.isAdmin(42L)).thenReturn(true);
+        dev.langchain4j.agent.tool.ToolSpecification editNoteSpec =
+                dev.langchain4j.agent.tool.ToolSpecification.builder()
+                        .name("mcp__obsidian__edit-note").description("edit").build();
+        when(mcpToolBridge.scopedProvider("C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian"))
+                .thenReturn(new McpToolBridge.ScopedTools(Map.of(editNoteSpec, (req, mem) -> "ok")));
+
+        AtomicReference<String> capturedPrompt = new AtomicReference<>();
+        doAnswer(inv -> {
+            capturedPrompt.set(inv.getArgument(3));
+            @SuppressWarnings("unchecked")
+            java.util.function.Consumer<ChatEvent> consumer = inv.getArgument(7);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
+                any(java.util.function.Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
+                        .header("Authorization", "Bearer " + makeAdminJwt("admin-sub", "admin@test.com"))
+                        .param("rootDirectory", "C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian")
+                        .param("prompt", AiController.OBSIDIAN_READ_BEFORE_WRITE_DIRECTIVE))
+                .andExpect(request().asyncStarted()).andReturn();
+        mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
+
+        String received = capturedPrompt.get();
+        int first = received.indexOf(AiController.OBSIDIAN_READ_BEFORE_WRITE_DIRECTIVE);
+        int second = received.indexOf(AiController.OBSIDIAN_READ_BEFORE_WRITE_DIRECTIVE, first + 1);
+        assertThat(second).isEqualTo(-1);
+    }
+
     private static String makeAdminJwt(String sub, String email) {
         return Jwts.builder()
                 .setSubject(sub)
