@@ -56,7 +56,7 @@ The `contains()` guard prevents duplication when the system prompt is pre-popula
 
 ## Testing
 
-- **`GitToolsTest.java`** — unit tests for `gitAdd` and `gitCommit`, mocking `ProcessRunner` output (same pattern as `GitTest.java`). Covers success and error paths.
+- **`GitToolsTest.java`** — integration tests for `gitAdd` and `gitCommit` using `@TempDir` + a real `git` subprocess (same pattern as `GitTest.java`). Covers success and error paths for both methods. Requires `git` on PATH.
 - **`AiControllerTest.java`** — verify that when admin + rootDirectory are set, the tool list contains a `GitTools` instance and the system prompt directive is injected. Verify directive is not duplicated when already present.
 
 ## Out of Scope

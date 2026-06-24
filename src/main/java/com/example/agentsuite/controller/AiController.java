@@ -9,6 +9,7 @@ import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatOrchestrationService;
 import com.example.agentsuite.service.ModelRegistry;
 import com.example.agentsuite.tools.Git;
+import com.example.agentsuite.tools.GitTools;
 import com.example.agentsuite.tools.MarkDownWriter;
 import com.example.agentsuite.tools.McpToolBridge;
 import com.example.agentsuite.tools.UnixTools;
@@ -28,6 +29,12 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.service.tool.ToolExecutor;
+import java.io.File;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +50,17 @@ import java.util.stream.Collectors;
 public class AiController {
 
     private static final Logger log = LoggerFactory.getLogger(AiController.class);
+
+    static final String GIT_COMMIT_DIRECTIVE =
+            "After creating or modifying any file, always call gitAdd with the file path " +
+            "and then gitCommit with a descriptive commit message.";
+
+    static final String OBSIDIAN_READ_BEFORE_WRITE_DIRECTIVE =
+            "When using obsidian tools: before any edit-note or create-note call on an existing " +
+            "file, always call read-note first to read the full current content. After every " +
+            "edit-note or delete-note call, verify the result with read-note or search-vault.";
+
+    private static final ObjectMapper TOOL_MAPPER = new ObjectMapper();
 
     private final ChatOrchestrationService orchestrationService;
     private final ModelRegistry modelRegistry;
@@ -270,12 +288,28 @@ public class AiController {
         }
         Object[] toolArray = buildToolInstances(String.join(",", authorized), rootDirectory, braveApiKey, mcpToolBridge, baseUrl, audioDir);
 
+        String p = prompt;
+        if (Arrays.stream(toolArray).anyMatch(t -> t instanceof GitTools)
+                && !p.contains(GIT_COMMIT_DIRECTIVE)) {
+            p = p.isBlank() ? GIT_COMMIT_DIRECTIVE : p + "\n\n" + GIT_COMMIT_DIRECTIVE;
+        }
+        boolean obsidianActive = Arrays.stream(toolArray)
+                .filter(t -> t instanceof DynamicToolProvider)
+                .map(t -> (DynamicToolProvider) t)
+                .anyMatch(dp -> dp.toolEntries().keySet().stream()
+                        .anyMatch(s -> s.name().startsWith("mcp__obsidian__")));
+        if (obsidianActive && !p.contains(OBSIDIAN_READ_BEFORE_WRITE_DIRECTIVE)) {
+            p = p.isBlank() ? OBSIDIAN_READ_BEFORE_WRITE_DIRECTIVE
+                            : p + "\n\n" + OBSIDIAN_READ_BEFORE_WRITE_DIRECTIVE;
+        }
+        final String effectivePrompt = p;
+
         CompletableFuture.runAsync(() -> {
             try {
                 orchestrationService.chatStream(
                         conversationId.isEmpty() ? null : conversationId,
                         userId,
-                        model, prompt, message, rootDirectory, requestId.isBlank() ? null : requestId,
+                        model, effectivePrompt, message, rootDirectory, requestId.isBlank() ? null : requestId,
                         event -> {
                             switch (event) {
                                 case ChatEvent.ToolBatch tb -> {
@@ -329,7 +363,10 @@ public class AiController {
             if (!seen.add(g)) continue;
             switch (g) {
                 case "unix" -> {
-                    if (!rootDirectory.isEmpty()) instances.add(new UnixTools(rootDirectory));
+                    if (!rootDirectory.isEmpty()) {
+                        instances.add(new UnixTools(rootDirectory));
+                        instances.add(new GitTools(rootDirectory));
+                    }
                 }
                 case "md-writer" -> {
                     // MarkDownWriter requires a rootDirectory anchor; entitlement is still granted, tool just can't be instantiated without it
@@ -339,7 +376,14 @@ public class AiController {
                 case "mcp" -> {
                     if (mcpToolBridge != null) {
                         DynamicToolProvider scoped = mcpToolBridge.scopedProvider(rootDirectory);
-                        if (scoped != null) instances.add(scoped);
+                        if (scoped != null) {
+                            boolean hasObsidian = !rootDirectory.isEmpty() &&
+                                    scoped.toolEntries().keySet().stream()
+                                            .anyMatch(s -> s.name().startsWith("mcp__obsidian__"));
+                            instances.add(hasObsidian
+                                    ? withObsidianPreCommit(scoped, rootDirectory)
+                                    : scoped);
+                        }
                     }
                 }
                 case "audio" -> {
@@ -348,6 +392,53 @@ public class AiController {
             }
         }
         return instances.toArray(new Object[0]);
+    }
+
+    static DynamicToolProvider withObsidianPreCommit(DynamicToolProvider provider, String rootDirectory) {
+        Git git = new Git(rootDirectory);
+        Map<ToolSpecification, ToolExecutor> wrapped = new LinkedHashMap<>();
+        for (Map.Entry<ToolSpecification, ToolExecutor> e : provider.toolEntries().entrySet()) {
+            String name = e.getKey().name();
+            if (name.equals("mcp__obsidian__edit-note")
+                    || name.equals("mcp__obsidian__delete-note")
+                    || name.equals("mcp__obsidian__create-note")) {
+                ToolExecutor original = e.getValue();
+                wrapped.put(e.getKey(), (req, memId) -> {
+                    preCommitObsidianFile(git, rootDirectory, name, req.arguments());
+                    return original.execute(req, memId);
+                });
+            } else {
+                wrapped.put(e.getKey(), e.getValue());
+            }
+        }
+        return new McpToolBridge.ScopedTools(Collections.unmodifiableMap(wrapped));
+    }
+
+    static void preCommitObsidianFile(Git git, String rootDirectory, String toolName, String argumentsJson) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> args = TOOL_MAPPER.readValue(argumentsJson, Map.class);
+            String relativePath = obsidianRelativePath(toolName, args);
+            if (relativePath == null) return;
+            if (!new File(rootDirectory, relativePath).exists()) return;
+            git.add(relativePath);
+            git.commit("pre-edit backup: " + relativePath);
+        } catch (Exception e) {
+            log.warn("Failed to pre-commit obsidian file before {}: {}", toolName, e.getMessage());
+        }
+    }
+
+    static String obsidianRelativePath(String toolName, Map<String, Object> args) {
+        return switch (toolName) {
+            case "mcp__obsidian__edit-note", "mcp__obsidian__create-note" -> {
+                String filename = (String) args.get("filename");
+                if (filename == null) yield null;
+                String folder = (String) args.get("folder");
+                yield (folder != null && !folder.isBlank()) ? folder + "/" + filename : filename;
+            }
+            case "mcp__obsidian__delete-note" -> (String) args.get("path");
+            default -> null;
+        };
     }
 
     private List<String> parseCommand(String input) {

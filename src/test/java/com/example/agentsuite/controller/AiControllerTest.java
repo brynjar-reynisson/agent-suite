@@ -8,10 +8,12 @@ import com.example.agentsuite.service.AuthorizationService;
 import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatOrchestrationService;
 import com.example.agentsuite.service.ModelRegistry;
+import com.example.agentsuite.tools.GitTools;
 import com.example.agentsuite.tools.MarkDownWriter;
 import com.example.agentsuite.tools.McpToolBridge;
 import com.example.agentsuite.tools.UnixTools;
 import com.example.agentsuite.tools.WebTools;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -312,8 +314,9 @@ class AiControllerTest {
     @Test
     void buildToolInstances_unixGroup_withRootDirectory_returnsUnixTools() {
         Object[] result = AiController.buildToolInstances("unix", tempDir.toString(), "", null, null, null);
-        assertThat(result).hasSize(1);
+        assertThat(result).hasSize(2);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
+        assertThat(result[1]).isInstanceOf(GitTools.class);
     }
 
     @Test
@@ -331,8 +334,9 @@ class AiControllerTest {
     @Test
     void buildToolInstances_multipleGroups_onlyKnownGroupsAdded() {
         Object[] result = AiController.buildToolInstances("unix,unknown", tempDir.toString(), "", null, null, null);
-        assertThat(result).hasSize(1);
+        assertThat(result).hasSize(2);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
+        assertThat(result[1]).isInstanceOf(GitTools.class);
     }
 
     @Test
@@ -351,9 +355,10 @@ class AiControllerTest {
     @Test
     void buildToolInstances_unixAndMdWriter_withRootDirectory_returnsBothInstances() {
         Object[] result = AiController.buildToolInstances("unix,md-writer", tempDir.toString(), "", null, null, null);
-        assertThat(result).hasSize(2);
+        assertThat(result).hasSize(3);
         assertThat(result[0]).isInstanceOf(UnixTools.class);
-        assertThat(result[1]).isInstanceOf(MarkDownWriter.class);
+        assertThat(result[1]).isInstanceOf(GitTools.class);
+        assertThat(result[2]).isInstanceOf(MarkDownWriter.class);
     }
 
     @Test
@@ -530,8 +535,8 @@ class AiControllerTest {
 
         verify(orchestrationService).chatStream(
                 isNull(), anyLong(), any(), any(), any(), any(), any(), any(Consumer.class),
-                argThat(arr -> arr instanceof Object[] t && t.length == 2
-                        && t[0] instanceof WebTools && t[1] instanceof UnixTools));
+                argThat(arr -> arr instanceof Object[] t && t.length == 3
+                        && t[0] instanceof WebTools && t[1] instanceof UnixTools && t[2] instanceof GitTools));
     }
 
     @Test
@@ -622,15 +627,16 @@ class AiControllerTest {
 
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
 
-        // order is a deliberate contract: grantedToolGroups order (web, md-writer, mcp, audio) then unix last
+        // order is a deliberate contract: grantedToolGroups order (web, md-writer, mcp, audio) then unix last (UnixTools + GitTools)
         verify(orchestrationService).chatStream(
                 isNull(), anyLong(), any(), any(), any(), any(), any(), any(Consumer.class),
-                argThat(arr -> arr instanceof Object[] t && t.length == 5
+                argThat(arr -> arr instanceof Object[] t && t.length == 6
                         && t[0] instanceof WebTools
                         && t[1] instanceof MarkDownWriter
                         && t[2] instanceof McpToolBridge.ScopedTools
                         && t[3] instanceof com.example.agentsuite.tools.AudioTools
-                        && t[4] instanceof UnixTools));
+                        && t[4] instanceof UnixTools
+                        && t[5] instanceof GitTools));
     }
 
     @Test
@@ -666,8 +672,8 @@ class AiControllerTest {
 
         verify(orchestrationService).chatStream(
                 isNull(), anyLong(), any(), any(), any(), any(), any(), any(Consumer.class),
-                argThat(arr -> arr instanceof Object[] t && t.length == 2
-                        && t[0] instanceof WebTools && t[1] instanceof UnixTools));
+                argThat(arr -> arr instanceof Object[] t && t.length == 3
+                        && t[0] instanceof WebTools && t[1] instanceof UnixTools && t[2] instanceof GitTools));
     }
 
     @Test
@@ -697,6 +703,229 @@ class AiControllerTest {
         mockMvc.perform(post("/ai/conversations/empty-conv/compact"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Nothing to compact."));
+    }
+
+    @Test
+    void chat_adminWithRootDirectory_systemPromptIncludesGitDirective() throws Exception {
+        when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
+        when(authorizationService.isAdmin(42L)).thenReturn(true);
+
+        AtomicReference<String> capturedPrompt = new AtomicReference<>();
+        doAnswer(inv -> {
+            capturedPrompt.set(inv.getArgument(3));
+            @SuppressWarnings("unchecked")
+            Consumer<ChatEvent> consumer = inv.getArgument(7);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
+                any(Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
+                        .header("Authorization", "Bearer " + makeAdminJwt("admin-sub", "admin@test.com"))
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(request().asyncStarted()).andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
+
+        assertThat(capturedPrompt.get()).contains(AiController.GIT_COMMIT_DIRECTIVE);
+    }
+
+    @Test
+    void chat_adminWithDirectiveAlreadyInPrompt_directiveNotDuplicated() throws Exception {
+        when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
+        when(authorizationService.isAdmin(42L)).thenReturn(true);
+
+        AtomicReference<String> capturedPrompt = new AtomicReference<>();
+        doAnswer(inv -> {
+            capturedPrompt.set(inv.getArgument(3));
+            @SuppressWarnings("unchecked")
+            Consumer<ChatEvent> consumer = inv.getArgument(7);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
+                any(Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
+                        .header("Authorization", "Bearer " + makeAdminJwt("admin-sub", "admin@test.com"))
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite")
+                        .param("prompt", AiController.GIT_COMMIT_DIRECTIVE))
+                .andExpect(request().asyncStarted()).andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
+
+        String received = capturedPrompt.get();
+        int first = received.indexOf(AiController.GIT_COMMIT_DIRECTIVE);
+        int second = received.indexOf(AiController.GIT_COMMIT_DIRECTIVE, first + 1);
+        assertThat(second).isEqualTo(-1);
+    }
+
+    // --- obsidian safeguards ---
+
+    @Test
+    void obsidianRelativePath_editNote_noFolder_returnsFilename() {
+        String result = AiController.obsidianRelativePath(
+                "mcp__obsidian__edit-note", Map.of("filename", "Thinking module.md"));
+        assertThat(result).isEqualTo("Thinking module.md");
+    }
+
+    @Test
+    void obsidianRelativePath_editNote_withFolder_returnsFolderSlashFilename() {
+        String result = AiController.obsidianRelativePath(
+                "mcp__obsidian__edit-note", Map.of("filename", "spec.md", "folder", "docs/specs"));
+        assertThat(result).isEqualTo("docs/specs/spec.md");
+    }
+
+    @Test
+    void obsidianRelativePath_createNote_withFolder_returnsFolderSlashFilename() {
+        String result = AiController.obsidianRelativePath(
+                "mcp__obsidian__create-note", Map.of("filename", "new.md", "folder", "archive"));
+        assertThat(result).isEqualTo("archive/new.md");
+    }
+
+    @Test
+    void obsidianRelativePath_deleteNote_returnsPath() {
+        String result = AiController.obsidianRelativePath(
+                "mcp__obsidian__delete-note", Map.of("path", "old/note.md"));
+        assertThat(result).isEqualTo("old/note.md");
+    }
+
+    @Test
+    void obsidianRelativePath_readNote_returnsNull() {
+        String result = AiController.obsidianRelativePath(
+                "mcp__obsidian__read-note", Map.of("filename", "anything.md"));
+        assertThat(result).isNull();
+    }
+
+    @Test
+    void obsidianRelativePath_editNote_missingFilename_returnsNull() {
+        String result = AiController.obsidianRelativePath(
+                "mcp__obsidian__edit-note", Map.of());
+        assertThat(result).isNull();
+    }
+
+    @Test
+    void preCommitObsidianFile_existingFile_commitsBeforeEdit(@TempDir Path dir) throws Exception {
+        new com.example.agentsuite.tools.ProcessRunner(
+                new String[]{"git", "-C", dir.toString(), "init"}).run();
+        new com.example.agentsuite.tools.ProcessRunner(
+                new String[]{"git", "-C", dir.toString(), "config", "user.email", "t@t.com"}).run();
+        new com.example.agentsuite.tools.ProcessRunner(
+                new String[]{"git", "-C", dir.toString(), "config", "user.name", "T"}).run();
+        java.nio.file.Files.writeString(dir.resolve("note.md"), "original content");
+        new com.example.agentsuite.tools.ProcessRunner(
+                new String[]{"git", "-C", dir.toString(), "add", "note.md"}).run();
+        new com.example.agentsuite.tools.ProcessRunner(
+                new String[]{"git", "-C", dir.toString(), "commit", "-m", "initial"}).run();
+
+        com.example.agentsuite.tools.Git git = new com.example.agentsuite.tools.Git(dir.toString());
+        java.nio.file.Files.writeString(dir.resolve("note.md"), "modified content");
+
+        AiController.preCommitObsidianFile(git, dir.toString(),
+                "mcp__obsidian__edit-note", "{\"filename\":\"note.md\"}");
+
+        com.example.agentsuite.tools.ProcessRunner.Output log =
+                new com.example.agentsuite.tools.ProcessRunner(
+                        new String[]{"git", "-C", dir.toString(), "log", "--oneline"}).run();
+        assertThat(log.stdOut()).contains("pre-edit backup: note.md");
+    }
+
+    @Test
+    void preCommitObsidianFile_nonExistentFile_skipsCommit(@TempDir Path dir) throws Exception {
+        new com.example.agentsuite.tools.ProcessRunner(
+                new String[]{"git", "-C", dir.toString(), "init"}).run();
+        new com.example.agentsuite.tools.ProcessRunner(
+                new String[]{"git", "-C", dir.toString(), "config", "user.email", "t@t.com"}).run();
+        new com.example.agentsuite.tools.ProcessRunner(
+                new String[]{"git", "-C", dir.toString(), "config", "user.name", "T"}).run();
+
+        com.example.agentsuite.tools.Git git = new com.example.agentsuite.tools.Git(dir.toString());
+        AiController.preCommitObsidianFile(git, dir.toString(),
+                "mcp__obsidian__create-note", "{\"filename\":\"new.md\"}");
+
+        com.example.agentsuite.tools.ProcessRunner.Output log =
+                new com.example.agentsuite.tools.ProcessRunner(
+                        new String[]{"git", "-C", dir.toString(), "log", "--oneline"}).run();
+        assertThat(log.stdOut()).doesNotContain("pre-edit backup");
+    }
+
+    @Test
+    void buildToolInstances_mcpGroup_withObsidianTools_returnsWrappedScopedTools() {
+        dev.langchain4j.agent.tool.ToolSpecification editNoteSpec =
+                dev.langchain4j.agent.tool.ToolSpecification.builder()
+                        .name("mcp__obsidian__edit-note").description("edit").build();
+        when(mcpToolBridge.scopedProvider(tempDir.toString()))
+                .thenReturn(new McpToolBridge.ScopedTools(Map.of(editNoteSpec, (req, mem) -> "ok")));
+
+        Object[] result = AiController.buildToolInstances("mcp", tempDir.toString(), "", mcpToolBridge, null, null);
+
+        assertThat(result).hasSize(1);
+        assertThat(result[0]).isInstanceOf(McpToolBridge.ScopedTools.class);
+        // wrapped provider still exposes the edit-note tool
+        McpToolBridge.ScopedTools scoped = (McpToolBridge.ScopedTools) result[0];
+        assertThat(scoped.toolEntries().keySet().stream().map(s -> s.name()))
+                .contains("mcp__obsidian__edit-note");
+    }
+
+    @Test
+    void chat_adminWithObsidianMcpTools_systemPromptIncludesObsidianDirective() throws Exception {
+        when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
+        when(authorizationService.isAdmin(42L)).thenReturn(true);
+        dev.langchain4j.agent.tool.ToolSpecification editNoteSpec =
+                dev.langchain4j.agent.tool.ToolSpecification.builder()
+                        .name("mcp__obsidian__edit-note").description("edit").build();
+        when(mcpToolBridge.scopedProvider("C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian"))
+                .thenReturn(new McpToolBridge.ScopedTools(Map.of(editNoteSpec, (req, mem) -> "ok")));
+
+        AtomicReference<String> capturedPrompt = new AtomicReference<>();
+        doAnswer(inv -> {
+            capturedPrompt.set(inv.getArgument(3));
+            @SuppressWarnings("unchecked")
+            java.util.function.Consumer<ChatEvent> consumer = inv.getArgument(7);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
+                any(java.util.function.Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
+                        .header("Authorization", "Bearer " + makeAdminJwt("admin-sub", "admin@test.com"))
+                        .param("rootDirectory", "C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian"))
+                .andExpect(request().asyncStarted()).andReturn();
+        mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
+
+        assertThat(capturedPrompt.get()).contains(AiController.OBSIDIAN_READ_BEFORE_WRITE_DIRECTIVE);
+    }
+
+    @Test
+    void chat_adminWithObsidianMcpTools_directiveNotDuplicated() throws Exception {
+        when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
+        when(authorizationService.isAdmin(42L)).thenReturn(true);
+        dev.langchain4j.agent.tool.ToolSpecification editNoteSpec =
+                dev.langchain4j.agent.tool.ToolSpecification.builder()
+                        .name("mcp__obsidian__edit-note").description("edit").build();
+        when(mcpToolBridge.scopedProvider("C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian"))
+                .thenReturn(new McpToolBridge.ScopedTools(Map.of(editNoteSpec, (req, mem) -> "ok")));
+
+        AtomicReference<String> capturedPrompt = new AtomicReference<>();
+        doAnswer(inv -> {
+            capturedPrompt.set(inv.getArgument(3));
+            @SuppressWarnings("unchecked")
+            java.util.function.Consumer<ChatEvent> consumer = inv.getArgument(7);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
+                any(java.util.function.Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
+                        .header("Authorization", "Bearer " + makeAdminJwt("admin-sub", "admin@test.com"))
+                        .param("rootDirectory", "C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian")
+                        .param("prompt", AiController.OBSIDIAN_READ_BEFORE_WRITE_DIRECTIVE))
+                .andExpect(request().asyncStarted()).andReturn();
+        mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
+
+        String received = capturedPrompt.get();
+        int first = received.indexOf(AiController.OBSIDIAN_READ_BEFORE_WRITE_DIRECTIVE);
+        int second = received.indexOf(AiController.OBSIDIAN_READ_BEFORE_WRITE_DIRECTIVE, first + 1);
+        assertThat(second).isEqualTo(-1);
     }
 
     private static String makeAdminJwt(String sub, String email) {
