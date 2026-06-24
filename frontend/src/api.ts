@@ -8,7 +8,7 @@ export interface ToolCall {
 }
 
 export interface Message {
-  role: 'user' | 'ai' | 'meta' | 'compact';
+  role: 'user' | 'ai' | 'meta' | 'compact' | 'clear';
   content: string;
   toolCalls?: ToolCall[];
   sourceLanguage?: string;

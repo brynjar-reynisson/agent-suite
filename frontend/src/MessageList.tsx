@@ -45,6 +45,15 @@ export function MessageList({ messages, loading, historySizeBytes, onImageClick 
             </div>
           );
         }
+        if (msg.role === 'clear') {
+          return (
+            <div key={i} className="self-stretch flex items-center gap-3 py-1">
+              <div className="flex-1 border-t border-gray-700" />
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Context cleared</span>
+              <div className="flex-1 border-t border-gray-700" />
+            </div>
+          );
+        }
         return (
           <div
             key={i}
