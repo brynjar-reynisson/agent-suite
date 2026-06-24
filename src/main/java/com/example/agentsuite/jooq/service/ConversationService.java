@@ -129,6 +129,8 @@ public class ConversationService {
                 }
                 case "compact" ->
                     messages.add(new ConversationDetailDto.MessageDto("compact", r.getMessage(), List.of()));
+                case "clear" ->
+                    messages.add(new ConversationDetailDto.MessageDto("clear", "", List.of()));
                 default -> {}
             }
         }

@@ -253,6 +253,114 @@ class ChatOrchestrationServiceTest {
         assertThat(((HistoryMessage.User) history.get(1)).content()).isEqualTo("latest question");
     }
 
+    // --- /clear command tests ---
+
+    @Test
+    void clearCommand_stateless_emitsDoneWithoutDbInteraction() {
+        List<ChatEvent> events = new ArrayList<>();
+        orchestration.chatStream(null, 1L, "deepseek-v4-pro", "sys", "/clear", "", null,
+                events::add, new Object[0]);
+
+        verifyNoInteractions(conversationService);
+        assertThat(events).hasSize(1);
+        assertThat(events.get(0)).isInstanceOf(ChatEvent.Done.class);
+    }
+
+    @Test
+    void clearCommand_withConversation_storesClearAndEmitsDoneWithoutCallingLlm() {
+        String externalId = UUID.randomUUID().toString();
+        long convDbId = 60L;
+
+        ConversationRecord conv = mock(ConversationRecord.class);
+        when(conv.getConversationId()).thenReturn(convDbId);
+        when(conv.getUserId()).thenReturn(1L);
+        when(conversationService.findByExternalId(externalId)).thenReturn(Optional.of(conv));
+        when(conversationService.findLastModelChange(convDbId)).thenReturn(Optional.of("deepseek-v4-pro"));
+        when(conversationService.findLastSystemPrompt(convDbId)).thenReturn(Optional.of(""));
+
+        List<ChatEvent> events = new ArrayList<>();
+        orchestration.chatStream(externalId, 1L, "deepseek-v4-pro", "", "/clear",
+                "", null, events::add, new Object[0]);
+
+        verify(conversationService).addMessage(convDbId, 1L, "clear", "");
+        verify(conversationService, never()).addMessage(eq(convDbId), anyLong(), eq("user"), any());
+        verifyNoInteractions(chatService);
+        assertThat(events).hasSize(1);
+        assertThat(events.get(0)).isInstanceOf(ChatEvent.Done.class);
+    }
+
+    @Test
+    void loadHistory_clearMarker_dropsAllMessagesBefore() {
+        String externalId = UUID.randomUUID().toString();
+        List<MessageRecord> msgs = List.of(
+            rec("system_prompt", "sys"),
+            rec("user", "old message"),
+            rec("assistant", "old reply"),
+            rec("clear", ""),
+            rec("user", "new question"),
+            rec("assistant", "new answer")
+        );
+        List<HistoryMessage> history = captureHistory(externalId, 61L, msgs);
+        // SystemPrompt(sys) + User(new) + Assistant(new)
+        assertThat(history).hasSize(3);
+        assertThat(history.get(0)).isInstanceOf(HistoryMessage.SystemPrompt.class);
+        assertThat(history.get(1)).isInstanceOf(HistoryMessage.User.class);
+        assertThat(((HistoryMessage.User) history.get(1)).content()).isEqualTo("new question");
+        assertThat(history.get(2)).isInstanceOf(HistoryMessage.Assistant.class);
+    }
+
+    @Test
+    void loadHistory_clearAfterCompact_clearWins() {
+        String externalId = UUID.randomUUID().toString();
+        List<MessageRecord> msgs = List.of(
+            rec("system_prompt", "sys"),
+            rec("user", "old msg"),
+            rec("compact", "old summary"),
+            rec("user", "middle msg"),
+            rec("clear", ""),
+            rec("user", "fresh question")
+        );
+        List<HistoryMessage> history = captureHistory(externalId, 62L, msgs);
+        // SystemPrompt + User(fresh) — no compact summary
+        assertThat(history).hasSize(2);
+        assertThat(history.get(0)).isInstanceOf(HistoryMessage.SystemPrompt.class);
+        assertThat(history.get(1)).isInstanceOf(HistoryMessage.User.class);
+        assertThat(((HistoryMessage.User) history.get(1)).content()).isEqualTo("fresh question");
+    }
+
+    @Test
+    void loadHistory_compactAfterClear_compactWins() {
+        String externalId = UUID.randomUUID().toString();
+        List<MessageRecord> msgs = List.of(
+            rec("system_prompt", "sys"),
+            rec("user", "old msg"),
+            rec("clear", ""),
+            rec("user", "after clear"),
+            rec("compact", "summary of after-clear"),
+            rec("user", "latest")
+        );
+        List<HistoryMessage> history = captureHistory(externalId, 63L, msgs);
+        // SystemPrompt + User(compact summary) + User(latest)
+        assertThat(history).hasSize(3);
+        assertThat(history.get(0)).isInstanceOf(HistoryMessage.SystemPrompt.class);
+        assertThat(((HistoryMessage.User) history.get(1)).content())
+                .startsWith("Previous conversation summary:\n\nsummary of after-clear");
+        assertThat(((HistoryMessage.User) history.get(2)).content()).isEqualTo("latest");
+    }
+
+    @Test
+    void buildTranscript_clearMessageIncluded() {
+        List<MessageRecord> msgs = List.of(
+            rec("user", "before clear"),
+            rec("clear", ""),
+            rec("user", "after clear")
+        );
+        String transcript = ChatOrchestrationService.buildTranscript(msgs);
+        assertThat(transcript).contains("[User]: before clear");
+        assertThat(transcript).contains("[Context cleared]");
+        assertThat(transcript).contains("[User]: after clear");
+    }
+
     // --- compact() tests ---
 
     @Test

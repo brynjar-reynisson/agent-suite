@@ -35,6 +35,10 @@ public class ChatOrchestrationService {
                            Consumer<ChatEvent> emitter, Object[] tools) {
 
         if (conversationId == null || conversationId.isBlank()) {
+            if ("/clear".equals(userMessage.trim())) {
+                emitter.accept(new ChatEvent.Done());
+                return;
+            }
             ChatService service = modelRegistry.get(model);
             if (service == null) {
                 emitter.accept(new ChatEvent.Error("Unknown model: " + model));
@@ -56,6 +60,17 @@ public class ChatOrchestrationService {
         }
 
         if (isDuplicateRequest(conversationDbId, requestId)) {
+            emitter.accept(new ChatEvent.Done());
+            return;
+        }
+
+        if ("/clear".equals(userMessage.trim())) {
+            try {
+                conversationService.addMessage(conversationDbId, userId, "clear", "");
+            } catch (Exception e) {
+                log.error("Failed to save clear message for conversation {}", conversationDbId, e);
+                emitter.accept(new ChatEvent.Error("Database error: " + e.getMessage()));
+            }
             emitter.accept(new ChatEvent.Done());
             return;
         }
@@ -170,6 +185,14 @@ public class ChatOrchestrationService {
             }
         }
 
+        int clearIndex = -1;
+        for (int i = records.size() - 1; i >= 0; i--) {
+            if ("clear".equals(records.get(i).getType())) {
+                clearIndex = i;
+                break;
+            }
+        }
+
         List<HistoryMessage> history = new ArrayList<>();
         String combinedSystemPrompt = applyWorkingDirectory(
                 lastSystemPrompt != null ? lastSystemPrompt : "", rootDirectory);
@@ -177,7 +200,11 @@ public class ChatOrchestrationService {
             history.add(new HistoryMessage.SystemPrompt(combinedSystemPrompt));
         }
 
-        if (compactIndex >= 0) {
+        if (clearIndex > compactIndex) {
+            for (int i = clearIndex + 1; i < records.size(); i++) {
+                addIfSubstantive(history, records.get(i));
+            }
+        } else if (compactIndex >= 0) {
             history.add(new HistoryMessage.User(
                     "Previous conversation summary:\n\n" + records.get(compactIndex).getMessage()));
             for (int i = compactIndex + 1; i < records.size(); i++) {
@@ -264,6 +291,7 @@ public class ChatOrchestrationService {
                 case "tool_call"   -> "[Tool call]: " + r.getMessage();
                 case "tool_result" -> "[Tool result]: " + r.getMessage();
                 case "compact"     -> "[Summary]: " + r.getMessage();
+                case "clear"       -> "[Context cleared]";
                 default            -> null;
             };
             if (line != null) sb.append(line).append('\n');
