@@ -95,8 +95,8 @@ test.describe('halt_thinking', () => {
     await fillAndSend(page, 'second message');
 
     // Both user messages should remain in the chat
-    await expect(page.getByText('first message')).toBeVisible();
-    await expect(page.getByText('second message')).toBeVisible();
+    await expect(page.getByText('first message', { exact: true })).toBeVisible();
+    await expect(page.getByText('second message', { exact: true })).toBeVisible();
 
     // The second stream's AI response should appear
     await expect(page.getByText('Answer to the second message')).toBeVisible();
