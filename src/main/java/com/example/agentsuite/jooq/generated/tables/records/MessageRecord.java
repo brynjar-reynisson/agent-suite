@@ -104,6 +104,20 @@ public class MessageRecord extends UpdatableRecordImpl<MessageRecord> {
         return (OffsetDateTime) get(5);
     }
 
+    /**
+     * Setter for <code>public.message.erased</code>.
+     */
+    public void setErased(Boolean value) {
+        set(6, value);
+    }
+
+    /**
+     * Getter for <code>public.message.erased</code>.
+     */
+    public Boolean getErased() {
+        return (Boolean) get(6);
+    }
+
     // -------------------------------------------------------------------------
     // Primary key information
     // -------------------------------------------------------------------------
@@ -127,7 +141,7 @@ public class MessageRecord extends UpdatableRecordImpl<MessageRecord> {
     /**
      * Create a detached, initialised MessageRecord
      */
-    public MessageRecord(Long messageId, Long userId, Long conversationId, String type, String message, OffsetDateTime messageTime) {
+    public MessageRecord(Long messageId, Long userId, Long conversationId, String type, String message, OffsetDateTime messageTime, Boolean erased) {
         super(Message.MESSAGE);
 
         setMessageId(messageId);
@@ -136,6 +150,7 @@ public class MessageRecord extends UpdatableRecordImpl<MessageRecord> {
         setType(type);
         setMessage(message);
         setMessageTime(messageTime);
+        setErased(erased);
         resetChangedOnNotNull();
     }
 }

@@ -4,6 +4,7 @@
 package com.example.agentsuite.jooq.generated.tables;
 
 
+import com.example.agentsuite.jooq.generated.Indexes;
 import com.example.agentsuite.jooq.generated.Keys;
 import com.example.agentsuite.jooq.generated.Public;
 import com.example.agentsuite.jooq.generated.tables.Message.MessagePath;
@@ -19,6 +20,7 @@ import org.jooq.Condition;
 import org.jooq.Field;
 import org.jooq.ForeignKey;
 import org.jooq.Identity;
+import org.jooq.Index;
 import org.jooq.InverseForeignKey;
 import org.jooq.Name;
 import org.jooq.Path;
@@ -159,6 +161,11 @@ public class Conversation extends TableImpl<ConversationRecord> {
     @Override
     public Schema getSchema() {
         return aliased() ? null : Public.PUBLIC;
+    }
+
+    @Override
+    public List<Index> getIndexes() {
+        return Arrays.asList(Indexes.IDX_CONVERSATION_USER_ID);
     }
 
     @Override

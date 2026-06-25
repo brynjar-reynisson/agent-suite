@@ -4,6 +4,7 @@
 package com.example.agentsuite.jooq.generated.tables;
 
 
+import com.example.agentsuite.jooq.generated.Indexes;
 import com.example.agentsuite.jooq.generated.Keys;
 import com.example.agentsuite.jooq.generated.Public;
 import com.example.agentsuite.jooq.generated.tables.Conversation.ConversationPath;
@@ -19,6 +20,7 @@ import org.jooq.Condition;
 import org.jooq.Field;
 import org.jooq.ForeignKey;
 import org.jooq.Identity;
+import org.jooq.Index;
 import org.jooq.InverseForeignKey;
 import org.jooq.Name;
 import org.jooq.Path;
@@ -89,6 +91,11 @@ public class Message extends TableImpl<MessageRecord> {
      */
     public final TableField<MessageRecord, OffsetDateTime> MESSAGE_TIME = createField(DSL.name("message_time"), SQLDataType.TIMESTAMPWITHTIMEZONE(6).nullable(false).defaultValue(DSL.field(DSL.raw("now()"), SQLDataType.TIMESTAMPWITHTIMEZONE)), this, "");
 
+    /**
+     * The column <code>public.message.erased</code>.
+     */
+    public final TableField<MessageRecord, Boolean> ERASED = createField(DSL.name("erased"), SQLDataType.BOOLEAN.nullable(false).defaultValue(DSL.field(DSL.raw("false"), SQLDataType.BOOLEAN)), this, "");
+
     private Message(Name alias, Table<MessageRecord> aliased) {
         this(alias, aliased, (Field<?>[]) null, null);
     }
@@ -154,6 +161,11 @@ public class Message extends TableImpl<MessageRecord> {
     @Override
     public Schema getSchema() {
         return aliased() ? null : Public.PUBLIC;
+    }
+
+    @Override
+    public List<Index> getIndexes() {
+        return Arrays.asList(Indexes.IDX_MESSAGE_CONVERSATION_ID, Indexes.IDX_MESSAGE_USER_ID);
     }
 
     @Override
