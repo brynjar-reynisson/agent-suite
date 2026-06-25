@@ -9,7 +9,9 @@
     "serve:prod": "vite preview --port 5176 --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test e2e/halt-thinking.spec.ts",
+    "test:e2e:headed": "playwright test e2e/halt-thinking.spec.ts --headed"
   },
   "dependencies": {
     "@microsoft/fetch-event-source": "^2.0.1",
@@ -27,6 +29,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.61.1",
     "@types/morgan": "^1.9.10",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
