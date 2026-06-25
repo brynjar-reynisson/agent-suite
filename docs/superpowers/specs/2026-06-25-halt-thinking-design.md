@@ -37,12 +37,16 @@ Two new refs:
 
 **`handleSend` changes:**
 
+The top-level `if (!input.trim() || loading) return;` guard drops the `|| loading` condition — the Send button and Enter key must remain active while streaming so the user can interrupt. The `loading` check moves into individual command branches that should stay blocked.
+
+The Send button in `App.tsx` removes `disabled={loading}`.
+
 | Input | `loading = false` | `loading = true` |
 |-------|-------------------|------------------|
 | Normal message | Start stream (existing behaviour) | Abort current stream, pop trailing AI message from state, start new stream |
 | `!stop` | No-op (nothing to stop) | Abort current stream; partial AI content stays visible |
-| `!erase-last` | Erase last turn from DB + local state | Toast: "Use !stop first" |
-| Other `!`/`/` commands | Existing behaviour | Return early (unchanged) |
+| `!erase-last` | Erase last turn from DB + local state | Toast: "Use !stop first before erasing" |
+| `!edit`, `!!`, `!exec`, `/compact`, `/compact-merge` | Existing behaviour | Return early with toast: "Wait for the response to finish" |
 
 **Stream startup sequence (normal + interrupt):**
 
