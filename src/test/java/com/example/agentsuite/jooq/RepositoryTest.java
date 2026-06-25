@@ -22,6 +22,7 @@ import java.util.UUID;
 import static com.example.agentsuite.jooq.generated.Tables.MESSAGE;
 import static com.example.agentsuite.jooq.generated.Tables.SUITE_USER;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @JooqTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -152,5 +153,51 @@ class RepositoryTest {
     void findLastModelChangeEmptyWhenNone() {
         long convId = conversationRepo.insert(guestId, "No Model", null, "uuid-no-model");
         assertThat(messageRepo.findLastModelChange(convId)).isEmpty();
+    }
+
+    @Test
+    void findByConversationId_excludesErasedMessages() {
+        long convId = conversationRepo.insert(guestId, "Erase Test", null, UUID.randomUUID().toString());
+        messageRepo.insert(convId, guestId, "user", "hello");
+        messageRepo.insert(convId, guestId, "assistant", "hi");
+        // Manually erase the assistant message directly via DSL
+        dsl.update(MESSAGE).set(MESSAGE.ERASED, true)
+                .where(MESSAGE.CONVERSATION_ID.eq(convId))
+                .and(MESSAGE.TYPE.eq("assistant"))
+                .execute();
+
+        List<MessageRecord> result = messageRepo.findByConversationId(convId);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getMessage()).isEqualTo("hello");
+    }
+
+    @Test
+    void eraseLastTurn_erasesUserAndSubsequentMessages() {
+        long convId = conversationRepo.insert(guestId, "EraseLastTurn Test", null, UUID.randomUUID().toString());
+        messageRepo.insert(convId, guestId, "user", "first");
+        messageRepo.insert(convId, guestId, "assistant", "reply");
+        messageRepo.insert(convId, guestId, "user", "second");
+        messageRepo.insert(convId, guestId, "tool_call", "[{}]");
+        messageRepo.insert(convId, guestId, "assistant", "done");
+
+        messageRepo.eraseLastTurn(convId);
+
+        List<MessageRecord> remaining = dsl.selectFrom(MESSAGE)
+                .where(MESSAGE.CONVERSATION_ID.eq(convId))
+                .and(MESSAGE.ERASED.isFalse())
+                .fetch();
+        assertThat(remaining).hasSize(2);
+        assertThat(remaining).extracting(MessageRecord::getMessage)
+                .containsExactly("first", "reply");
+    }
+
+    @Test
+    void eraseLastTurn_throwsWhenNoUserMessage() {
+        long convId = conversationRepo.insert(guestId, "NoUser Test", null, UUID.randomUUID().toString());
+        messageRepo.insert(convId, guestId, "assistant", "hi");
+
+        assertThatThrownBy(() -> messageRepo.eraseLastTurn(convId))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

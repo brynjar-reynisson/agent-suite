@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS "message" (
     "type"            TEXT                     NOT NULL,
     "message"         TEXT                     NOT NULL,
     "message_time"    TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    "erased"          BOOLEAN                  NOT NULL DEFAULT FALSE,
     CONSTRAINT "fk_message_user" FOREIGN KEY ("user_id") REFERENCES "suite_user" ("user_id"),
     CONSTRAINT "fk_message_conversation" FOREIGN KEY ("conversation_id") REFERENCES "conversation" ("conversation_id")
 );

@@ -30,6 +30,7 @@ public class MessageRepository {
     public List<MessageRecord> findByConversationId(long conversationId) {
         return dsl.selectFrom(MESSAGE)
                 .where(MESSAGE.CONVERSATION_ID.eq(conversationId))
+                .and(MESSAGE.ERASED.isFalse())
                 .orderBy(MESSAGE.MESSAGE_TIME.asc(), MESSAGE.MESSAGE_ID.asc())
                 .fetch();
     }
@@ -54,4 +55,22 @@ public class MessageRepository {
                 .fetchOptional(MESSAGE.MESSAGE_);
     }
 
+    public void eraseLastTurn(long conversationId) {
+        Long lastUserMsgId = dsl.select(MESSAGE.MESSAGE_ID)
+                .from(MESSAGE)
+                .where(MESSAGE.CONVERSATION_ID.eq(conversationId))
+                .and(MESSAGE.TYPE.eq("user"))
+                .and(MESSAGE.ERASED.isFalse())
+                .orderBy(MESSAGE.MESSAGE_ID.desc())
+                .limit(1)
+                .fetchOneInto(Long.class);
+        if (lastUserMsgId == null) {
+            throw new IllegalArgumentException("No user message found to erase");
+        }
+        dsl.update(MESSAGE)
+                .set(MESSAGE.ERASED, true)
+                .where(MESSAGE.CONVERSATION_ID.eq(conversationId))
+                .and(MESSAGE.MESSAGE_ID.greaterOrEqual(lastUserMsgId))
+                .execute();
+    }
 }
