@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  chatStream, compactConversation, compactMergeConversation, execTool, execShellStream,
+  chatStream, compactConversation, compactMergeConversation, eraseLastTurn, execTool, execShellStream,
   getConversationDetail, type ConversationDetail, type ConversationSummary, type Message,
 } from './api';
 import { useAuth, getAccessToken } from './auth';
@@ -42,6 +42,8 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
   const lastSentModel = useRef<string | null>(null);
   const lastSentPrompt = useRef<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const streamGenRef = useRef(0);
   const [editorFile, setEditorFile] = useState<{ path: string; rootDirectory: string } | null>(null);
   const closeEditor = useCallback(() => setEditorFile(null), []);
   const [activeConvDisplayName, setActiveConvDisplayName] = useState<string | null>(null);
@@ -90,11 +92,18 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
   };
 
   const handleSend = async (input: string) => {
-    if (!input.trim() || loading) return;
+    if (!input.trim()) return; // NEW: removed || loading
 
-    // intercept !edit before adding to conversation history
+    // NEW: !stop — abort without adding to history
+    if (input === '!stop') {
+      abortRef.current?.abort();
+      return;
+    }
+
+    // !edit — blocked while loading
     const editMatch = input.match(/^!edit\s+(.+)$/i);
     if (editMatch) {
+      if (loading) { showToast('Wait for the response to finish'); return; } // NEW
       if (!rootDirectory) {
         showToast('Select a root directory first');
       } else if (!isAdmin) {
@@ -109,9 +118,10 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
       return;
     }
 
-    // intercept !! for direct shell execution
+    // !! direct shell — blocked while loading
     const execMatch = input.match(/^!!(.+)$/);
     if (execMatch) {
+      if (loading) { showToast('Wait for the response to finish'); return; } // NEW
       if (!rootDirectory) {
         showToast('Select a root directory first');
         return;
@@ -165,7 +175,94 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
       return;
     }
 
-    const userMessage: Message = { role: 'user', content: input };
+    // /compact — blocked while loading
+    if (input === '/compact') {
+      if (loading) { showToast('Wait for the response to finish'); return; } // NEW
+      if (!conversationId.current) {
+        setMessages(prev => [...prev, { role: 'ai', content: 'Start a conversation before compacting.' }]);
+        return;
+      }
+      setLoading(true);
+      try {
+        const token = await getAccessToken();
+        const { summary } = await compactConversation(conversationId.current, token);
+        setMessages(prev => [...prev, { role: 'compact', content: summary }]);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Compact failed.';
+        setMessages(prev => [...prev, { role: 'ai', content: `Error: ${msg}` }]);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // /compact-merge — blocked while loading
+    if (input === '/compact-merge') {
+      if (loading) { showToast('Wait for the response to finish'); return; } // NEW
+      if (!conversationId.current) {
+        setMessages(prev => [...prev, { role: 'ai', content: 'Start a conversation before merging compacts.' }]);
+        return;
+      }
+      setLoading(true);
+      try {
+        const token = await getAccessToken();
+        const { summary } = await compactMergeConversation(conversationId.current, token);
+        setMessages(prev => [...prev, { role: 'compact', content: summary }]);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Compact merge failed.';
+        setMessages(prev => [...prev, { role: 'ai', content: `Error: ${msg}` }]);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // !exec (single ! commands other than !stop, !erase-last, !edit, !!) — blocked while loading
+    if (input.startsWith('!')) {
+      if (loading) { showToast('Wait for the response to finish'); return; } // NEW
+      const metaMessages: Message[] = [];
+      if (model !== lastSentModel.current) {
+        metaMessages.push({ role: 'meta', content: 'model:' + model });
+        lastSentModel.current = model;
+      }
+      if (prompt !== lastSentPrompt.current) {
+        if (prompt) metaMessages.push({ role: 'meta', content: 'system:' + prompt });
+        lastSentPrompt.current = prompt;
+      }
+      setMessages(prev => [...prev, ...metaMessages, { role: 'user', content: input }]);
+      setLoading(true);
+      try {
+        const command = input.slice(1).trim();
+        const token = await getAccessToken();
+        const result = await execTool(command, rootDirectory, token);
+        const lang = catFileLang(command);
+        setMessages(prev => [...prev, lang
+          ? { role: 'ai', content: result, sourceLanguage: lang }
+          : { role: 'ai', content: '```\n' + result + '\n```' },
+        ]);
+      } catch (error: any) {
+        setMessages(prev => [...prev, { role: 'ai', content: `Error: ${error.message}` }]);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // --- Normal chat (possibly interrupting an in-flight stream) ---
+
+    // NEW: If loading, abort current stream and remove partial AI response
+    if (loading) {
+      abortRef.current?.abort();
+      setMessages(prev => {
+        const msgs = [...prev];
+        if (msgs.length > 0 && msgs[msgs.length - 1].role === 'ai') {
+          return msgs.slice(0, -1);
+        }
+        return msgs;
+      });
+    }
+
+    // Build meta messages and add user message to state
     const metaMessages: Message[] = [];
     if (model !== lastSentModel.current) {
       metaMessages.push({ role: 'meta', content: 'model:' + model });
@@ -176,65 +273,15 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
       lastSentPrompt.current = prompt;
     }
     if (!input.startsWith('/')) {
-      setMessages((prev) => [...prev, ...metaMessages, userMessage]);
+      setMessages(prev => [...prev, ...metaMessages, { role: 'user', content: input }]);
     }
+
+    // NEW: Generation counter prevents old stream's finally from clearing loading
+    streamGenRef.current++;
+    const gen = streamGenRef.current;
+    const controller = new AbortController(); // NEW
+    abortRef.current = controller;            // NEW
     setLoading(true);
-
-    if (input.startsWith('!')) {
-      try {
-        const command = input.slice(1).trim();
-        const token = await getAccessToken();
-        const result = await execTool(command, rootDirectory, token);
-        const lang = catFileLang(command);
-        setMessages((prev) => [...prev, lang
-          ? { role: 'ai', content: result, sourceLanguage: lang }
-          : { role: 'ai', content: '```\n' + result + '\n```' },
-        ]);
-      } catch (error: any) {
-        setMessages((prev) => [...prev, { role: 'ai', content: `Error: ${error.message}` }]);
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
-    if (input === '/compact') {
-      if (!conversationId.current) {
-        setMessages((prev) => [...prev, { role: 'ai', content: 'Start a conversation before compacting.' }]);
-        setLoading(false);
-        return;
-      }
-      try {
-        const token = await getAccessToken();
-        const { summary } = await compactConversation(conversationId.current, token);
-        setMessages((prev) => [...prev, { role: 'compact', content: summary }]);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Compact failed.';
-        setMessages((prev) => [...prev, { role: 'ai', content: `Error: ${msg}` }]);
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
-    if (input === '/compact-merge') {
-      if (!conversationId.current) {
-        setMessages((prev) => [...prev, { role: 'ai', content: 'Start a conversation before merging compacts.' }]);
-        setLoading(false);
-        return;
-      }
-      try {
-        const token = await getAccessToken();
-        const { summary } = await compactMergeConversation(conversationId.current, token);
-        setMessages((prev) => [...prev, { role: 'compact', content: summary }]);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Compact merge failed.';
-        setMessages((prev) => [...prev, { role: 'ai', content: `Error: ${msg}` }]);
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
 
     const matched = PROMPT_BANK.find(p => p.name === prompt);
     const resolvedPrompt = matched?.text ?? prompt;
@@ -253,7 +300,7 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
         },
         {
           onToolCall: (tc) => {
-            setMessages((prev) => {
+            setMessages(prev => {
               const msgs = [...prev];
               const last = msgs[msgs.length - 1];
               if (last && last.role === 'ai') {
@@ -265,7 +312,7 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
             });
           },
           onContent: (text) => {
-            setMessages((prev) => {
+            setMessages(prev => {
               const msgs = [...prev];
               const last = msgs[msgs.length - 1];
               if (last && last.role === 'ai') {
@@ -279,21 +326,27 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
           onError: showToast,
         },
         token,
+        controller, // NEW: pass controller so it can be aborted externally
       );
     } catch (error: any) {
-      setMessages((prev) => {
-        const errorMessage: Message = { role: 'ai', content: `Error: ${error.message}` };
-        const msgs = [...prev];
-        const last = msgs[msgs.length - 1];
-        if (last && last.role === 'ai' && last.content === '') {
-          msgs[msgs.length - 1] = errorMessage;
-        } else {
-          msgs.push(errorMessage);
-        }
-        return msgs;
-      });
+      if (gen === streamGenRef.current) { // NEW: only update state if this is still the active stream
+        setMessages(prev => {
+          const errorMessage: Message = { role: 'ai', content: `Error: ${error.message}` };
+          const msgs = [...prev];
+          const last = msgs[msgs.length - 1];
+          if (last && last.role === 'ai' && last.content === '') {
+            msgs[msgs.length - 1] = errorMessage;
+          } else {
+            msgs.push(errorMessage);
+          }
+          return msgs;
+        });
+      }
     } finally {
-      setLoading(false);
+      if (gen === streamGenRef.current) { // NEW: only clear loading if this is still the active stream
+        setLoading(false);
+        abortRef.current = null;
+      }
     }
   };
 
