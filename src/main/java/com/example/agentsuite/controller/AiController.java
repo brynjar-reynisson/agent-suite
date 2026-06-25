@@ -248,6 +248,21 @@ public class AiController {
         }
     }
 
+    @PostMapping("/ai/conversations/{externalId}/erase-last")
+    public ResponseEntity<Void> eraseLastTurn(
+            @PathVariable String externalId,
+            HttpServletRequest request) {
+        long userId = currentUserId(request);
+        try {
+            conversationService.eraseLastTurn(externalId, userId);
+            return ResponseEntity.ok().build();
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @RequestMapping(path = "/ai/chat", method = {RequestMethod.GET, RequestMethod.POST})
     public SseEmitter chat(@RequestParam(defaultValue = "Hello, how are you?") String message,
                            @RequestParam(defaultValue = "") String prompt,

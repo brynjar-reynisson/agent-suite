@@ -147,6 +147,16 @@ public class ConversationService {
         );
     }
 
+    @Transactional
+    public void eraseLastTurn(String externalId, long userId) {
+        ConversationRecord conv = conversationRepository.findByExternalId(externalId)
+                .orElseThrow(() -> new NoSuchElementException("Conversation not found: " + externalId));
+        if (!conv.getUserId().equals(userId)) {
+            throw new NoSuchElementException("Conversation not found: " + externalId);
+        }
+        messageRepository.eraseLastTurn(conv.getConversationId());
+    }
+
     private List<ConversationDetailDto.ToolCallDto> parseToolCalls(String callsJson) {
         try {
             JsonNode arr = MAPPER.readTree(callsJson);

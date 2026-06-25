@@ -12,7 +12,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
+import java.util.NoSuchElementException;
 
 class ConversationServiceTest {
 
@@ -56,5 +58,36 @@ class ConversationServiceTest {
         assertThat(detail.messages()).hasSize(3);
         assertThat(detail.messages().get(1).role()).isEqualTo("compact");
         assertThat(detail.messages().get(1).content()).isEqualTo("this is the summary");
+    }
+
+    @Test
+    void eraseLastTurn_delegatesToRepository() {
+        ConversationRecord conv = mock(ConversationRecord.class);
+        when(conv.getConversationId()).thenReturn(5L);
+        when(conv.getUserId()).thenReturn(1L);
+        when(conversationRepository.findByExternalId("ext-1")).thenReturn(Optional.of(conv));
+
+        conversationService.eraseLastTurn("ext-1", 1L);
+
+        verify(messageRepository).eraseLastTurn(5L);
+    }
+
+    @Test
+    void eraseLastTurn_throwsWhenConversationNotFound() {
+        when(conversationRepository.findByExternalId("missing")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> conversationService.eraseLastTurn("missing", 1L))
+                .isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
+    void eraseLastTurn_throwsWhenWrongUser() {
+        ConversationRecord conv = mock(ConversationRecord.class);
+        when(conv.getConversationId()).thenReturn(5L);
+        when(conv.getUserId()).thenReturn(99L);
+        when(conversationRepository.findByExternalId("ext-1")).thenReturn(Optional.of(conv));
+
+        assertThatThrownBy(() -> conversationService.eraseLastTurn("ext-1", 1L))
+                .isInstanceOf(NoSuchElementException.class);
     }
 }

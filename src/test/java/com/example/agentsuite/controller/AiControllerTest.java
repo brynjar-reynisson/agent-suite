@@ -706,6 +706,31 @@ class AiControllerTest {
     }
 
     @Test
+    void eraseLastTurn_returnsOk() throws Exception {
+        mockMvc.perform(post("/ai/conversations/conv-123/erase-last"))
+                .andExpect(status().isOk());
+        verify(conversationService).eraseLastTurn(eq("conv-123"), anyLong());
+    }
+
+    @Test
+    void eraseLastTurn_returnsNotFoundWhenConversationMissing() throws Exception {
+        doThrow(new NoSuchElementException("not found"))
+                .when(conversationService).eraseLastTurn(eq("missing-conv"), anyLong());
+
+        mockMvc.perform(post("/ai/conversations/missing-conv/erase-last"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void eraseLastTurn_returnsBadRequestWhenNoUserMessage() throws Exception {
+        doThrow(new IllegalArgumentException("No user message found to erase"))
+                .when(conversationService).eraseLastTurn(eq("conv-123"), anyLong());
+
+        mockMvc.perform(post("/ai/conversations/conv-123/erase-last"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void chat_adminWithRootDirectory_systemPromptIncludesGitDirective() throws Exception {
         when(suiteUserService.findOrCreate("admin-sub", "admin@test.com")).thenReturn(42L);
         when(authorizationService.isAdmin(42L)).thenReturn(true);
