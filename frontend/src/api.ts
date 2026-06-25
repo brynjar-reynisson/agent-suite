@@ -48,8 +48,9 @@ export const chatStream = async (
   params: ChatRequest,
   callbacks: StreamCallbacks,
   token?: string | null,
+  abortController?: AbortController,
 ): Promise<void> => {
-  const controller = new AbortController();
+  const controller = abortController ?? new AbortController();
   await fetchEventSource(`${API_BASE_URL}/ai/chat`, {
     method: 'POST',
     signal: controller.signal,
@@ -192,6 +193,17 @@ export const compactMergeConversation = async (
     throw new Error((body as { error?: string }).error ?? `Compact merge failed (${res.status})`);
   }
   return res.json();
+};
+
+export const eraseLastTurn = async (
+  conversationId: string,
+  token?: string | null,
+): Promise<void> => {
+  const res = await fetch(
+    `${API_BASE_URL}/ai/conversations/${encodeURIComponent(conversationId)}/erase-last`,
+    { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {} },
+  );
+  if (!res.ok) throw new Error(`Erase failed (${res.status})`);
 };
 
 export const readFile = async (
