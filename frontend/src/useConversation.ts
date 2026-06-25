@@ -100,6 +100,32 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
       return;
     }
 
+    // !erase-last — soft-delete last user+AI turn
+    if (input === '!erase-last') {
+      if (loading) { showToast('Use !stop first before erasing'); return; }
+      const hasUser = messages.some(m => m.role === 'user');
+      if (!hasUser) { showToast('Nothing to erase'); return; }
+      try {
+        const token = await getAccessToken();
+        await eraseLastTurn(conversationId.current, token);
+        setMessages(prev => {
+          const msgs = [...prev];
+          // Remove last 'ai' entry (skipping meta/compact/clear)
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].role === 'ai') { msgs.splice(i, 1); break; }
+          }
+          // Remove last 'user' entry
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].role === 'user') { msgs.splice(i, 1); break; }
+          }
+          return msgs;
+        });
+      } catch (err: unknown) {
+        showToast(err instanceof Error ? err.message : 'Erase failed');
+      }
+      return;
+    }
+
     // !edit — blocked while loading
     const editMatch = input.match(/^!edit\s+(.+)$/i);
     if (editMatch) {
