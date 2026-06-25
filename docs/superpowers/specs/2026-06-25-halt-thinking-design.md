@@ -13,12 +13,15 @@ Three related behaviors for interrupting an in-flight agent response:
 ## Conversation History Semantics
 
 When a stream is interrupted by a new message (halt_thinking):
-- The original user message is **kept** in history.
-- The partial AI response is **discarded** from local state (the trailing AI message is popped).
+- The original user message is **kept** in local state and in the DB.
+- The partial AI response is **discarded from local React state** (the trailing AI message is popped from the UI).
 - The new user message is appended and a new stream starts.
-- From the LLM's perspective on the next turn: `[..., user: original, user: new, AI: ...]`.
 
-`!erase-last` gives manual control to remove the previous stopped turn entirely when it should not be part of history at all.
+**Important limitation:** There is no server-side cancellation (see Out of Scope). The backend keeps running and, when it finishes, persists the completed assistant response to the DB. On page reload, that response reappears. Use `!erase-last` to remove the interrupted turn from DB history when this matters.
+
+From the LLM's perspective on the next live turn (before reload): `[..., user: original, user: new, AI: ...]`. After reload: the completed assistant response is also visible.
+
+`!erase-last` gives manual control to remove the previous stopped turn from both local state and the DB — use it when the interrupted response should not be part of LLM history.
 
 ## Frontend — Stream Control (`api.ts`, `useConversation.ts`)
 
