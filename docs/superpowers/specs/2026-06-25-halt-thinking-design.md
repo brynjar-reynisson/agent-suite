@@ -69,8 +69,9 @@ try {
 **`!erase-last` sequence:**
 
 1. Call `eraseLastTurn(conversationId.current, token)`.
-2. On success, walk `messages` state backwards: remove the trailing AI message (if present), then the user message before it.
-3. On API error, show toast.
+2. On success, walk `messages` state backwards: remove the last entry with `role === 'ai'` (if present), then continue walking backwards to find and remove the last entry with `role === 'user'`. Skips over `meta`/`clear`/`compact` entries, which are never erased.
+3. If no `role === 'user'` entry exists in state, show toast "Nothing to erase" (and skip the API call).
+4. On API error, show toast.
 
 **`!stop` sequence:**
 
