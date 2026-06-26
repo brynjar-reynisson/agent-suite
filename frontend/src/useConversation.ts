@@ -108,18 +108,10 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
       try {
         const token = await getAccessToken();
         await eraseLastTurn(conversationId.current, token);
-        setMessages(prev => {
-          const msgs = [...prev];
-          // Remove last 'ai' entry (skipping meta/compact/clear)
-          for (let i = msgs.length - 1; i >= 0; i--) {
-            if (msgs[i].role === 'ai') { msgs.splice(i, 1); break; }
-          }
-          // Remove last 'user' entry
-          for (let i = msgs.length - 1; i >= 0; i--) {
-            if (msgs[i].role === 'user') { msgs.splice(i, 1); break; }
-          }
-          return msgs;
-        });
+        // Reload from backend: local state may have extra AI messages from the
+        // AbortError that fetchEventSource raises on !stop, so splicing is unreliable.
+        const detail = await getConversationDetail(conversationId.current, token);
+        setMessages(detail.messages);
       } catch (err: unknown) {
         showToast(err instanceof Error ? err.message : 'Erase failed');
       }

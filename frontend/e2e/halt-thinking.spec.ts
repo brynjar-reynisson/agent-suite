@@ -164,10 +164,30 @@ test.describe('halt_thinking', () => {
       }),
     );
 
-    // Mock the erase endpoint — real backend not needed
     await page.route('**/ai/conversations/*/erase-last', route =>
       route.fulfill({ status: 200 }),
     );
+
+    // After erase the hook reloads the conversation from the backend — return empty history
+    await page.route('**/ai/conversations/*', route => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            externalId: 'test-conv',
+            name: 'Test',
+            customName: null,
+            createTime: new Date().toISOString(),
+            initialModel: '',
+            systemPrompt: '',
+            rootDirectory: '',
+            messages: [],
+          }),
+        });
+      }
+      return route.continue();
+    });
 
     await page.goto('/');
     await fillAndSend(page, 'user message to be erased');
