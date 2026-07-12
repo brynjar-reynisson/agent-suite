@@ -13,7 +13,12 @@ public class AnthropicChatService extends AbstractLangChain4jChatService {
         var builder = AnthropicChatModel.builder()
                 .apiKey(apiKey)
                 .modelName(modelName)
-                .maxTokens(8192);
+                .maxTokens(8192)
+                // Anthropic prompt caching is opt-in: without these, no cache_control
+                // breakpoint is ever sent, so the system prompt and tool specs are
+                // never cached even across on-topic turns.
+                .cacheSystemMessages(true)
+                .cacheTools(true);
         // Extended-thinking models (opus-4+) do not accept a temperature parameter
         if (!modelName.contains("opus-4")) {
             builder.temperature(0.1);
