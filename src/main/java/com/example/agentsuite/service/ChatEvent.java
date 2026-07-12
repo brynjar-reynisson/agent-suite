@@ -15,5 +15,9 @@ public sealed interface ChatEvent {
 
     record Error(String message) implements ChatEvent {}
 
-    record Done() implements ChatEvent {}
+    record Done(TurnUsage usage) implements ChatEvent {
+        public Done() {
+            this(null);
+        }
+    }
 }
