@@ -345,7 +345,7 @@ public class AiController {
                                 case ChatEvent.Content c -> sendEvent(emitter, "content", c.text());
                                 case ChatEvent.Error e -> sendEvent(emitter, "error", e.message());
                                 case ChatEvent.Done d -> {
-                                    sendEvent(emitter, "done", "");
+                                    sendEvent(emitter, "done", d.usage() != null ? d.usage() : "");
                                     emitter.complete();
                                 }
                             }

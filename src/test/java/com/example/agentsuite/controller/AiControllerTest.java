@@ -8,6 +8,7 @@ import com.example.agentsuite.service.AuthorizationService;
 import com.example.agentsuite.service.ChatEvent;
 import com.example.agentsuite.service.ChatOrchestrationService;
 import com.example.agentsuite.service.ModelRegistry;
+import com.example.agentsuite.service.TurnUsage;
 import com.example.agentsuite.tools.GitTools;
 import com.example.agentsuite.tools.MarkDownWriter;
 import com.example.agentsuite.tools.McpToolBridge;
@@ -1005,6 +1006,46 @@ class AiControllerTest {
         int first = received.indexOf(AiController.OBSIDIAN_READ_BEFORE_WRITE_DIRECTIVE);
         int second = received.indexOf(AiController.OBSIDIAN_READ_BEFORE_WRITE_DIRECTIVE, first + 1);
         assertThat(second).isEqualTo(-1);
+    }
+
+    @Test
+    void chat_doneEventWithUsage_includesTokenCountsInSseBody() throws Exception {
+        doAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            Consumer<ChatEvent> consumer = inv.getArgument(7);
+            consumer.accept(new ChatEvent.Done(new TurnUsage(120, 45, 30, 5)));
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
+                any(Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat"))
+                .andExpect(request().asyncStarted()).andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("\"inputTokens\":120")))
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("\"outputTokens\":45")))
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("\"cacheReadTokens\":30")))
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("\"cacheWriteTokens\":5")));
+    }
+
+    @Test
+    void chat_doneEventWithoutUsage_emitsEmptyDoneData() throws Exception {
+        doAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            Consumer<ChatEvent> consumer = inv.getArgument(7);
+            consumer.accept(new ChatEvent.Done());
+            return null;
+        }).when(orchestrationService).chatStream(isNull(), anyLong(), any(), any(), any(), any(), any(),
+                any(Consumer.class), any());
+
+        MvcResult mvcResult = mockMvc.perform(get("/ai/chat"))
+                .andExpect(request().asyncStarted()).andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.not(
+                        org.hamcrest.CoreMatchers.containsString("inputTokens"))));
     }
 
     private static String makeAdminJwt(String sub, String email) {
