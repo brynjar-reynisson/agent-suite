@@ -14,6 +14,10 @@ function formatToolArgs(args: string): string {
   }
 }
 
+function formatTokenCount(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
+
 interface MessageListProps {
   messages: Message[];
   loading: boolean;
@@ -134,6 +138,14 @@ export function MessageList({ messages, loading, historySizeBytes, onImageClick 
                 >
                   {msg.content}
                 </ReactMarkdown>
+              </div>
+            )}
+            {msg.role === 'ai' && msg.usage && (
+              <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-400">
+                {formatTokenCount(msg.usage.inputTokens)} in · {formatTokenCount(msg.usage.outputTokens)} out
+                {msg.usage.cacheReadTokens != null && (
+                  <> · {formatTokenCount(msg.usage.cacheReadTokens)} cached</>
+                )}
               </div>
             )}
           </div>

@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:e2e": "playwright test e2e/halt-thinking.spec.ts",
-    "test:e2e:headed": "playwright test e2e/halt-thinking.spec.ts --headed"
+    "test:e2e:headed": "playwright test e2e/halt-thinking.spec.ts --headed",
+    "test:e2e:turn-usage": "playwright test e2e/turn-usage.spec.ts"
   },
   "dependencies": {
     "@microsoft/fetch-event-source": "^2.0.1",
