@@ -19,6 +19,7 @@ export interface Message {
   content: string;
   toolCalls?: ToolCall[];
   sourceLanguage?: string;
+  usage?: TokenUsage;
 }
 
 export interface ConversationSummary {

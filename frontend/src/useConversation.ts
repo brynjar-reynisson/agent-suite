@@ -341,6 +341,16 @@ export function useConversation({ model, prompt, rootDirectory, availableTools, 
               return msgs;
             });
           },
+          onDone: (usage) => {
+            setMessages(prev => {
+              const msgs = [...prev];
+              const last = msgs[msgs.length - 1];
+              if (last && last.role === 'ai') {
+                msgs[msgs.length - 1] = { ...last, usage };
+              }
+              return msgs;
+            });
+          },
           onError: showToast,
         },
         token,
