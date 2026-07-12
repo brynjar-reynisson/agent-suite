@@ -7,6 +7,13 @@ export interface ToolCall {
   arguments: string;
 }
 
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+}
+
 export interface Message {
   role: 'user' | 'ai' | 'meta' | 'compact' | 'clear';
   content: string;
@@ -41,6 +48,7 @@ export interface ChatRequest {
 export interface StreamCallbacks {
   onToolCall: (tc: ToolCall) => void;
   onContent: (text: string) => void;
+  onDone?: (usage: TokenUsage) => void;
   onError?: (message: string) => void;
 }
 
@@ -76,7 +84,16 @@ export const chatStream = async (
       if (ev.event === 'tool_call') callbacks.onToolCall(JSON.parse(ev.data));
       if (ev.event === 'content') callbacks.onContent(ev.data);
       if (ev.event === 'error') callbacks.onError?.(ev.data);
-      if (ev.event === 'done') controller.abort();
+      if (ev.event === 'done') {
+        if (ev.data) {
+          try {
+            callbacks.onDone?.(JSON.parse(ev.data));
+          } catch {
+            // No usage payload (non-LLM directive path) — nothing to report
+          }
+        }
+        controller.abort();
+      }
     },
     onclose() {
       throw new Error('Connection closed unexpectedly, please try again');
