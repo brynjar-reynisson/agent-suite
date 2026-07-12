@@ -25,7 +25,7 @@ If `conversationId` is provided, `ChatOrchestrationService` persists all message
 
 **DTOs & Events**
 - `HistoryMessage` — sealed DTO interface bridging DB message rows to LLM message types (SystemPrompt, User, Assistant, ToolCall, ToolResult).
-- `ChatEvent` — sealed interface (Java records) for SSE event types: `ToolBatch` (per-iteration tool calls+results), `Content`, `Error`, `Done`.
+- `ChatEvent` — sealed interface (Java records) for SSE event types: `ToolBatch` (per-iteration tool calls+results), `Content`, `Error`, `Done` (optionally carries a `TurnUsage` with input/output/cache token counts).
 - `ChatResponse` — data class holding tool call list and response text.
 
 **Auth & Authorization**

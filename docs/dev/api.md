@@ -55,7 +55,7 @@ GET /images/{filename}
   Returns 200 with the appropriate image content-type, 404 if not found, 400 for unsupported extension.
 ```
 
-Streaming response: Server-Sent Events with event types `tool_call`, `content`, `error`, `done`.
+Streaming response: Server-Sent Events with event types `tool_call`, `content`, `error`, `done`. The `done` event's data may carry a JSON `TurnUsage` payload (`inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`) when the provider reports token usage for the turn; `cacheReadTokens`/`cacheWriteTokens` are `null` when the provider doesn't report them.
 
 ## Supported Models
 
