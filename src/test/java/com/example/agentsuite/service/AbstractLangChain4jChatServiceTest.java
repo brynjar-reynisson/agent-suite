@@ -2,9 +2,11 @@ package com.example.agentsuite.service;
 
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.model.anthropic.AnthropicTokenUsage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.output.TokenUsage;
 import dev.langchain4j.service.tool.ToolExecutor;
 import org.junit.jupiter.api.Test;
 
@@ -68,5 +70,66 @@ class AbstractLangChain4jChatServiceTest {
     void toUserFacingError_nullMessage_returnsEmptyString() {
         Exception e = new RuntimeException((String) null);
         assertThat(AbstractLangChain4jChatService.toUserFacingError(e)).isEqualTo("");
+    }
+
+    @Test
+    void chatStream_capturesTokenUsage_onDoneEvent() {
+        ChatModel mockModel = mock(ChatModel.class);
+        AiMessage aiResponse = AiMessage.from("hello there");
+        TokenUsage usage = new TokenUsage(100, 40, 140);
+        when(mockModel.chat(any(ChatRequest.class)))
+                .thenReturn(ChatResponse.builder().aiMessage(aiResponse).tokenUsage(usage).build());
+
+        TestChatService service = new TestChatService(mockModel);
+        List<ChatEvent> events = new ArrayList<>();
+        service.chatStream("", "hello", events::add);
+
+        ChatEvent.Done done = (ChatEvent.Done) events.stream()
+                .filter(e -> e instanceof ChatEvent.Done)
+                .findFirst()
+                .orElseThrow();
+        assertThat(done.usage()).isNotNull();
+        assertThat(done.usage().inputTokens()).isEqualTo(100);
+        assertThat(done.usage().outputTokens()).isEqualTo(40);
+        assertThat(done.usage().cacheReadTokens()).isNull();
+        assertThat(done.usage().cacheWriteTokens()).isNull();
+    }
+
+    @Test
+    void chatStream_anthropicCacheTokens_populateTurnUsage() {
+        ChatModel mockModel = mock(ChatModel.class);
+        AiMessage aiResponse = AiMessage.from("hello there");
+        AnthropicTokenUsage usage = AnthropicTokenUsage.builder()
+                .inputTokenCount(100)
+                .outputTokenCount(40)
+                .cacheReadInputTokens(30)
+                .cacheCreationInputTokens(5)
+                .build();
+        when(mockModel.chat(any(ChatRequest.class)))
+                .thenReturn(ChatResponse.builder().aiMessage(aiResponse).tokenUsage(usage).build());
+
+        TestChatService service = new TestChatService(mockModel);
+        List<ChatEvent> events = new ArrayList<>();
+        service.chatStream("", "hello", events::add);
+
+        ChatEvent.Done done = (ChatEvent.Done) events.stream()
+                .filter(e -> e instanceof ChatEvent.Done)
+                .findFirst()
+                .orElseThrow();
+        assertThat(done.usage().cacheReadTokens()).isEqualTo(30);
+        assertThat(done.usage().cacheWriteTokens()).isEqualTo(5);
+    }
+
+    @Test
+    void toTurnUsage_nullInput_returnsNull() {
+        assertThat(AbstractLangChain4jChatService.toTurnUsage(null)).isNull();
+    }
+
+    @Test
+    void toTurnUsage_nullTokenCounts_defaultToZero() {
+        TokenUsage usage = new TokenUsage(null, null, null);
+        var turnUsage = AbstractLangChain4jChatService.toTurnUsage(usage);
+        assertThat(turnUsage.inputTokens()).isEqualTo(0);
+        assertThat(turnUsage.outputTokens()).isEqualTo(0);
     }
 }

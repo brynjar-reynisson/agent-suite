@@ -13,8 +13,11 @@ import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
+import dev.langchain4j.model.anthropic.AnthropicTokenUsage;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.output.TokenUsage;
 import dev.langchain4j.service.AiServices;
+import dev.langchain4j.service.Result;
 import dev.langchain4j.service.tool.DefaultToolExecutor;
 import dev.langchain4j.service.tool.ToolExecutor;
 import dev.langchain4j.service.tool.ToolProvider;
@@ -35,7 +38,7 @@ abstract class AbstractLangChain4jChatService implements ChatService {
     }
 
     private interface AssistantService {
-        String chat(@dev.langchain4j.service.UserMessage String userMessage);
+        Result<String> chat(@dev.langchain4j.service.UserMessage String userMessage);
     }
 
     private AssistantService buildAiService(String systemPrompt, List<ChatMessage> historyMessages,
@@ -132,8 +135,8 @@ abstract class AbstractLangChain4jChatService implements ChatService {
                 collector,
                 tools
         );
-        String content = svc.chat(userMessage);
-        return new ChatResponse(collectedCalls, content);
+        Result<String> result = svc.chat(userMessage);
+        return new ChatResponse(collectedCalls, result.content());
     }
 
     @Override
@@ -161,9 +164,9 @@ abstract class AbstractLangChain4jChatService implements ChatService {
         List<ChatMessage> seedMessages = buildMessageList(nonSystemHistory);
         AssistantService svc = buildAiService(systemPrompt, seedMessages, emitter, tools);
         try {
-            String response = svc.chat(userMessage);
-            emitter.accept(new ChatEvent.Content(response));
-            emitter.accept(new ChatEvent.Done());
+            Result<String> result = svc.chat(userMessage);
+            emitter.accept(new ChatEvent.Content(result.content()));
+            emitter.accept(new ChatEvent.Done(toTurnUsage(result.tokenUsage())));
         } catch (Exception e) {
             emitter.accept(new ChatEvent.Error(toUserFacingError(e)));
             emitter.accept(new ChatEvent.Done());
@@ -177,6 +180,21 @@ abstract class AbstractLangChain4jChatService implements ChatService {
                     " per turn). Send another message to continue.";
         }
         return msg;
+    }
+
+    static TurnUsage toTurnUsage(TokenUsage usage) {
+        if (usage == null) {
+            return null;
+        }
+        int input = usage.inputTokenCount() != null ? usage.inputTokenCount() : 0;
+        int output = usage.outputTokenCount() != null ? usage.outputTokenCount() : 0;
+        Integer cacheRead = null;
+        Integer cacheWrite = null;
+        if (usage instanceof AnthropicTokenUsage anthropicUsage) {
+            cacheRead = anthropicUsage.cacheReadInputTokens();
+            cacheWrite = anthropicUsage.cacheCreationInputTokens();
+        }
+        return new TurnUsage(input, output, cacheRead, cacheWrite);
     }
 
     private List<ChatMessage> buildMessageList(List<HistoryMessage> history) {
