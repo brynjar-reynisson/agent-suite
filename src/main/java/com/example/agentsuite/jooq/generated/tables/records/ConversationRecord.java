@@ -118,6 +118,20 @@ public class ConversationRecord extends UpdatableRecordImpl<ConversationRecord> 
         return (String) get(6);
     }
 
+    /**
+     * Setter for <code>public.conversation.md_file_name</code>.
+     */
+    public void setMdFileName(String value) {
+        set(7, value);
+    }
+
+    /**
+     * Getter for <code>public.conversation.md_file_name</code>.
+     */
+    public String getMdFileName() {
+        return (String) get(7);
+    }
+
     // -------------------------------------------------------------------------
     // Primary key information
     // -------------------------------------------------------------------------
@@ -141,7 +155,7 @@ public class ConversationRecord extends UpdatableRecordImpl<ConversationRecord> 
     /**
      * Create a detached, initialised ConversationRecord
      */
-    public ConversationRecord(Long conversationId, Long userId, String conversationName, OffsetDateTime createTime, String rootDirectory, String externalId, String customName) {
+    public ConversationRecord(Long conversationId, Long userId, String conversationName, OffsetDateTime createTime, String rootDirectory, String externalId, String customName, String mdFileName) {
         super(Conversation.CONVERSATION);
 
         setConversationId(conversationId);
@@ -151,6 +165,7 @@ public class ConversationRecord extends UpdatableRecordImpl<ConversationRecord> 
         setRootDirectory(rootDirectory);
         setExternalId(externalId);
         setCustomName(customName);
+        setMdFileName(mdFileName);
         resetChangedOnNotNull();
     }
 }

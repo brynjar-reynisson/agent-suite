@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS "conversation" (
     "root_directory"    TEXT,
     "external_id"       TEXT                     NOT NULL DEFAULT RANDOM_UUID() UNIQUE,
     "custom_name"       TEXT,
+    "md_file_name"      TEXT,
     CONSTRAINT "fk_conversation_user" FOREIGN KEY ("user_id") REFERENCES "suite_user" ("user_id")
 );
 

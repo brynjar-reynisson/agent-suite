@@ -96,6 +96,11 @@ public class Conversation extends TableImpl<ConversationRecord> {
      */
     public final TableField<ConversationRecord, String> CUSTOM_NAME = createField(DSL.name("custom_name"), SQLDataType.CLOB, this, "");
 
+    /**
+     * The column <code>public.conversation.md_file_name</code>.
+     */
+    public final TableField<ConversationRecord, String> MD_FILE_NAME = createField(DSL.name("md_file_name"), SQLDataType.CLOB, this, "");
+
     private Conversation(Name alias, Table<ConversationRecord> aliased) {
         this(alias, aliased, (Field<?>[]) null, null);
     }
