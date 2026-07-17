@@ -57,9 +57,12 @@ user conversation data, like `backups/`). `ConversationFileService` owns this:
 - **Disabled** unless the active Spring profile is `dev` or `prod` — no files are written during
   tests or no-profile runs.
 
-Filename: `<user>_<name>-<dev|prod>.md`, where `<user>` is the email local-part (`guest` for the
-guest user), and `<name>` is `custom_name` if set else `conversation_name`, sanitized and
-truncated to 80 characters. Colliding names get a ` (2)`, ` (3)`, ... suffix. The resolved
-filename is stored on `conversation.md_file_name` so renames and appends target the right file.
+Path: `conversations/<dev|prod>/<user>/<name>.md` — environment and user are directory
+levels (each sanitized), not filename prefixes, so `conversations/` doesn't become one flat,
+ever-growing directory. `<user>` is the email local-part (`guest` for the guest user), and
+`<name>` is `custom_name` if set else `conversation_name`, sanitized and truncated to 80
+characters. Colliding names within the same `<env>/<user>/` directory get a ` (2)`, ` (3)`, ...
+suffix. The resolved relative path is stored on `conversation.md_file_name` so renames and
+appends target the right file.
 
 File I/O failures are logged and swallowed — they never block or fail the underlying DB write.
