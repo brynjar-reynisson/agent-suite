@@ -4,13 +4,17 @@ import com.example.agentsuite.controller.ConversationDetailDto;
 import com.example.agentsuite.controller.ConversationSummaryDto;
 import com.example.agentsuite.jooq.generated.tables.records.ConversationRecord;
 import com.example.agentsuite.jooq.generated.tables.records.MessageRecord;
+import com.example.agentsuite.jooq.generated.tables.records.SuiteUserRecord;
 import com.example.agentsuite.jooq.repository.ConversationRepository;
 import com.example.agentsuite.jooq.repository.MessageRepository;
+import com.example.agentsuite.jooq.repository.SuiteUserRepository;
+import com.example.agentsuite.service.ConversationFileService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -23,21 +27,33 @@ public class ConversationService {
 
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
+    private final SuiteUserRepository suiteUserRepository;
+    private final ConversationFileService conversationFileService;
 
     public ConversationService(ConversationRepository conversationRepository,
-                                MessageRepository messageRepository) {
+                                MessageRepository messageRepository,
+                                SuiteUserRepository suiteUserRepository,
+                                ConversationFileService conversationFileService) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
+        this.suiteUserRepository = suiteUserRepository;
+        this.conversationFileService = conversationFileService;
     }
 
     @Transactional
     public long createConversation(long userId, String name, String rootDirectory, String externalId) {
-        return conversationRepository.insert(userId, name, rootDirectory, externalId);
+        long conversationId = conversationRepository.insert(userId, name, rootDirectory, externalId);
+        String email = suiteUserRepository.findById(userId).map(SuiteUserRecord::getEmail).orElse(null);
+        conversationFileService.createFile(email, name, externalId, OffsetDateTime.now())
+                .ifPresent(fileName -> conversationRepository.updateMdFileName(conversationId, fileName));
+        return conversationId;
     }
 
     @Transactional
     public void addMessage(long conversationId, long userId, String type, String message) {
         messageRepository.insert(conversationId, userId, type, message);
+        conversationRepository.findById(conversationId).ifPresent(conv ->
+                conversationFileService.appendMessage(conv.getMdFileName(), type, message, OffsetDateTime.now()));
     }
 
     @Transactional(readOnly = true)
@@ -74,6 +90,11 @@ public class ConversationService {
             throw new NoSuchElementException("Conversation not found: " + externalId);
         }
         conversationRepository.updateCustomName(conv.getConversationId(), customName);
+
+        String displayName = (customName != null && !customName.isBlank()) ? customName : conv.getConversationName();
+        String email = suiteUserRepository.findById(userId).map(SuiteUserRecord::getEmail).orElse(null);
+        conversationFileService.renameFile(conv.getMdFileName(), email, displayName)
+                .ifPresent(fileName -> conversationRepository.updateMdFileName(conv.getConversationId(), fileName));
     }
 
     @Transactional(readOnly = true)

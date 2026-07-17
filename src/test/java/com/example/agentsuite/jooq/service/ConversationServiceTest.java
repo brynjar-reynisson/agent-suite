@@ -3,8 +3,11 @@ package com.example.agentsuite.jooq.service;
 import com.example.agentsuite.controller.ConversationDetailDto;
 import com.example.agentsuite.jooq.generated.tables.records.ConversationRecord;
 import com.example.agentsuite.jooq.generated.tables.records.MessageRecord;
+import com.example.agentsuite.jooq.generated.tables.records.SuiteUserRecord;
 import com.example.agentsuite.jooq.repository.ConversationRepository;
 import com.example.agentsuite.jooq.repository.MessageRepository;
+import com.example.agentsuite.jooq.repository.SuiteUserRepository;
+import com.example.agentsuite.service.ConversationFileService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -20,13 +23,18 @@ class ConversationServiceTest {
 
     private ConversationRepository conversationRepository;
     private MessageRepository messageRepository;
+    private SuiteUserRepository suiteUserRepository;
+    private ConversationFileService conversationFileService;
     private ConversationService conversationService;
 
     @BeforeEach
     void setUp() {
         conversationRepository = mock(ConversationRepository.class);
         messageRepository = mock(MessageRepository.class);
-        conversationService = new ConversationService(conversationRepository, messageRepository);
+        suiteUserRepository = mock(SuiteUserRepository.class);
+        conversationFileService = mock(ConversationFileService.class);
+        conversationService = new ConversationService(conversationRepository, messageRepository,
+                suiteUserRepository, conversationFileService);
     }
 
     private MessageRecord rec(String type, String message) {
@@ -89,5 +97,51 @@ class ConversationServiceTest {
 
         assertThatThrownBy(() -> conversationService.eraseLastTurn("ext-1", 1L))
                 .isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
+    void createConversation_createsFileAndPersistsFileName() {
+        when(conversationRepository.insert(1L, "Chat", "/root", "ext-1")).thenReturn(10L);
+        SuiteUserRecord user = mock(SuiteUserRecord.class);
+        when(user.getEmail()).thenReturn("a@x.com");
+        when(suiteUserRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(conversationFileService.createFile(eq("a@x.com"), eq("Chat"), eq("ext-1"), any()))
+                .thenReturn(Optional.of("a_Chat-dev.md"));
+
+        long id = conversationService.createConversation(1L, "Chat", "/root", "ext-1");
+
+        assertThat(id).isEqualTo(10L);
+        verify(conversationRepository).updateMdFileName(10L, "a_Chat-dev.md");
+    }
+
+    @Test
+    void addMessage_appendsToConversationFile() {
+        ConversationRecord conv = mock(ConversationRecord.class);
+        when(conv.getMdFileName()).thenReturn("a_Chat-dev.md");
+        when(conversationRepository.findById(10L)).thenReturn(Optional.of(conv));
+
+        conversationService.addMessage(10L, 1L, "user", "Hello");
+
+        verify(messageRepository).insert(10L, 1L, "user", "Hello");
+        verify(conversationFileService).appendMessage(eq("a_Chat-dev.md"), eq("user"), eq("Hello"), any());
+    }
+
+    @Test
+    void renameConversation_renamesFileAndPersistsNewFileName() {
+        ConversationRecord conv = mock(ConversationRecord.class);
+        when(conv.getConversationId()).thenReturn(10L);
+        when(conv.getUserId()).thenReturn(1L);
+        when(conv.getConversationName()).thenReturn("Old Name");
+        when(conv.getMdFileName()).thenReturn("a_Old Name-dev.md");
+        when(conversationRepository.findByExternalId("ext-1")).thenReturn(Optional.of(conv));
+        SuiteUserRecord user = mock(SuiteUserRecord.class);
+        when(user.getEmail()).thenReturn("a@x.com");
+        when(suiteUserRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(conversationFileService.renameFile("a_Old Name-dev.md", "a@x.com", "New Name"))
+                .thenReturn(Optional.of("a_New Name-dev.md"));
+
+        conversationService.renameConversation("ext-1", 1L, "New Name");
+
+        verify(conversationRepository).updateMdFileName(10L, "a_New Name-dev.md");
     }
 }

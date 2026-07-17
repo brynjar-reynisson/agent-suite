@@ -5,7 +5,9 @@ import com.example.agentsuite.controller.ConversationDetailDto;
 import com.example.agentsuite.jooq.generated.tables.records.MessageRecord;
 import com.example.agentsuite.jooq.repository.ConversationRepository;
 import com.example.agentsuite.jooq.repository.MessageRepository;
+import com.example.agentsuite.jooq.repository.SuiteUserRepository;
 import com.example.agentsuite.jooq.service.ConversationService;
+import com.example.agentsuite.service.ConversationFileService;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.jooq.JooqTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.env.Environment;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,14 +29,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @JooqTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({ConversationRepository.class, MessageRepository.class})
+@Import({ConversationRepository.class, MessageRepository.class, SuiteUserRepository.class})
 @Transactional
 @TestPropertySource(properties = "spring.sql.init.mode=always")
 class ConversationServiceTest {
 
     @Autowired ConversationRepository conversationRepo;
     @Autowired MessageRepository messageRepo;
+    @Autowired SuiteUserRepository suiteUserRepo;
     @Autowired DSLContext dsl;
+    @Autowired Environment environment;
 
     private ConversationService service;
     private long guestId;
@@ -52,7 +57,8 @@ class ConversationServiceTest {
         someoneId = dsl.select(SUITE_USER.USER_ID).from(SUITE_USER)
                 .where(SUITE_USER.UUID.eq("00000000-0000-0000-0000-000000000002")).fetchOne(SUITE_USER.USER_ID);
 
-        service = new ConversationService(conversationRepo, messageRepo);
+        service = new ConversationService(conversationRepo, messageRepo, suiteUserRepo,
+                new ConversationFileService("conversations", environment));
 
         // Guest conversation: two model switches, two system prompts, user/assistant pairs
         guestConvId = service.createConversation(guestId, "Guest Chat", "/projects", UUID.randomUUID().toString());

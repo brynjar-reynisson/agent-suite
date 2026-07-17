@@ -2,6 +2,7 @@ package com.example.agentsuite.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ public class ConversationFileService {
     private final String envLabel;
     private final boolean enabled;
 
+    @Autowired
     public ConversationFileService(@Value("${conversation.file.dir:conversations}") String baseDir,
                                     Environment environment) {
         List<String> profiles = Arrays.asList(environment.getActiveProfiles());
