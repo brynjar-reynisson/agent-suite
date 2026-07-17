@@ -9,6 +9,9 @@ release/
 # Prod database backups (contain user conversation data)
 backups/
 
+# Conversation markdown mirror (contains user conversation data)
+conversations/
+
 # IntelliJ Idea
 .idea/
 target/

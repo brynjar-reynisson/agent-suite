@@ -42,3 +42,21 @@ Stored in the `message` table:
 | `tool_result` | Yes | JSON `[{"name":"...","result":"..."}]` per iteration |
 | `model_change` | No | Model alias string |
 | `compact` | No | LLM-generated summary of conversation history up to this point |
+
+## Conversation Markdown Mirror
+
+Each conversation is mirrored to a `.md` file under `conversations/` (gitignored — contains
+user conversation data, like `backups/`). `ConversationFileService` owns this:
+
+- **Created** on the conversation's first message, alongside the DB row.
+- **Appended to** on every subsequent message, 1:1 with what's written to the `message` table.
+- **Renamed on disk** when the conversation is renamed (`ConversationService.renameConversation`).
+- **Disabled** unless the active Spring profile is `dev` or `prod` — no files are written during
+  tests or no-profile runs.
+
+Filename: `<user>_<name>-<dev|prod>.md`, where `<user>` is the email local-part (`guest` for the
+guest user), and `<name>` is `custom_name` if set else `conversation_name`, sanitized and
+truncated to 80 characters. Colliding names get a ` (2)`, ` (3)`, ... suffix. The resolved
+filename is stored on `conversation.md_file_name` so renames and appends target the right file.
+
+File I/O failures are logged and swallowed — they never block or fail the underlying DB write.

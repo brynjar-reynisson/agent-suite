@@ -35,6 +35,8 @@ Tool groups: `web` (all users), `unix`/`md-writer`/`mcp` (admin + non-empty `roo
 
 **Tool call budget:** `ChatService.MAX_SEQUENTIAL_TOOL_INVOCATIONS = 30`. A directive stating this limit is auto-injected into the system prompt whenever any tools are active. If the limit is hit, the agent gets a clear user-facing error instead of a raw exception. Change the constant in `ChatService` to update both the runtime limit and the directive.
 
+**Conversation file mirror:** Each conversation is mirrored to a `.md` file under `conversations/` (gitignored), named `<user>_<name>-<dev|prod>.md`, created on the first message, appended to on every message, and renamed on disk when the conversation is renamed. See [docs/dev/database.md](docs/dev/database.md).
+
 <!-- agent-lsp:rules:start -->
 ## agent-lsp Skills
 
