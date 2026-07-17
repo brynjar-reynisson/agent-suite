@@ -56,16 +56,16 @@ public class ConversationFileService {
     public Optional<String> createFile(String email, String displayName, String externalId, OffsetDateTime createTime) {
         if (!enabled) return Optional.empty();
         try {
-            Files.createDirectories(baseDir);
             String fileName = resolveUniqueFileName(email, displayName, null);
+            Path target = baseDir.resolve(fileName);
+            Files.createDirectories(target.getParent());
             String header = "# " + displayName + "\n\n"
                     + "- User: " + emailUser(email) + "\n"
                     + "- External ID: " + externalId + "\n"
                     + "- Created: " + createTime + "\n"
                     + "- Environment: " + envLabel + "\n\n"
                     + "---\n\n";
-            Files.writeString(baseDir.resolve(fileName), header, StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE_NEW);
+            Files.writeString(target, header, StandardCharsets.UTF_8, StandardOpenOption.CREATE_NEW);
             return Optional.of(fileName);
         } catch (IOException e) {
             log.error("Failed to create conversation file for '{}'", displayName, e);
@@ -94,7 +94,9 @@ public class ConversationFileService {
             if (newFileName.equals(currentFileName)) return Optional.of(currentFileName);
             Path source = baseDir.resolve(currentFileName);
             if (!Files.exists(source)) return Optional.empty();
-            Files.move(source, baseDir.resolve(newFileName));
+            Path target = baseDir.resolve(newFileName);
+            Files.createDirectories(target.getParent());
+            Files.move(source, target);
             return Optional.of(newFileName);
         } catch (IOException e) {
             log.error("Failed to rename conversation file '{}'", currentFileName, e);
@@ -103,11 +105,12 @@ public class ConversationFileService {
     }
 
     private String resolveUniqueFileName(String email, String displayName, String excludeFileName) {
-        String base = emailUser(email) + "_" + sanitize(displayName) + "-" + envLabel;
-        String candidate = base + ".md";
+        Path dir = Path.of(envLabel, sanitize(emailUser(email)));
+        String name = sanitize(displayName);
+        String candidate = dir.resolve(name + ".md").toString();
         int suffix = 2;
         while (!candidate.equals(excludeFileName) && Files.exists(baseDir.resolve(candidate))) {
-            candidate = base + " (" + suffix + ").md";
+            candidate = dir.resolve(name + " (" + suffix + ").md").toString();
             suffix++;
         }
         return candidate;

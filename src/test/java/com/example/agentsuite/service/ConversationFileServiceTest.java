@@ -24,12 +24,16 @@ class ConversationFileServiceTest {
         service = new ConversationFileService(tempDir, "dev", true);
     }
 
+    private String relPath(String first, String... more) {
+        return Path.of(first, more).toString();
+    }
+
     @Test
     void createFile_writesHeaderAndReturnsFileName() throws IOException {
         Optional<String> fileName = service.createFile(
                 "breynisson@gmail.com", "Bug triage", "ext-1", OffsetDateTime.parse("2026-07-17T10:00:00Z"));
 
-        assertThat(fileName).contains("breynisson_Bug triage-dev.md");
+        assertThat(fileName).contains(relPath("dev", "breynisson", "Bug triage.md"));
         String content = Files.readString(tempDir.resolve(fileName.get()));
         assertThat(content).contains("# Bug triage");
         assertThat(content).contains("- User: breynisson");
@@ -51,10 +55,10 @@ class ConversationFileServiceTest {
     }
 
     @Test
-    void createFile_guestUser_usesGuestPrefix() {
+    void createFile_guestUser_usesGuestDirectory() {
         Optional<String> fileName = service.createFile(null, "Anon chat", "ext-3", OffsetDateTime.now());
 
-        assertThat(fileName).contains("guest_Anon chat-dev.md");
+        assertThat(fileName).contains(relPath("dev", "guest", "Anon chat.md"));
     }
 
     @Test
@@ -62,8 +66,24 @@ class ConversationFileServiceTest {
         Optional<String> first = service.createFile("a@x.com", "Same Name", "ext-4", OffsetDateTime.now());
         Optional<String> second = service.createFile("a@x.com", "Same Name", "ext-5", OffsetDateTime.now());
 
-        assertThat(first).contains("a_Same Name-dev.md");
-        assertThat(second).contains("a_Same Name-dev (2).md");
+        assertThat(first).contains(relPath("dev", "a", "Same Name.md"));
+        assertThat(second).contains(relPath("dev", "a", "Same Name (2).md"));
+    }
+
+    @Test
+    void createFile_sameNameDifferentUser_noCollision() {
+        Optional<String> first = service.createFile("a@x.com", "Chat", "ext-13", OffsetDateTime.now());
+        Optional<String> second = service.createFile("b@x.com", "Chat", "ext-14", OffsetDateTime.now());
+
+        assertThat(first).contains(relPath("dev", "a", "Chat.md"));
+        assertThat(second).contains(relPath("dev", "b", "Chat.md"));
+    }
+
+    @Test
+    void createFile_userSegmentSanitized() {
+        Optional<String> fileName = service.createFile("weird/user@x.com", "Chat", "ext-15", OffsetDateTime.now());
+
+        assertThat(fileName).contains(relPath("dev", "weird_user", "Chat.md"));
     }
 
     @Test
@@ -118,7 +138,7 @@ class ConversationFileServiceTest {
 
         Optional<String> renamed = service.renameFile(fileName, "a@x.com", "New Name");
 
-        assertThat(renamed).contains("a_New Name-dev.md");
+        assertThat(renamed).contains(relPath("dev", "a", "New Name.md"));
         assertThat(Files.exists(tempDir.resolve(fileName))).isFalse();
         assertThat(Files.exists(tempDir.resolve(renamed.get()))).isTrue();
     }
@@ -140,7 +160,7 @@ class ConversationFileServiceTest {
 
         Optional<String> renamed = service.renameFile(toRename, "a@x.com", "Target Name");
 
-        assertThat(renamed).contains("a_Target Name-dev (2).md");
+        assertThat(renamed).contains(relPath("dev", "a", "Target Name (2).md"));
         assertThat(Files.exists(tempDir.resolve(taken))).isTrue();
     }
 
