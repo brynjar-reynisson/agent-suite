@@ -54,4 +54,11 @@ public class ConversationRepository {
                 .where(CONVERSATION.CONVERSATION_ID.eq(conversationId))
                 .execute();
     }
+
+    public void updateMdFileName(long conversationId, String mdFileName) {
+        dsl.update(CONVERSATION)
+                .set(CONVERSATION.MD_FILE_NAME, mdFileName)
+                .where(CONVERSATION.CONVERSATION_ID.eq(conversationId))
+                .execute();
+    }
 }

@@ -140,6 +140,26 @@ class RepositoryTest {
     }
 
     @Test
+    void findByIdReturnsCorrectUser() {
+        assertThat(suiteUserRepo.findById(someoneId))
+                .isPresent()
+                .hasValueSatisfying(u -> assertThat(u.getUuid()).isEqualTo("someone@somewhere.com"));
+    }
+
+    @Test
+    void findByIdUnknownReturnsEmpty() {
+        assertThat(suiteUserRepo.findById(-1L)).isEmpty();
+    }
+
+    @Test
+    void updateMdFileNamePersists() {
+        long id = conversationRepo.insert(guestId, "MdFile Test", null, UUID.randomUUID().toString());
+        conversationRepo.updateMdFileName(id, "guest_MdFile Test-dev.md");
+        assertThat(conversationRepo.findById(id).orElseThrow().getMdFileName())
+                .isEqualTo("guest_MdFile Test-dev.md");
+    }
+
+    @Test
     void findLastModelChangeReturnsLatest() {
         long convId = conversationRepo.insert(guestId, "Model Test", null, "uuid-model-test");
         messageRepo.insert(convId, guestId, "model_change", "deepseek-v4-pro");

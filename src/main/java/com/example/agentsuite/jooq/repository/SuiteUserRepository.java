@@ -23,6 +23,12 @@ public class SuiteUserRepository {
                 .fetchOptional();
     }
 
+    public Optional<SuiteUserRecord> findById(long userId) {
+        return dsl.selectFrom(SUITE_USER)
+                .where(SUITE_USER.USER_ID.eq(userId))
+                .fetchOptional();
+    }
+
     public long insert(String uuid, String email) {
         return dsl.insertInto(SUITE_USER)
                 .set(SUITE_USER.UUID, uuid)
