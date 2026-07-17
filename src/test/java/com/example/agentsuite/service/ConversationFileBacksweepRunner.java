@@ -29,6 +29,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @org.springframework.test.annotation.Commit
 class ConversationFileBacksweepRunner {
 
+    private static final String DEFAULT_DB_URL = "jdbc:postgresql://127.0.0.1:54322/postgres";
+    private static final String DEFAULT_ENV_LABEL = "dev";
+
     @Autowired DSLContext dsl;
     @Autowired ConversationRepository conversationRepository;
     @Autowired MessageRepository messageRepository;
@@ -37,7 +40,7 @@ class ConversationFileBacksweepRunner {
     @DynamicPropertySource
     static void backsweepDatasource(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", () ->
-                System.getenv().getOrDefault("BACKSWEEP_DB_URL", "jdbc:postgresql://127.0.0.1:54322/postgres"));
+                System.getenv().getOrDefault("BACKSWEEP_DB_URL", DEFAULT_DB_URL));
         registry.add("spring.datasource.username", () ->
                 System.getenv().getOrDefault("BACKSWEEP_DB_USERNAME", "postgres"));
         registry.add("spring.datasource.password", () ->
@@ -45,9 +48,24 @@ class ConversationFileBacksweepRunner {
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
     }
 
+    // Guards against the operator setting BACKSWEEP_DB_URL to a remote (e.g. prod) host while
+    // forgetting to also override BACKSWEEP_ENV_LABEL away from its "dev" default -- which would
+    // silently write real remote conversation content into the local conversations/dev/ tree.
+    static void requireEnvLabelMatchesTarget(String dbUrl, String envLabel) {
+        boolean looksLocal = dbUrl.contains("127.0.0.1") || dbUrl.contains("localhost");
+        if (!looksLocal && DEFAULT_ENV_LABEL.equals(envLabel)) {
+            throw new IllegalStateException("BACKSWEEP_DB_URL (" + dbUrl + ") does not look like the local dev "
+                    + "database, but BACKSWEEP_ENV_LABEL is still \"dev\" (the default). Set "
+                    + "BACKSWEEP_ENV_LABEL=prod explicitly to confirm this is intentional.");
+        }
+    }
+
     @Test
     void backfillMissingConversationFiles() {
-        String envLabel = System.getenv().getOrDefault("BACKSWEEP_ENV_LABEL", "dev");
+        String dbUrl = System.getenv().getOrDefault("BACKSWEEP_DB_URL", DEFAULT_DB_URL);
+        String envLabel = System.getenv().getOrDefault("BACKSWEEP_ENV_LABEL", DEFAULT_ENV_LABEL);
+        requireEnvLabelMatchesTarget(dbUrl, envLabel);
+
         ConversationFileService fileService = new ConversationFileService(Path.of("conversations"), envLabel, true);
 
         List<ConversationRecord> pending = dsl.selectFrom(CONVERSATION)
