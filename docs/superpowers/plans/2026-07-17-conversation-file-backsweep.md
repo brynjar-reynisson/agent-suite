@@ -19,6 +19,7 @@
 - Display name resolution must match `ConversationService.renameConversation`'s existing rule exactly: `conv.getCustomName()` if non-blank, else `conv.getConversationName()`.
 - `ConversationFileService.appendMessage` already excludes `tool_result` messages — do not add separate filtering logic for this in the runner; just replay every message from `MessageRepository.findByConversationId` (which already excludes erased rows and is already ordered).
 - Query scope: every `conversation` row where `md_file_name IS NULL`, ordered by `conversation_id` ascending — issued directly via the injected `DSLContext`, not a new `ConversationRepository` method (this is a one-off migration query, not permanent production code).
+- `@JooqTest` is meta-annotated with `@Transactional` and rolls back every test method's DB writes by default (verified against Spring Boot 3.5.0's `JooqTest.class`) — the class **must** carry `@org.springframework.test.annotation.Commit` (class-level) or the `updateMdFileName` writes will silently roll back while the `.md` files (plain filesystem I/O, outside the JDBC transaction) still get written for real, leaving orphaned files with no matching DB update. This is already included in the code below — do not remove it.
 
 ---
 
@@ -73,6 +74,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @JooqTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({ConversationRepository.class, MessageRepository.class, SuiteUserRepository.class})
+@org.springframework.test.annotation.Commit
 class ConversationFileBacksweepRunner {
 
     @Autowired DSLContext dsl;
