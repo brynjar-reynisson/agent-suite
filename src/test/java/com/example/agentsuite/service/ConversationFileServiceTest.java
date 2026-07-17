@@ -89,6 +89,19 @@ class ConversationFileServiceTest {
     }
 
     @Test
+    void appendMessage_toolResult_skipped() throws IOException {
+        String fileName = service.createFile("a@x.com", "Chat", "ext-12", OffsetDateTime.now()).orElseThrow();
+        long sizeBeforeAppend = Files.size(tempDir.resolve(fileName));
+
+        service.appendMessage(fileName, "tool_result",
+                "[{\"name\":\"cat\",\"result\":\"password=hunter2\"}]", OffsetDateTime.now());
+
+        String content = Files.readString(tempDir.resolve(fileName));
+        assertThat(content).doesNotContain("tool_result").doesNotContain("hunter2");
+        assertThat(Files.size(tempDir.resolve(fileName))).isEqualTo(sizeBeforeAppend);
+    }
+
+    @Test
     void appendMessage_disabled_doesNothing() throws IOException {
         ConversationFileService disabled = new ConversationFileService(tempDir, null, false);
 

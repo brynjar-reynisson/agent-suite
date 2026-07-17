@@ -74,9 +74,9 @@ public class ConversationFileService {
     }
 
     public void appendMessage(String fileName, String type, String message, OffsetDateTime timestamp) {
-        if (!enabled || fileName == null) return;
+        if (!enabled || fileName == null || "tool_result".equals(type)) return;
         try {
-            String body = ("tool_call".equals(type) || "tool_result".equals(type))
+            String body = "tool_call".equals(type)
                     ? "```json\n" + message + "\n```\n"
                     : message + "\n";
             String block = "### " + type + " — " + timestamp + "\n" + body + "\n";

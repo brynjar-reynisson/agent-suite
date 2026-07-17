@@ -49,7 +49,10 @@ Each conversation is mirrored to a `.md` file under `conversations/` (gitignored
 user conversation data, like `backups/`). `ConversationFileService` owns this:
 
 - **Created** on the conversation's first message, alongside the DB row.
-- **Appended to** on every subsequent message, 1:1 with what's written to the `message` table.
+- **Appended to** on every subsequent message, one block per row written to the `message`
+  table — except `tool_result`, which is deliberately omitted: tool output can contain
+  sensitive data (file contents, credentials, command output) and isn't safe to mirror
+  to a plain file. `tool_call` (the tool name + arguments) is still written.
 - **Renamed on disk** when the conversation is renamed (`ConversationService.renameConversation`).
 - **Disabled** unless the active Spring profile is `dev` or `prod` — no files are written during
   tests or no-profile runs.
