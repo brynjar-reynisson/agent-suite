@@ -106,6 +106,10 @@ public class AiController {
         if (rootDirectory.isEmpty()) {
             return "Error: Select a root directory to use this command.";
         }
+        boolean isAdmin = Boolean.TRUE.equals(request.getAttribute(UserResolverFilter.ATTR_IS_ADMIN));
+        if (!isAdmin) {
+            return "Error: Admin role required for this command.";
+        }
 
         List<String> tokens = parseCommand(command);
         if (tokens.isEmpty()) {
@@ -122,10 +126,6 @@ public class AiController {
                     ? unixTools.grep(tokens.get(1), tokens.get(2))
                     : "Error: grep requires search text and file filter";
             case "git" -> {
-                boolean isAdmin = Boolean.TRUE.equals(request.getAttribute(UserResolverFilter.ATTR_IS_ADMIN));
-                if (!isAdmin) {
-                    yield "Error: Admin role required for git commands.";
-                }
                 if (tokens.size() < 2) {
                     yield "Error: git requires a subcommand: status, add, commit, pull, push, newBranch, checkoutBranch";
                 }
@@ -295,7 +295,9 @@ public class AiController {
         Set<String> authorized = new LinkedHashSet<>(authorizationService.grantedToolGroups(isAdmin));
         if (!rootDirectory.isEmpty()) {
             // unix is context-dependent (requires rootDirectory), never in grantedToolGroups
-            authorized.add("unix");
+            if (isAdmin) {
+                authorized.add("unix");
+            }
         } else {
             // md-writer also requires a project root — strip it when none is selected
             authorized.remove("md-writer");

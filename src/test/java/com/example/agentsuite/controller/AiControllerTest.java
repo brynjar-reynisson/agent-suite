@@ -159,6 +159,7 @@ class AiControllerTest {
     @Test
     void tools_unknownCommand_returnsError() throws Exception {
         mockMvc.perform(get("/ai/tools")
+                        .header("Authorization", ADMIN_BEARER)
                         .param("command", "rm -rf /")
                         .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
                 .andExpect(status().isOk())
@@ -168,10 +169,20 @@ class AiControllerTest {
     @Test
     void tools_emptyCommand_returnsError() throws Exception {
         mockMvc.perform(get("/ai/tools")
+                        .header("Authorization", ADMIN_BEARER)
                         .param("command", "")
                         .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("No command specified")));
+    }
+
+    @Test
+    void tools_guestUser_returnsAuthorizationError() throws Exception {
+        mockMvc.perform(get("/ai/tools")
+                        .param("command", "ls src")
+                        .param("rootDirectory", "C:/Users/Lenovo/IdeaProjects/agent-suite"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.CoreMatchers.containsString("Admin role required")));
     }
 
     @Test
@@ -519,7 +530,7 @@ class AiControllerTest {
     }
 
     @Test
-    void chat_guestUserWithRootDirectory_webAndUnixPassedToOrchestration() throws Exception {
+    void chat_guestUserWithRootDirectory_unixNotGrantedToNonAdmin() throws Exception {
         doAnswer(inv -> {
             @SuppressWarnings("unchecked")
             Consumer<ChatEvent> consumer = inv.getArgument(7);
@@ -534,10 +545,10 @@ class AiControllerTest {
 
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
 
+        // unix (UnixTools/GitTools) requires admin even when rootDirectory is set — guests only get web
         verify(orchestrationService).chatStream(
                 isNull(), anyLong(), any(), any(), any(), any(), any(), any(Consumer.class),
-                argThat(arr -> arr instanceof Object[] t && t.length == 3
-                        && t[0] instanceof WebTools && t[1] instanceof UnixTools && t[2] instanceof GitTools));
+                argThat(arr -> arr instanceof Object[] t && t.length == 1 && t[0] instanceof WebTools));
     }
 
     @Test
