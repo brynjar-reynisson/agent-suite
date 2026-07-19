@@ -3,6 +3,9 @@
 ## Endpoints
 
 ```
+GET /health
+  Returns 200 OK with body "OK". Unauthenticated, no dependencies checked — liveness probe only.
+
 GET/POST /ai/chat
   ?message=<user message>          (default: "Hello, how are you?")
   ?prompt=<system prompt>          (default: empty)
