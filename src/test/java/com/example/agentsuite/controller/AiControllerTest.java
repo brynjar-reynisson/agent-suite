@@ -135,7 +135,7 @@ class AiControllerTest {
         mockMvc.perform(get("/ai/config/directories"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.CoreMatchers.containsString(
-                        "C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian")));
+                        "C:/Users/Lenovo/Documents/obsidian/soulman")));
     }
 
     @Test
@@ -294,11 +294,11 @@ class AiControllerTest {
 
     @Test
     void mcpTools_adminUser_withRootDirectory_returnsRootScopedNames() throws Exception {
-        when(mcpToolBridge.toolNames("C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian"))
+        when(mcpToolBridge.toolNames("C:/Users/Lenovo/Documents/obsidian/soulman"))
                 .thenReturn(List.of("mcp__obsidian__read_note"));
         mockMvc.perform(get("/ai/config/mcp-tools")
                         .header("Authorization", ADMIN_BEARER)
-                        .param("rootDirectory", "C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian"))
+                        .param("rootDirectory", "C:/Users/Lenovo/Documents/obsidian/soulman"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0]").value("mcp__obsidian__read_note"));
     }
@@ -964,7 +964,7 @@ class AiControllerTest {
         dev.langchain4j.agent.tool.ToolSpecification editNoteSpec =
                 dev.langchain4j.agent.tool.ToolSpecification.builder()
                         .name("mcp__obsidian__edit-note").description("edit").build();
-        when(mcpToolBridge.scopedProvider("C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian"))
+        when(mcpToolBridge.scopedProvider("C:/Users/Lenovo/Documents/obsidian/soulman"))
                 .thenReturn(new McpToolBridge.ScopedTools(Map.of(editNoteSpec, (req, mem) -> "ok")));
 
         AtomicReference<String> capturedPrompt = new AtomicReference<>();
@@ -979,7 +979,7 @@ class AiControllerTest {
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
                         .header("Authorization", "Bearer " + makeAdminJwt("admin-sub", "admin@test.com"))
-                        .param("rootDirectory", "C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian"))
+                        .param("rootDirectory", "C:/Users/Lenovo/Documents/obsidian/soulman"))
                 .andExpect(request().asyncStarted()).andReturn();
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
 
@@ -993,7 +993,7 @@ class AiControllerTest {
         dev.langchain4j.agent.tool.ToolSpecification editNoteSpec =
                 dev.langchain4j.agent.tool.ToolSpecification.builder()
                         .name("mcp__obsidian__edit-note").description("edit").build();
-        when(mcpToolBridge.scopedProvider("C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian"))
+        when(mcpToolBridge.scopedProvider("C:/Users/Lenovo/Documents/obsidian/soulman"))
                 .thenReturn(new McpToolBridge.ScopedTools(Map.of(editNoteSpec, (req, mem) -> "ok")));
 
         AtomicReference<String> capturedPrompt = new AtomicReference<>();
@@ -1008,7 +1008,7 @@ class AiControllerTest {
 
         MvcResult mvcResult = mockMvc.perform(get("/ai/chat")
                         .header("Authorization", "Bearer " + makeAdminJwt("admin-sub", "admin@test.com"))
-                        .param("rootDirectory", "C:/Users/Lenovo/Documents/obsidian/brynjar-obsidian")
+                        .param("rootDirectory", "C:/Users/Lenovo/Documents/obsidian/soulman")
                         .param("prompt", AiController.OBSIDIAN_READ_BEFORE_WRITE_DIRECTIVE))
                 .andExpect(request().asyncStarted()).andReturn();
         mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk());
