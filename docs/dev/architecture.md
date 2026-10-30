@@ -48,6 +48,9 @@ If `conversationId` is provided, `ChatOrchestrationService` persists all message
 > **Per-root MCP server notes (`C:\REAPER\Projects\.agent-suite-mcp.json`):**
 > `computer-control` — provides `take_screenshot_with_ocr` and `list_windows`. Requires `"env": {"PYTHONUTF8": "1"}` in its config entry; without it, the PyInstaller-bundled server crashes with `UnicodeEncodeError` when OCR detects non-ASCII characters (e.g. CJK) because Windows defaults the console to cp1252.
 
+> **Per-root MCP server notes (`C:\Users\Lenovo\IdeaProjects\digital-me\.agent-suite-mcp.json`):**
+> `digital-me` — Streamable HTTP server (`http://localhost:8080/mcp`) of the digital-me personal search engine (runtime dir `C:\Users\Lenovo\DigitalMe`, started via `restart-digital-me.ps1`). Tools appear as `mcp__digital-me__*` when the digital-me project is selected. Connections are made at agent-suite startup, so digital-me must be running first; restart agent-suite if it was down.
+
 **Media**
 - `ImageContentHandler` — receives `McpSchema.ImageContent` from `McpToolBridge`, decodes base64, writes `screenshot_<UUID>.<ext>` to `tmp_screenshot_files/`, returns a markdown image link. Supports `image/png`, `image/jpeg`, `image/webp`. Appends an italicised note to the tool result telling non-vision models (e.g. DeepSeek) to call `mcp__computer-control__take_screenshot_with_ocr` to read the image rather than guessing its contents.
 - `ImageController` — `GET /images/{filename}` endpoint serving PNG/JPG/JPEG/WEBP from `tmp_screenshot_files/`. Path-confined, extension-locked, unauthenticated.
